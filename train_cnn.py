@@ -1,0 +1,374 @@
+import os
+import time
+import numpy as np
+import matplotlib.pyplot as plt
+from tqdm import tqdm
+
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torch.optim.lr_scheduler import CyclicLR
+import torchvision.models as models
+from torchvision.models import ShuffleNet_V2_X0_5_Weights, ShuffleNet_V2_X1_0_Weights
+from torchvision.models import ShuffleNet_V2_X1_5_Weights, ShuffleNet_V2_X2_0_Weights
+import torchvision.transforms as transforms
+
+from preprocessing_from_db import load_dataset_with_preprocessing, custom_preprocessing
+
+# Set device
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+print(f"Using device: {device}")
+
+def train_cnn_from_db(
+    base_dir="processed_dataset",
+    batch_size=32,
+    img_size=(224, 224),
+    num_epochs=30,
+    cycle_length=5,  # Switch optimizer every 5 epochs
+    adam_lr=0.001,
+    sgd_lr=0.01,
+    model_save_dir="saved_models",
+    model_name="shufflenet_v2_fruit_grader",
+    model_variant="1.0x"
+):
+    """
+    Train ShuffleNet V2 on the fruit dataset
+    
+    Args:
+        base_dir: Path to dataset
+        batch_size: Batch size for training
+        img_size: Input image size
+        num_epochs: Number of training epochs
+        cycle_length: Number of epochs before switching optimizer
+        adam_lr: Learning rate for Adam optimizer
+        sgd_lr: Learning rate for SGD optimizer
+        model_save_dir: Directory to save models
+        model_name: Base name for the saved model
+        model_variant: ShuffleNet V2 variant ('0.5x', '1.0x', '1.5x', '2.0x')
+    
+    Returns:
+        Trained model and training statistics
+    """
+    print("\n==== Starting ShuffleNet V2 Training ====\n")
+    
+    # Create model save directory if it doesn't exist
+    os.makedirs(model_save_dir, exist_ok=True)
+    
+    # 1. Load dataset
+    print("Loading and preparing dataset...")
+    train_dataset, val_dataset, test_dataset, class_indices = load_dataset_with_preprocessing(
+        base_dir,
+        img_size=img_size,
+        batch_size=batch_size,
+        preprocess_first=True
+    )
+    
+    num_classes = len(class_indices)
+    print(f"Training model for {num_classes} classes: {list(class_indices.keys())}")
+    
+    # 2. Initialize model
+    print(f"Initializing ShuffleNet V2 ({model_variant})...")
+    
+    # Use weights parameter instead of pretrained for each model variant
+    if model_variant == "0.5x":
+        model = models.shufflenet_v2_x0_5(weights=ShuffleNet_V2_X0_5_Weights.IMAGENET1K_V1)
+    elif model_variant == "1.0x":
+        model = models.shufflenet_v2_x1_0(weights=ShuffleNet_V2_X1_0_Weights.IMAGENET1K_V1)
+    elif model_variant == "1.5x":
+        model = models.shufflenet_v2_x1_5(weights=ShuffleNet_V2_X1_5_Weights.IMAGENET1K_V1)
+    elif model_variant == "2.0x":
+        model = models.shufflenet_v2_x2_0(weights=ShuffleNet_V2_X2_0_Weights.IMAGENET1K_V1)
+    else:
+        raise ValueError(f"Unsupported model variant: {model_variant}")
+    
+    # Modify final layer for our classification task
+    in_features = model.fc.in_features
+    model.fc = nn.Linear(in_features, num_classes)
+    
+    # Move model to device
+    model = model.to(device)
+    
+    # Set up cross entropy loss function
+    criterion = nn.CrossEntropyLoss()
+    
+    # Set up both optimizers as used in the article
+    adam_optimizer = optim.Adam(model.parameters(), lr=adam_lr)
+    sgd_optimizer = optim.SGD(model.parameters(), lr=sgd_lr, momentum=0.9, weight_decay=0.0001)
+    
+    # Track which optimizer is currently being used
+    current_optimizer_name = "Adam"  # Start with Adam
+    
+    # Set up schedulers
+    iter_per_epoch = len(train_dataset)
+    step_size_up = iter_per_epoch * 2  # 2 epochs per cycle
+    
+    adam_scheduler = CyclicLR(
+        adam_optimizer,
+        base_lr=adam_lr / 10,
+        max_lr=adam_lr,
+        step_size_up=step_size_up,
+        mode="triangular",
+        cycle_momentum=False
+    )
+    
+    sgd_scheduler = CyclicLR(
+        sgd_optimizer,
+        base_lr=sgd_lr / 10,
+        max_lr=sgd_lr,
+        step_size_up=step_size_up,
+        mode="triangular",
+        cycle_momentum=True
+    )
+    
+    # 5. Training and validation
+    print("\nStarting training...\n")
+    
+    # For tracking metrics
+    history = {
+        'train_loss': [],
+        'val_loss': [],
+        'train_acc': [],
+        'val_acc': [],
+        'optimizer': []  # Track which optimizer was used in each epoch
+    }
+    
+    best_val_acc = 0.0
+    best_model_path = ""
+    
+    for epoch in range(num_epochs):
+        epoch_start = time.time()
+        
+        # Determine which optimizer to use for this epoch
+        current_cycle = (epoch // cycle_length) % 2
+        if current_cycle == 0:
+            optimizer = adam_optimizer
+            scheduler = adam_scheduler
+            current_optimizer_name = "Adam"
+            print(f"Epoch {epoch+1}/{num_epochs}: Using Adam optimizer")
+        else:
+            optimizer = sgd_optimizer
+            scheduler = sgd_scheduler
+            current_optimizer_name = "SGD"
+            print(f"Epoch {epoch+1}/{num_epochs}: Using SGD optimizer")
+        
+        # Training phase
+        model.train()
+        train_loss = 0.0
+        train_correct = 0
+        train_total = 0
+        
+        # Get batches from our custom dataset iterator
+        train_batches = list(train_dataset)
+        
+        for inputs, targets in tqdm(train_batches, desc=f"Epoch {epoch+1}/{num_epochs} [{current_optimizer_name}]"):
+            # Convert numpy arrays to PyTorch tensors
+            inputs = torch.from_numpy(inputs).to(device)
+            targets = torch.from_numpy(targets).to(device)
+            
+            # IMPORTANT FIX: Transpose the input tensor from [batch, height, width, channels] to [batch, channels, height, width]
+            inputs = inputs.permute(0, 3, 1, 2)
+            
+            # Zero the parameter gradients
+            optimizer.zero_grad()
+            
+            # Forward pass
+            outputs = model(inputs)
+            loss = criterion(outputs, targets)
+            
+            # Backward pass and optimize
+            loss.backward()
+            optimizer.step()
+            scheduler.step()
+            
+            # Track statistics
+            train_loss += loss.item()
+            _, predicted = torch.max(outputs, 1)
+            _, target_indices = torch.max(targets, 1)
+            train_total += targets.size(0)
+            train_correct += (predicted == target_indices).sum().item()
+        
+        train_loss = train_loss / len(train_batches)
+        train_acc = 100 * train_correct / train_total
+        
+        # Validation phase
+        model.eval()
+        val_loss = 0.0
+        val_correct = 0
+        val_total = 0
+        
+        # Get batches from validation dataset
+        val_batches = list(val_dataset)
+        
+        with torch.no_grad():
+            for inputs, targets in tqdm(val_batches, desc=f"Epoch {epoch+1}/{num_epochs} [Val]"):
+                # Convert numpy arrays to PyTorch tensors
+                inputs = torch.from_numpy(inputs).to(device)
+                targets = torch.from_numpy(targets).to(device)
+                
+                # IMPORTANT FIX: Transpose the input tensor from [batch, height, width, channels] to [batch, channels, height, width]
+                inputs = inputs.permute(0, 3, 1, 2)
+                
+                # Forward pass
+                outputs = model(inputs)
+                loss = criterion(outputs, targets)
+                
+                # Track statistics
+                val_loss += loss.item()
+                _, predicted = torch.max(outputs, 1)
+                _, target_indices = torch.max(targets, 1)
+                val_total += targets.size(0)
+                val_correct += (predicted == target_indices).sum().item()
+        
+        val_loss = val_loss / len(val_batches)
+        val_acc = 100 * val_correct / val_total
+        
+        # Update history
+        history['train_loss'].append(train_loss)
+        history['val_loss'].append(val_loss)
+        history['train_acc'].append(train_acc)
+        history['val_acc'].append(val_acc)
+        history['optimizer'].append(current_optimizer_name)
+        
+        # Print epoch summary
+        epoch_time = time.time() - epoch_start
+        print(f"Epoch {epoch+1}/{num_epochs} [{current_optimizer_name}] - {epoch_time:.2f}s - "
+              f"Train loss: {train_loss:.4f}, acc: {train_acc:.2f}% | "
+              f"Val loss: {val_loss:.4f}, acc: {val_acc:.2f}%")
+        
+        # Save best model
+        if val_acc > best_val_acc:
+            best_val_acc = val_acc
+            # Save with epoch and accuracy in filename
+            best_model_path = os.path.join(
+                model_save_dir,
+                f"{model_name}_{model_variant}_epoch{epoch+1}_acc{val_acc:.2f}.pth"
+            )
+            torch.save({
+                'epoch': epoch + 1,
+                'model_state_dict': model.state_dict(),
+                'adam_optimizer_state_dict': adam_optimizer.state_dict(),
+                'sgd_optimizer_state_dict': sgd_optimizer.state_dict(),
+                'adam_scheduler_state_dict': adam_scheduler.state_dict(),
+                'sgd_scheduler_state_dict': sgd_scheduler.state_dict(),
+                'current_optimizer': current_optimizer_name,
+                'val_acc': val_acc,
+                'class_indices': class_indices,
+                'num_classes': num_classes,
+                'img_size': img_size,
+                'model_variant': model_variant
+            }, best_model_path)
+            print(f"Saved best model with validation accuracy: {val_acc:.2f}%")
+    
+    # 6. Evaluate on test set
+    print("\nEvaluating model on test set...")
+    model.eval()
+    test_correct = 0
+    test_total = 0
+    
+    # For confusion matrix
+    all_preds = []
+    all_targets = []
+    
+    # Get batches from test dataset
+    test_batches = list(test_dataset)
+    
+    with torch.no_grad():
+        for inputs, targets in tqdm(test_batches, desc="Testing"):
+            # Convert numpy arrays to PyTorch tensors
+            inputs = torch.from_numpy(inputs).to(device)
+            targets = torch.from_numpy(targets).to(device)
+            
+            # IMPORTANT FIX: Transpose the input tensor from [batch, height, width, channels] to [batch, channels, height, width]
+            inputs = inputs.permute(0, 3, 1, 2)
+            
+            # Forward pass
+            outputs = model(inputs)
+            
+            # Track statistics
+            _, predicted = torch.max(outputs, 1)
+            _, target_indices = torch.max(targets, 1)
+            test_total += targets.size(0)
+            test_correct += (predicted == target_indices).sum().item()
+            
+            # Store for confusion matrix
+            all_preds.extend(predicted.cpu().numpy())
+            all_targets.extend(target_indices.cpu().numpy())
+    
+    test_acc = 100 * test_correct / test_total
+    print(f"Test accuracy: {test_acc:.2f}%")
+    
+    # 7. Plot training curves
+    plt.figure(figsize=(15, 10))
+    
+    # Plot loss
+    plt.subplot(2, 2, 1)
+    plt.plot(history['train_loss'], label='Train')
+    plt.plot(history['val_loss'], label='Validation')
+    plt.title('Model Loss')
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.legend()
+    
+    # Plot accuracy
+    plt.subplot(2, 2, 2)
+    plt.plot(history['train_acc'], label='Train')
+    plt.plot(history['val_acc'], label='Validation')
+    plt.title('Model Accuracy')
+    plt.xlabel('Epoch')
+    plt.ylabel('Accuracy (%)')
+    plt.legend()
+    
+    # Plot loss with optimizer highlighting
+    plt.subplot(2, 2, 3)
+    for i in range(len(history['train_loss'])):
+        color = 'blue' if history['optimizer'][i] == 'Adam' else 'red'
+        if i > 0:
+            plt.plot([i-1, i], [history['train_loss'][i-1], history['train_loss'][i]], 
+                     color=color, linewidth=2)
+    plt.title('Loss by Optimizer')
+    plt.xlabel('Epoch')
+    plt.ylabel('Training Loss')
+    
+    # Add legend for optimizer colors
+    from matplotlib.lines import Line2D
+    legend_elements = [
+        Line2D([0], [0], color='blue', lw=2, label='Adam'),
+        Line2D([0], [0], color='red', lw=2, label='SGD')
+    ]
+    plt.legend(handles=legend_elements)
+    
+    # Plot accuracy with optimizer highlighting
+    plt.subplot(2, 2, 4)
+    for i in range(len(history['val_acc'])):
+        color = 'blue' if history['optimizer'][i] == 'Adam' else 'red'
+        if i > 0:
+            plt.plot([i-1, i], [history['val_acc'][i-1], history['val_acc'][i]], 
+                     color=color, linewidth=2)
+    plt.title('Validation Accuracy by Optimizer')
+    plt.xlabel('Epoch')
+    plt.ylabel('Accuracy (%)')
+    plt.legend(handles=legend_elements)
+    
+    plt.tight_layout()
+    # Save the figure
+    plt.savefig(os.path.join(model_save_dir, f"{model_name}_{model_variant}_training_curves.png"))
+    plt.close()
+    
+    # Return the trained model and best model path
+    return model, best_model_path, class_indices
+
+if __name__ == "__main__":
+    # Train the model
+    model, best_model_path, class_indices = train_cnn_from_db(
+        base_dir="processed_dataset",
+        batch_size=32,
+        img_size=(224, 224),
+        num_epochs=30,
+        adam_lr=0.001,
+        sgd_lr=0.01,
+        cycle_length=5,  # Switch optimizer every 5 epochs
+        model_variant="1.0x"
+    )
+    
+    print(f"\nTraining complete. Best model saved at: {best_model_path}")
+    print(f"Class indices: {class_indices}")

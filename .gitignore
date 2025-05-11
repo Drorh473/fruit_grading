@@ -1,0 +1,3 @@
+# Ignore processed datasets
+processed_dataset/
+processed_dataset_original/
