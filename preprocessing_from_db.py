@@ -4,6 +4,17 @@ import matplotlib.pyplot as plt
 import os
 import math
 import shutil
+from pathlib import Path
+from dotenv import load_dotenv
+
+# Load environment variables
+env_path = Path('.') / '.env'
+load_dotenv(dotenv_path=env_path)
+
+# Get dataset paths from environment
+PROCESSED_DATASET_PATH = os.getenv('PROCESSED_DATASET_PATH')
+ORIGINAL_DATASET_PATH = os.getenv('ORIGINAL_DATASET_PATH')
+MODEL_DIR = os.getenv('MODEL_DIR', 'saved_models')
 
 def custom_preprocessing(image, save_path=None):
     """Apply preprocessing steps from the article:
@@ -62,9 +73,13 @@ def custom_preprocessing(image, save_path=None):
     
     return enhanced
 
-def preprocess_and_save_dataset(input_dir, output_dir="processed_dataset"):
+def preprocess_and_save_dataset(input_dir=None, output_dir=None):
     """Preprocess all images in the dataset and save them to the output directory"""
-    print(f"Starting preprocessing and saving images to {output_dir}...")
+    # Use environment paths if not provided
+    input_dir = input_dir or ORIGINAL_DATASET_PATH
+    output_dir = output_dir or PROCESSED_DATASET_PATH
+    
+    print(f"Starting preprocessing and saving images from {input_dir} to {output_dir}...")
     
     # Create output directories
     for dataset_type in ['training', 'testing', 'validation']:
@@ -205,7 +220,7 @@ class DirectoryIterator:
                 break
         return batches
 
-def load_dataset_with_preprocessing(base_dir, img_size=(224, 224), batch_size=32, preprocess_first=False):
+def load_dataset_with_preprocessing(base_dir=None, img_size=(224, 224), batch_size=32, preprocess_first=False):
     """
     Load dataset with custom preprocessing
     
@@ -215,17 +230,25 @@ def load_dataset_with_preprocessing(base_dir, img_size=(224, 224), batch_size=32
         batch_size: Batch size for the data generators
         preprocess_first: If True, preprocess all images first and save them
     """
-    print("Loading dataset with custom preprocessing...")
+    # Use environment paths if not provided
+    if base_dir is None:
+        base_dir = PROCESSED_DATASET_PATH
+    
+    print(f"Loading dataset from {base_dir} with custom preprocessing...")
     
     # Option to preprocess and save all images first
     if preprocess_first:
-        # Create a temporary directory for original images if needed
-        if os.path.exists(base_dir) and not os.path.exists(f"{base_dir}_original"):
-            print(f"Creating backup of original images in {base_dir}_original")
-            shutil.copytree(base_dir, f"{base_dir}_original")
+        # Use original dataset path from environment
+        original_path = ORIGINAL_DATASET_PATH
+        if not original_path:
+            print("Warning: ORIGINAL_DATASET_PATH not set in .env file. Creating a backup.")
+            if os.path.exists(base_dir) and not os.path.exists(f"{base_dir}_original"):
+                print(f"Creating backup of original images in {base_dir}_original")
+                shutil.copytree(base_dir, f"{base_dir}_original")
+                original_path = f"{base_dir}_original"
         
         # Preprocess and save all images
-        processed_dir = preprocess_and_save_dataset(f"{base_dir}_original", base_dir)
+        preprocess_and_save_dataset(original_path, base_dir)
         # Since images are already preprocessed, we won't apply preprocessing again
         preprocessing_fn = None
     else:
@@ -290,10 +313,17 @@ def load_dataset_with_preprocessing(base_dir, img_size=(224, 224), batch_size=32
     
     return train_dataset, val_dataset, test_dataset, train_dataset.class_indices
 
-if __name__ == "__main__":    
+if __name__ == "__main__":
+    # Check if PROCESSED_DATASET_PATH is set in .env
+    if not PROCESSED_DATASET_PATH:
+        print("Warning: PROCESSED_DATASET_PATH not set in .env file. Using default 'processed_dataset'.")
+        processed_dir = "processed_dataset"
+    else:
+        processed_dir = PROCESSED_DATASET_PATH
+        
     # First preprocess and save all images, then load the dataset
     train_dataset, val_dataset, test_dataset, class_indices = load_dataset_with_preprocessing(
-        "processed_dataset",
+        base_dir=processed_dir,
         img_size=(224, 224),
         batch_size=32,
         preprocess_first=True  # This enables preprocessing and saving
@@ -317,5 +347,11 @@ if __name__ == "__main__":
         plt.axis('off')
     
     plt.tight_layout()
-    plt.savefig("sample_preprocessed_images.png")
+    
+    # Save to model directory from environment
+    save_path = os.path.join(MODEL_DIR, "sample_preprocessed_images.png")
+    os.makedirs(MODEL_DIR, exist_ok=True)
+    plt.savefig(save_path)
+    print(f"Sample images saved to {save_path}")
+    
     plt.show()

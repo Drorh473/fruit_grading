@@ -4,41 +4,67 @@ import cv2
 import numpy as np
 import threading
 import queue
+import os
+from pathlib import Path
+from dotenv import load_dotenv
 from pymongo import MongoClient
+
+# Load environment variables
+env_path = Path('.') / '.env'
+load_dotenv(dotenv_path=env_path)
+
+# Get MongoDB settings from environment
+MONGO_CONNECTION_STRING = os.getenv('MONGO_CONNECTION_STRING')
+DB_NAME = os.getenv('DB_NAME', 'fruit_grading')
+
+# Get camera settings from environment
+CAMERA_FPS = int(os.getenv('CAMERA_FPS', 30))
+CAMERA_RANDOM_ORDER = os.getenv('CAMERA_RANDOM_ORDER', 'true').lower() == 'true'
 
 class CameraSimulator:
     """
     Simulates a camera stream by retrieving images from a MongoDB database
-    at a fixed frame rate (e.g., 60 FPS).
+    at a fixed frame rate.
     """
-    def __init__(self, db_name="fruit_grading", collection_name="images", 
-                 fps=300, buffer_size=100, random_order=True):
+    def __init__(self, db_name=None, collection_name="images", 
+                 fps=None, buffer_size=100, random_order=None):
         """
         Initialize the camera simulator.
         
         Args:
-            db_name: MongoDB database name
+            db_name: MongoDB database name (defaults to env setting)
             collection_name: MongoDB collection name
-            fps: Frames per second to simulate (default: 60 FPS)
+            fps: Frames per second to simulate (defaults to env setting)
             buffer_size: Size of the buffer queue
-            random_order: Whether to return images in random order
+            random_order: Whether to return images in random order (defaults to env setting)
         """
-        self.fps = fps
-        self.frame_time = 1.0 / fps
-        self.random_order = random_order
+        # Use environment settings if not provided
+        self.db_name = db_name or DB_NAME
+        self.fps = fps or CAMERA_FPS
+        self.random_order = random_order if random_order is not None else CAMERA_RANDOM_ORDER
+        
+        # Derived settings
+        self.frame_time = 1.0 / self.fps
         self.running = False
         self.buffer = queue.Queue(maxsize=buffer_size)
         
         # Connect to MongoDB
-        print(f"Connecting to MongoDB database: {db_name}.{collection_name}")
-        self.client = MongoClient("mongodb://localhost:27017/")
-        self.db = self.client[db_name]
+        print(f"Connecting to MongoDB database: {self.db_name}.{collection_name}")
+        
+        if MONGO_CONNECTION_STRING:
+            self.client = MongoClient(MONGO_CONNECTION_STRING)
+        else:
+            # Fallback to localhost if connection string not provided
+            print("Warning: MongoDB connection string not set in .env file. Using localhost.")
+            self.client = MongoClient("mongodb://localhost:27017/")
+            
+        self.db = self.client[self.db_name]
         self.collection = self.db[collection_name]
         
         # Get all document IDs from the database
         self.doc_ids = [doc["_id"] for doc in self.collection.find({}, {"_id": 1})]
         if not self.doc_ids:
-            raise ValueError("No documents found in the database!")
+            raise ValueError(f"No documents found in the database: {self.db_name}.{collection_name}")
         
         print(f"Found {len(self.doc_ids)} images in the database")
         self.current_index = 0
@@ -156,13 +182,8 @@ class CameraSimulator:
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
     
-    # Create camera simulator with 60 FPS
-    cam = CameraSimulator(
-        db_name="fruit_grading",
-        collection_name="images",
-        fps=60,
-        random_order=True
-    )
+    # Create camera simulator with environment settings
+    cam = CameraSimulator()
     
     # Start the camera
     cam.start()
@@ -173,8 +194,9 @@ if __name__ == "__main__":
         
         frame_count = 0
         start_time = time.time()
+        max_frames = 10  # Limit to 10 frames for quick testing
         
-        while frame_count < 100:  # Process 100 frames
+        while frame_count < max_frames:
             success, frame, metadata = cam.read()
             
             if success:
@@ -195,8 +217,7 @@ if __name__ == "__main__":
                 plt.pause(0.01)
                 
                 # Print metadata
-                if frame_count % 10 == 0:
-                    print(f"Frame {frame_count} metadata: {metadata}")
+                print(f"Frame {frame_count} metadata: {metadata}")
             else:
                 # Wait briefly if no frame
                 time.sleep(0.1)

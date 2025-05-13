@@ -1,9 +1,23 @@
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
-import time
+import os
+from pathlib import Path
+from dotenv import load_dotenv
 from camera_simulator import CameraSimulator
 from tqdm import tqdm
+
+# Load environment variables
+env_path = Path('.') / '.env'
+load_dotenv(dotenv_path=env_path)
+
+# Get MongoDB settings
+DB_NAME = os.getenv('DB_NAME', 'fruit_grading')
+MONGO_CONNECTION_STRING = os.getenv('MONGO_CONNECTION_STRING')
+
+# Get camera settings
+CAMERA_FPS = int(os.getenv('CAMERA_FPS', 30))
+CAMERA_RANDOM_ORDER = os.getenv('CAMERA_RANDOM_ORDER', 'true').lower() == 'true'
 
 def custom_preprocessing(image):
     """Apply preprocessing steps from the article:
@@ -55,25 +69,29 @@ def custom_preprocessing(image):
         'normalized': enhanced_normalized
     }
 
-def get_processed_images(db_name="fruit_grading", collection_name="images", fps=300):
+def get_processed_images(db_name=None, collection_name="images", fps=None, num_images=None):
     """
     Get images from the camera simulator and apply preprocessing
     
     Args:
-        db_name: MongoDB database name
+        db_name: MongoDB database name (defaults to env setting)
         collection_name: MongoDB collection name
-        num_images: Number of images to process
-        fps: Frames per second for the camera simulator
+        fps: Frames per second for the camera simulator (defaults to env setting)
+        num_images: Number of images to process (if None, processes all images)
         
     Returns:
         List of processed image dictionaries with metadata
     """
+    # Use environment settings if not specified
+    db_name = db_name or DB_NAME
+    fps = fps or CAMERA_FPS
+    
     # Create and start camera simulator
     camera = CameraSimulator(
         db_name=db_name,
         collection_name=collection_name,
         fps=fps,
-        random_order=True
+        random_order=CAMERA_RANDOM_ORDER
     )
     
     camera.start()
@@ -82,7 +100,13 @@ def get_processed_images(db_name="fruit_grading", collection_name="images", fps=
     processed_images = []
     
     try:
-        for i in tqdm(range(len(camera.doc_ids)),desc="proccesing images from camera"):
+        # Determine how many images to process
+        if num_images is None:
+            num_images = len(camera.doc_ids)
+        else:
+            num_images = min(num_images, len(camera.doc_ids))
+        
+        for i in tqdm(range(num_images), desc="Processing images from camera"):
             # Read image from camera
             success, frame, metadata = camera.read()
             
@@ -104,68 +128,3 @@ def get_processed_images(db_name="fruit_grading", collection_name="images", fps=
         camera.stop()
     
     return processed_images
-
-def display_processed_images(processed_images):
-    """
-    Display original and processed images side by side
-    
-    Args:
-        processed_images: List of processed image dictionaries
-    """
-    num_images = len(processed_images)
-    if num_images == 0:
-        print("No images to display")
-        return
-    
-    # Create figure
-    fig, axes = plt.subplots(num_images, 3, figsize=(15, 5 * num_images))
-    
-    # Handle case of single image
-    if num_images == 1:
-        axes = axes.reshape(1, -1)
-    
-    # Display each image
-    for i, processed in enumerate(processed_images):
-        # Get metadata
-        metadata = processed.get('metadata', {})
-        category = metadata.get('category', 'unknown')
-        
-        # Display original
-        axes[i, 0].imshow(processed['original'])
-        axes[i, 0].set_title(f"Original - {category}")
-        axes[i, 0].axis('off')
-        
-        # Display after Gaussian blur
-        axes[i, 1].imshow(processed['blurred'])
-        axes[i, 1].set_title("Gaussian Blur")
-        axes[i, 1].axis('off')
-        
-        # Display after CLAHE
-        axes[i, 2].imshow(processed['enhanced'])
-        axes[i, 2].set_title("CLAHE Enhanced")
-        axes[i, 2].axis('off')
-    
-    plt.tight_layout()
-    plt.savefig("preprocessing_results.png")
-    plt.show()
-
-def main():
-    """Main function to demonstrate preprocessing on camera images"""
-    print("Getting images from camera simulator and applying preprocessing...")
-    
-    # Process 4 images
-    processed_images = get_processed_images(
-        db_name="fruit_grading", 
-        collection_name="images",
-        fps=300
-    )
-    
-    # Display results
-    if processed_images:
-        print(f"Displaying {len(processed_images)} processed images")
-        display_processed_images(processed_images[:5])
-    else:
-        print("No images were processed successfully")
-
-if __name__ == "__main__":
-    main()

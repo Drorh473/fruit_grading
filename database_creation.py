@@ -7,11 +7,26 @@ from PIL import Image
 import multiprocessing
 from multiprocessing import Pool
 from tqdm import tqdm
+from dotenv import load_dotenv
+from pathlib import Path
 
-def create_database(db_name="fruit_grading", collection_name="images"):
+# Load environment variables
+env_path = Path('.') / '.env'
+load_dotenv(dotenv_path=env_path)
+
+# Get MongoDB connection string from .env
+MONGODB_CONNECTION_STRING = os.getenv('MONGO_CONNECTION_STRING')
+if not MONGODB_CONNECTION_STRING:
+    raise ValueError("MongoDB connection string not found in .env file")
+
+# Get dataset paths from .env
+PROCESSED_DATASET_PATH = os.getenv('PROCESSED_DATASET_PATH')
+ORIGINAL_DATASET_PATH = os.getenv('ORIGINAL_DATASET_PATH')
+
+def create_database(db_name=os.getenv('DB_NAME', "fruit_grading"), collection_name="images"):
     """Create MongoDB database for storing image metadata"""
     # Connect to MongoDB
-    client = pymongo.MongoClient("mongodb://localhost:27017/")
+    client = pymongo.MongoClient(MONGODB_CONNECTION_STRING)
     db = client[db_name]
     collection = db[collection_name]
     
@@ -23,7 +38,7 @@ def create_database(db_name="fruit_grading", collection_name="images"):
     print(f"Connected to MongoDB database: {db_name}, collection: {collection_name}")
     return db_name, collection_name
 
-def collect_images(dataset_path):
+def collect_images(dataset_path=ORIGINAL_DATASET_PATH):
     """Collect all images from Mendeley dataset"""
     # Track execution time
     start_time = time.time()
@@ -101,7 +116,7 @@ def store_in_database(organized_images, db_name, collection_name):
     print("Starting database storage...")
     
     # Connect to MongoDB
-    client = pymongo.MongoClient("mongodb://localhost:27017/")
+    client = pymongo.MongoClient(MONGODB_CONNECTION_STRING)
     db = client[db_name]
     collection = db[collection_name]
     
@@ -128,7 +143,7 @@ def split_data(db_name, collection_name, training_percentage=80, validation_perc
         raise ValueError("Percentages must sum to 100")
     
     # Connect to MongoDB
-    client = pymongo.MongoClient("mongodb://localhost:27017/")
+    client = pymongo.MongoClient(MONGODB_CONNECTION_STRING)
     db = client[db_name]
     collection = db[collection_name]
     
@@ -153,15 +168,15 @@ def split_data(db_name, collection_name, training_percentage=80, validation_perc
                 {"_id": {"$in": training_ids}},
                 {"$set": {"set_type": "training"}}
             )
-        vaildation_count = int(len(ids) * (validation_percentage / 100))
-        validation_ids=ids[training_count:training_count+vaildation_count]
+        validation_count = int(len(ids) * (validation_percentage / 100))
+        validation_ids=ids[training_count:training_count+validation_count]
         if validation_ids:
             collection.update_many(
                 {"_id": {"$in": validation_ids}},
                 {"$set": {"set_type": "validation"}}
             )
         # Assign to testing set
-        testing_ids = ids[training_count+vaildation_count:]
+        testing_ids = ids[training_count+validation_count:]
         if testing_ids:
             collection.update_many(
                 {"_id": {"$in": testing_ids}},
@@ -180,9 +195,9 @@ def split_data(db_name, collection_name, training_percentage=80, validation_perc
     return db_name, collection_name
 
 def copy_image_file(args):
-    doc_id, path, name, category, condition, set_type, camera,  color , output_dir = args
+    doc_id, path, name, category, condition, set_type, camera, color, output_dir = args
     category_dir = os.path.join(output_dir, set_type, category)
-    dest_path = os.path.join(category_dir, f"{doc_id}_{name}_{condition}.jpg")
+    dest_path = os.path.join(category_dir, f"{doc_id}{name}{condition}.jpg")
     try:
         shutil.copy2(path, dest_path)
         return True
@@ -190,19 +205,19 @@ def copy_image_file(args):
         print(f"Error copying {path}: {e}")
         return False
 
-def create_data_directory_structure(db_name, collection_name, output_dir="processed_dataset"):
+def create_data_directory_structure(db_name, collection_name, output_dir=PROCESSED_DATASET_PATH):
     """Create directory structure and copy files for training/testing"""
     start_time = time.time()
     
     # if this dir already exists delete all the dirs
     if os.path.exists(output_dir):
         shutil.rmtree(output_dir)
-    # make new dirs for testing , training and validation
+    # make new dirs for testing, training and validation
     os.makedirs(os.path.join(output_dir, "training"), exist_ok=True)
     os.makedirs(os.path.join(output_dir, "testing"), exist_ok=True)
     os.makedirs(os.path.join(output_dir, "validation"), exist_ok=True)
     # Connect to MongoDB
-    client = pymongo.MongoClient("mongodb://localhost:27017/")
+    client = pymongo.MongoClient(MONGODB_CONNECTION_STRING)
     db = client[db_name]
     collection = db[collection_name]
     
@@ -259,7 +274,7 @@ def print_database_summary(db_name, collection_name):
     start_time = time.time()
     
     # Connect to MongoDB
-    client = pymongo.MongoClient("mongodb://localhost:27017/")
+    client = pymongo.MongoClient(MONGODB_CONNECTION_STRING)
     db = client[db_name]
     collection = db[collection_name]
     
@@ -302,10 +317,11 @@ def print_database_summary(db_name, collection_name):
     minutes = (time.time() - start_time) / 60
     print(f"Summary generated in {minutes:.2f} minutes")
 
-def process_dataset(dataset_path, db_name="fruit_grading", collection_name="images"):
+def process_dataset(dataset_path=ORIGINAL_DATASET_PATH, db_name=os.getenv('DB_NAME', "fruit_grading"), collection_name="images"):
     """Process the dataset if not already done"""
     # Create flag file path in local directory
-    flag_file = os.path.join("processed_dataset", ".processing_complete")
+    processed_path = PROCESSED_DATASET_PATH or "processed_dataset"
+    flag_file = os.path.join(processed_path, ".processing_complete")
     
     # Check if processing is already complete
     if os.path.exists(flag_file):
@@ -332,7 +348,7 @@ def process_dataset(dataset_path, db_name="fruit_grading", collection_name="imag
     db_name, collection_name = split_data(db_name, collection_name)
     
     # Create directory structure
-    create_data_directory_structure(db_name, collection_name)
+    create_data_directory_structure(db_name, collection_name, PROCESSED_DATASET_PATH)
     
     # Print summary
     print_database_summary(db_name, collection_name)
@@ -347,6 +363,12 @@ def process_dataset(dataset_path, db_name="fruit_grading", collection_name="imag
     print(f"Dataset processing complete in {time.time() - start_time:.2f} seconds")
     return db_name, collection_name
 
-if __name__ == "__main__":
-    dataset_path = r"C:\Users\dror\Downloads\FruitNetDataset"  # Use raw string with r prefix for Windows paths
+if __name__ == "__main__":  # Fixed the __main__ check
+    # Use environment variables for dataset path
+    if not ORIGINAL_DATASET_PATH:
+        print("Warning: ORIGINAL_DATASET_PATH not set in .env file")
+        dataset_path = input("Please enter the path to the original dataset: ")
+    else:
+        dataset_path = ORIGINAL_DATASET_PATH
+    
     db_name, collection_name = process_dataset(dataset_path)

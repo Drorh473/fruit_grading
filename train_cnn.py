@@ -14,22 +14,23 @@ from torchvision.models import ShuffleNet_V2_X1_5_Weights, ShuffleNet_V2_X2_0_We
 import torchvision.transforms as transforms
 
 from preprocessing_from_db import load_dataset_with_preprocessing, custom_preprocessing
+from env_config import get_model_config, get_dataset_paths
 
 # Set device
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
 
 def train_cnn_from_db(
-    base_dir="processed_dataset",
+    base_dir=None,
     batch_size=32,
     img_size=(224, 224),
     num_epochs=30,
     cycle_length=5,  # Switch optimizer every 5 epochs
     adam_lr=0.001,
     sgd_lr=0.01,
-    model_save_dir="saved_models",
+    model_save_dir=None,
     model_name="shufflenet_v2_fruit_grader",
-    model_variant="1.0x"
+    model_variant=None
 ):
     """
     Train ShuffleNet V2 on the fruit dataset
@@ -49,7 +50,24 @@ def train_cnn_from_db(
     Returns:
         Trained model and training statistics
     """
+    # Get configuration from environment
+    dataset_paths = get_dataset_paths()
+    model_config = get_model_config()
+    
+    # Use environment config values if not provided as parameters
+    if base_dir is None:
+        base_dir = dataset_paths.get('processed', 'processed_dataset')
+    
+    if model_save_dir is None:
+        model_save_dir = model_config.get('model_dir', 'saved_models')
+        
+    if model_variant is None:
+        model_variant = model_config.get('default_variant', '1.0x')
+    
     print("\n==== Starting ShuffleNet V2 Training ====\n")
+    print(f"Using dataset from: {base_dir}")
+    print(f"Using model variant: {model_variant}")
+    print(f"Models will be saved to: {model_save_dir}")
     
     # Create model save directory if it doesn't exist
     os.makedirs(model_save_dir, exist_ok=True)
@@ -60,7 +78,7 @@ def train_cnn_from_db(
         base_dir,
         img_size=img_size,
         batch_size=batch_size,
-        preprocess_first=True
+        preprocess_first=False
     )
     
     num_classes = len(class_indices)
@@ -132,8 +150,19 @@ def train_cnn_from_db(
         'optimizer': []  # Track which optimizer was used in each epoch
     }
     
+    # Track the best model and its stats
     best_val_acc = 0.0
-    best_model_path = ""
+    best_epoch = 0
+    best_model_state = None
+    best_optimizer_states = {
+        'adam': None,
+        'sgd': None
+    }
+    best_scheduler_states = {
+        'adam': None,
+        'sgd': None
+    }
+    best_optimizer_name = None
     
     for epoch in range(num_epochs):
         epoch_start = time.time()
@@ -235,32 +264,49 @@ def train_cnn_from_db(
               f"Train loss: {train_loss:.4f}, acc: {train_acc:.2f}% | "
               f"Val loss: {val_loss:.4f}, acc: {val_acc:.2f}%")
         
-        # Save best model
+        # Check if this is the best model so far
         if val_acc > best_val_acc:
             best_val_acc = val_acc
-            # Save with epoch and accuracy in filename
-            best_model_path = os.path.join(
-                model_save_dir,
-                f"{model_name}_{model_variant}_epoch{epoch+1}_acc{val_acc:.2f}.pth"
-            )
-            torch.save({
-                'epoch': epoch + 1,
-                'model_state_dict': model.state_dict(),
-                'adam_optimizer_state_dict': adam_optimizer.state_dict(),
-                'sgd_optimizer_state_dict': sgd_optimizer.state_dict(),
-                'adam_scheduler_state_dict': adam_scheduler.state_dict(),
-                'sgd_scheduler_state_dict': sgd_scheduler.state_dict(),
-                'current_optimizer': current_optimizer_name,
-                'val_acc': val_acc,
-                'class_indices': class_indices,
-                'num_classes': num_classes,
-                'img_size': img_size,
-                'model_variant': model_variant
-            }, best_model_path)
-            print(f"Saved best model with validation accuracy: {val_acc:.2f}%")
+            best_epoch = epoch + 1
+            best_model_state = model.state_dict().copy()
+            best_optimizer_states['adam'] = adam_optimizer.state_dict().copy()
+            best_optimizer_states['sgd'] = sgd_optimizer.state_dict().copy()
+            best_scheduler_states['adam'] = adam_scheduler.state_dict().copy()
+            best_scheduler_states['sgd'] = sgd_scheduler.state_dict().copy()
+            best_optimizer_name = current_optimizer_name
+            print(f"New best model with validation accuracy: {val_acc:.2f}%")
+    
+    # Save the best model at the end of training
+    print(f"\nTraining complete. Saving the best model from epoch {best_epoch} with accuracy {best_val_acc:.2f}%")
+    
+    # Set the model to the best state
+    model.load_state_dict(best_model_state)
+    
+    # Save the best model
+    best_model_path = os.path.join(
+        model_save_dir,
+        f"{model_name}_{model_variant}_best.pth"
+    )
+    
+    torch.save({
+        'epoch': best_epoch,
+        'model_state_dict': best_model_state,
+        'adam_optimizer_state_dict': best_optimizer_states['adam'],
+        'sgd_optimizer_state_dict': best_optimizer_states['sgd'],
+        'adam_scheduler_state_dict': best_scheduler_states['adam'],
+        'sgd_scheduler_state_dict': best_scheduler_states['sgd'],
+        'current_optimizer': best_optimizer_name,
+        'val_acc': best_val_acc,
+        'class_indices': class_indices,
+        'num_classes': num_classes,
+        'img_size': img_size,
+        'model_variant': model_variant
+    }, best_model_path)
+    
+    print(f"Best model saved at: {best_model_path}")
     
     # 6. Evaluate on test set
-    print("\nEvaluating model on test set...")
+    print("\nEvaluating best model on test set...")
     model.eval()
     test_correct = 0
     test_total = 0
@@ -295,7 +341,7 @@ def train_cnn_from_db(
             all_targets.extend(target_indices.cpu().numpy())
     
     test_acc = 100 * test_correct / test_total
-    print(f"Test accuracy: {test_acc:.2f}%")
+    print(f"Test accuracy of best model: {test_acc:.2f}%")
     
     # 7. Plot training curves
     plt.figure(figsize=(15, 10))
@@ -304,6 +350,7 @@ def train_cnn_from_db(
     plt.subplot(2, 2, 1)
     plt.plot(history['train_loss'], label='Train')
     plt.plot(history['val_loss'], label='Validation')
+    plt.axvline(x=best_epoch-1, color='g', linestyle='--', label=f'Best Model (Epoch {best_epoch})')
     plt.title('Model Loss')
     plt.xlabel('Epoch')
     plt.ylabel('Loss')
@@ -313,6 +360,7 @@ def train_cnn_from_db(
     plt.subplot(2, 2, 2)
     plt.plot(history['train_acc'], label='Train')
     plt.plot(history['val_acc'], label='Validation')
+    plt.axvline(x=best_epoch-1, color='g', linestyle='--', label=f'Best Model (Epoch {best_epoch})')
     plt.title('Model Accuracy')
     plt.xlabel('Epoch')
     plt.ylabel('Accuracy (%)')
@@ -325,6 +373,7 @@ def train_cnn_from_db(
         if i > 0:
             plt.plot([i-1, i], [history['train_loss'][i-1], history['train_loss'][i]], 
                      color=color, linewidth=2)
+    plt.axvline(x=best_epoch-1, color='g', linestyle='--', label=f'Best Model (Epoch {best_epoch})')
     plt.title('Loss by Optimizer')
     plt.xlabel('Epoch')
     plt.ylabel('Training Loss')
@@ -333,7 +382,8 @@ def train_cnn_from_db(
     from matplotlib.lines import Line2D
     legend_elements = [
         Line2D([0], [0], color='blue', lw=2, label='Adam'),
-        Line2D([0], [0], color='red', lw=2, label='SGD')
+        Line2D([0], [0], color='red', lw=2, label='SGD'),
+        Line2D([0], [0], color='g', linestyle='--', label=f'Best Model (Epoch {best_epoch})')
     ]
     plt.legend(handles=legend_elements)
     
@@ -344,6 +394,7 @@ def train_cnn_from_db(
         if i > 0:
             plt.plot([i-1, i], [history['val_acc'][i-1], history['val_acc'][i]], 
                      color=color, linewidth=2)
+    plt.axvline(x=best_epoch-1, color='g', linestyle='--', label=f'Best Model (Epoch {best_epoch})')
     plt.title('Validation Accuracy by Optimizer')
     plt.xlabel('Epoch')
     plt.ylabel('Accuracy (%)')
@@ -358,16 +409,21 @@ def train_cnn_from_db(
     return model, best_model_path, class_indices
 
 if __name__ == "__main__":
-    # Train the model
+    # Get configuration from environment
+    model_config = get_model_config()
+    dataset_paths = get_dataset_paths()
+    
+    # Train the model using environment configuration
     model, best_model_path, class_indices = train_cnn_from_db(
-        base_dir="processed_dataset",
+        base_dir=dataset_paths.get('processed', 'processed_dataset'),
         batch_size=32,
         img_size=(224, 224),
         num_epochs=30,
         adam_lr=0.001,
         sgd_lr=0.01,
         cycle_length=5,  # Switch optimizer every 5 epochs
-        model_variant="1.0x"
+        model_save_dir=model_config.get('model_dir', 'saved_models'),
+        model_variant=model_config.get('default_variant', '1.0x')
     )
     
     print(f"\nTraining complete. Best model saved at: {best_model_path}")
