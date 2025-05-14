@@ -1,114 +1,116 @@
 import torch
 import cv2
+import numpy as np
 from preprocessing_from_camera import custom_preprocessing
 from env_config import get_model_config
 
-class FeatureMapExtractor:
-    def __init__(self, model):
-        """
-        Initialize the Feature Map Extractor with a trained model
-        
-        Args:
-            model: A trained PyTorch model
-        """
-        # Set device
-        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        print(f"Using device: {self.device}")
-        
-        # Store the model
-        self.model = model.to(self.device)
-        self.model.eval()  # Set to evaluation mode
-        
-        # Register hooks to extract feature maps
-        self.feature_maps = {}
-        self.hooks = []
-        self._register_hooks()
+def register_hooks(model):
+
+    # Dictionary to store the feature maps
+    feature_maps = {}
+    hooks = []
     
-    def _register_hooks(self):
-        """Register hooks to extract feature maps from different layers"""
-        # Function to capture outputs
-        def get_features(name):
-            def hook(model, input, output):
-                self.feature_maps[name] = output.detach()
-            return hook
-        
-        # Register hooks for key layers
-        self.hooks.append(self.model.conv1.register_forward_hook(get_features('conv1')))
-        self.hooks.append(self.model.stage2.register_forward_hook(get_features('stage2')))
-        self.hooks.append(self.model.stage3.register_forward_hook(get_features('stage3')))
-        self.hooks.append(self.model.stage4.register_forward_hook(get_features('stage4')))
-        self.hooks.append(self.model.conv5.register_forward_hook(get_features('conv5')))
+    # Function to capture outputs
+    def get_features(name):
+        def hook(model, input, output):
+            feature_maps[name] = output.detach()
+        return hook
     
-    def remove_hooks(self):
-        """Remove all registered hooks"""
-        for hook in self.hooks:
-            hook.remove()
-        self.hooks = []
+    # Register hooks for key layers
+    hooks.append(model.conv1.register_forward_hook(get_features('conv1')))
+    hooks.append(model.stage2.register_forward_hook(get_features('stage2')))
+    hooks.append(model.stage3.register_forward_hook(get_features('stage3')))
+    hooks.append(model.stage4.register_forward_hook(get_features('stage4')))
+    hooks.append(model.conv5.register_forward_hook(get_features('conv5')))
     
-    def preprocess_frame(self, frame):
-        """Preprocess a camera frame for model input"""
-        if frame is None:
-            raise ValueError("Received empty frame from camera")
-        
-        # Convert BGR to RGB if needed
-        if len(frame.shape) == 3 and frame.shape[2] == 3:
-            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    return feature_maps, hooks
+
+def remove_hooks(hooks):
+
+    for hook in hooks:
+        hook.remove()
+
+def preprocess_frame(frame, device):
+    """
+    Preprocess a camera frame for model input.
+    
+    Args:
+        frame: Camera frame as numpy array
+        device: PyTorch device (CPU or GPU)
+    
+    Returns:
+        PyTorch tensor ready for model input
+    """
+    if frame is None:
+        raise ValueError("Received empty frame from camera")
+    
+    # Convert BGR to RGB if needed
+    if len(frame.shape) == 3 and frame.shape[2] == 3:
+        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    else:
+        frame_rgb = frame
+    
+    # Apply custom preprocessing
+    processed = custom_preprocessing(frame_rgb)
+    
+    # Check if processed is a dictionary (which it will be according to your code)
+    if isinstance(processed, dict):
+        if 'normalized' in processed:
+            processed_frame = processed['normalized']
         else:
-            frame_rgb = frame
-        
-        # Apply custom preprocessing
-        processed_frame = custom_preprocessing(frame_rgb)
-        
-        # Convert to PyTorch tensor and add batch dimension
-        frame_tensor = torch.from_numpy(processed_frame).permute(2, 0, 1).unsqueeze(0).float().to(self.device)
-        
-        return frame_tensor
+            # Fall back to enhanced image if normalized not available
+            processed_frame = processed.get('enhanced', processed_frame).astype(np.float32) / 255.0
+    else:
+        # If it's already a normalized array, use it directly
+        processed_frame = processed
     
-    def extract_feature_maps(self, frame):
-        """
-        Run model and extract feature maps from a camera frame
-        
-        Args:
-            frame: Camera frame as numpy array
-        
-        Returns:
-            Dictionary with feature maps
-        """
+    # Convert to PyTorch tensor and add batch dimension
+    # Need to transpose from HWC to CHW format for PyTorch
+    frame_tensor = torch.from_numpy(processed_frame).permute(2, 0, 1).unsqueeze(0).float().to(device)
+    
+    return frame_tensor
+
+def extract_feature_maps(model, frame):
+    # Set device
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    print(f"Using device: {device}")
+    
+    # Move model to device and set to eval mode
+    model = model.to(device)
+    model.eval()
+    
+    # Register hooks
+    feature_maps_dict, hooks = register_hooks(model)
+    
+    try:
         # Preprocess frame
-        frame_tensor = self.preprocess_frame(frame)
-        
-        # Clear previous feature maps
-        self.feature_maps = {}
+        frame_tensor = preprocess_frame(frame, device)
         
         # Run model with no gradient computation
         with torch.no_grad():
             # Forward pass
-            _ = self.model(frame_tensor)
+            _ = model(frame_tensor)
             
-            # Get feature maps
-            feature_maps = {name: feat.cpu().numpy() for name, feat in self.feature_maps.items()}
+            # Transform feature maps to (h', w', c') format
+            result_maps = {}
+            for name, feat in feature_maps_dict.items():
+                # Move to CPU as numpy array
+                feat_np = feat.cpu().numpy()
+                
+                # Convert from (batch_size, c', h', w') to (h', w', c')
+                # 1. Transpose dimensions to get (batch, h, w, c)
+                feat_np = np.transpose(feat_np, (0, 2, 3, 1))
+                
+                # 2. Remove the batch dimension (index 0) since batch size is 1
+                feat_np = feat_np[0]  # Now shape is (h', w', c')
+                
+                result_maps[name] = feat_np
             
-            return feature_maps
-
-
-def get_feature_maps_from_camera(model, frame):
-    """
-    Get feature maps from a camera frame using the provided model
-    
-    Args:
-        model: A trained PyTorch model
-        frame: Camera frame as numpy array
-        
-    Returns:
-        Dictionary with feature maps
-    """
-    # Create feature map extractor with the provided model
-    extractor = FeatureMapExtractor(model)
-    
-    try:
-        # Extract feature maps
-        feature_maps = extractor.extract_feature_maps(frame)
-        return feature_maps
+            return result_maps
     finally:
         # Clean up hooks to prevent memory leaks
-        extractor.remove_hooks()
+        remove_hooks(hooks)
+
+def get_feature_maps_from_camera(model, frame):
+    # Simply call the extract_feature_maps function
+    return extract_feature_maps(model, frame)

@@ -13,7 +13,7 @@ from torchvision.models import ShuffleNet_V2_X0_5_Weights, ShuffleNet_V2_X1_0_We
 from torchvision.models import ShuffleNet_V2_X1_5_Weights, ShuffleNet_V2_X2_0_Weights
 import torchvision.transforms as transforms
 
-from preprocessing_from_db import load_dataset_with_preprocessing, custom_preprocessing
+from preprocessing_from_db import preprocessing_from_db
 from env_config import get_model_config, get_dataset_paths
 
 # Set device
@@ -21,11 +21,8 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
 
 def train_cnn_from_db(
-    base_dir=None,
-    batch_size=32,
-    img_size=(224, 224),
-    num_epochs=30,
-    cycle_length=5,  # Switch optimizer every 5 epochs
+    num_epochs=10,
+    cycle_length=2,  # Switch optimizer every 5 epochs
     adam_lr=0.001,
     sgd_lr=0.01,
     model_save_dir=None,
@@ -33,12 +30,9 @@ def train_cnn_from_db(
     model_variant=None
 ):
     """
-    Train ShuffleNet V2 on the fruit dataset
+    Train ShuffleNet V2 on the fruit dataset using data from MongoDB
     
     Args:
-        base_dir: Path to dataset
-        batch_size: Batch size for training
-        img_size: Input image size
         num_epochs: Number of training epochs
         cycle_length: Number of epochs before switching optimizer
         adam_lr: Learning rate for Adam optimizer
@@ -51,13 +45,9 @@ def train_cnn_from_db(
         Trained model and training statistics
     """
     # Get configuration from environment
-    dataset_paths = get_dataset_paths()
     model_config = get_model_config()
     
     # Use environment config values if not provided as parameters
-    if base_dir is None:
-        base_dir = dataset_paths.get('processed', 'processed_dataset')
-    
     if model_save_dir is None:
         model_save_dir = model_config.get('model_dir', 'saved_models')
         
@@ -65,7 +55,6 @@ def train_cnn_from_db(
         model_variant = model_config.get('default_variant', '1.0x')
     
     print("\n==== Starting ShuffleNet V2 Training ====\n")
-    print(f"Using dataset from: {base_dir}")
     print(f"Using model variant: {model_variant}")
     print(f"Models will be saved to: {model_save_dir}")
     
@@ -74,15 +63,16 @@ def train_cnn_from_db(
     
     # 1. Load dataset
     print("Loading and preparing dataset...")
-    train_dataset, val_dataset, test_dataset, class_indices = load_dataset_with_preprocessing(
-        base_dir,
-        img_size=img_size,
-        batch_size=batch_size,
-        preprocess_first=False
-    )
+    train_gen, val_gen, test_gen, class_indices, counts = preprocessing_from_db()
+    
+    if train_gen is None:
+        raise ValueError("Failed to load training dataset")
+    
+    img_size = (224, 224)  # Use fixed size since images are resized in preprocessing_from_db
     
     num_classes = len(class_indices)
     print(f"Training model for {num_classes} classes: {list(class_indices.keys())}")
+    print(f"Training samples: {counts['training']}, Validation samples: {counts['validation']}, Testing samples: {counts['testing']}")
     
     # 2. Initialize model
     print(f"Initializing ShuffleNet V2 ({model_variant})...")
@@ -117,8 +107,9 @@ def train_cnn_from_db(
     current_optimizer_name = "Adam"  # Start with Adam
     
     # Set up schedulers
-    iter_per_epoch = len(train_dataset)
-    step_size_up = iter_per_epoch * 2  # 2 epochs per cycle
+    # Calculate approximate steps per epoch based on sample count and batch size
+    steps_per_epoch = train_gen.num_batches
+    step_size_up = steps_per_epoch * 2  # 2 epochs per cycle
     
     adam_scheduler = CyclicLR(
         adam_optimizer,
@@ -164,6 +155,9 @@ def train_cnn_from_db(
     }
     best_optimizer_name = None
     
+    # Create ImageNet normalization transform
+    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+    
     for epoch in range(num_epochs):
         epoch_start = time.time()
         
@@ -186,16 +180,17 @@ def train_cnn_from_db(
         train_correct = 0
         train_total = 0
         
-        # Get batches from our custom dataset iterator
-        train_batches = list(train_dataset)
-        
-        for inputs, targets in tqdm(train_batches, desc=f"Epoch {epoch+1}/{num_epochs} [{current_optimizer_name}]"):
-            # Convert numpy arrays to PyTorch tensors
-            inputs = torch.from_numpy(inputs).to(device)
-            targets = torch.from_numpy(targets).to(device)
+        # Get batches from our generator
+        train_iterator = train_gen()
+        for inputs, targets in tqdm(train_iterator, desc=f"Epoch {epoch+1}/{num_epochs} [{current_optimizer_name}]"):
+            # Convert to float first and normalize to 0-1 range 
+            inputs = torch.from_numpy(inputs).float().div(255.0).to(device)
             
-            # IMPORTANT FIX: Transpose the input tensor from [batch, height, width, channels] to [batch, channels, height, width]
-            inputs = inputs.permute(0, 3, 1, 2)
+            # Apply ImageNet normalization
+            inputs = normalize(inputs.permute(0, 3, 1, 2))  # permute to get NCHW format
+            
+            # Convert targets to float
+            targets = torch.from_numpy(targets).float().to(device)
             
             # Zero the parameter gradients
             optimizer.zero_grad()
@@ -216,7 +211,7 @@ def train_cnn_from_db(
             train_total += targets.size(0)
             train_correct += (predicted == target_indices).sum().item()
         
-        train_loss = train_loss / len(train_batches)
+        train_loss = train_loss / train_gen.num_batches
         train_acc = 100 * train_correct / train_total
         
         # Validation phase
@@ -226,16 +221,18 @@ def train_cnn_from_db(
         val_total = 0
         
         # Get batches from validation dataset
-        val_batches = list(val_dataset)
+        val_iterator = val_gen()
         
         with torch.no_grad():
-            for inputs, targets in tqdm(val_batches, desc=f"Epoch {epoch+1}/{num_epochs} [Val]"):
-                # Convert numpy arrays to PyTorch tensors
-                inputs = torch.from_numpy(inputs).to(device)
-                targets = torch.from_numpy(targets).to(device)
+            for inputs, targets in tqdm(val_iterator, desc=f"Epoch {epoch+1}/{num_epochs} [Val]"):
+                # Convert to float first and normalize to 0-1 range 
+                inputs = torch.from_numpy(inputs).float().div(255.0).to(device)
                 
-                # IMPORTANT FIX: Transpose the input tensor from [batch, height, width, channels] to [batch, channels, height, width]
-                inputs = inputs.permute(0, 3, 1, 2)
+                # Apply ImageNet normalization
+                inputs = normalize(inputs.permute(0, 3, 1, 2))  # permute to get NCHW format
+                
+                # Convert targets to float
+                targets = torch.from_numpy(targets).float().to(device)
                 
                 # Forward pass
                 outputs = model(inputs)
@@ -248,7 +245,7 @@ def train_cnn_from_db(
                 val_total += targets.size(0)
                 val_correct += (predicted == target_indices).sum().item()
         
-        val_loss = val_loss / len(val_batches)
+        val_loss = val_loss / val_gen.num_batches
         val_acc = 100 * val_correct / val_total
         
         # Update history
@@ -316,16 +313,18 @@ def train_cnn_from_db(
     all_targets = []
     
     # Get batches from test dataset
-    test_batches = list(test_dataset)
+    test_iterator = test_gen()
     
     with torch.no_grad():
-        for inputs, targets in tqdm(test_batches, desc="Testing"):
-            # Convert numpy arrays to PyTorch tensors
-            inputs = torch.from_numpy(inputs).to(device)
-            targets = torch.from_numpy(targets).to(device)
+        for inputs, targets in tqdm(test_iterator, desc="Testing"):
+            # Convert to float first and normalize to 0-1 range 
+            inputs = torch.from_numpy(inputs).float().div(255.0).to(device)
             
-            # IMPORTANT FIX: Transpose the input tensor from [batch, height, width, channels] to [batch, channels, height, width]
-            inputs = inputs.permute(0, 3, 1, 2)
+            # Apply ImageNet normalization
+            inputs = normalize(inputs.permute(0, 3, 1, 2))  # permute to get NCHW format
+            
+            # Convert targets to float
+            targets = torch.from_numpy(targets).float().to(device)
             
             # Forward pass
             outputs = model(inputs)
@@ -411,17 +410,13 @@ def train_cnn_from_db(
 if __name__ == "__main__":
     # Get configuration from environment
     model_config = get_model_config()
-    dataset_paths = get_dataset_paths()
     
     # Train the model using environment configuration
     model, best_model_path, class_indices = train_cnn_from_db(
-        base_dir=dataset_paths.get('processed', 'processed_dataset'),
-        batch_size=32,
-        img_size=(224, 224),
-        num_epochs=30,
+        num_epochs=10,  # Reduced from 30 for faster training
         adam_lr=0.001,
         sgd_lr=0.01,
-        cycle_length=5,  # Switch optimizer every 5 epochs
+        cycle_length=2,  # Switch optimizer every 2 epochs
         model_save_dir=model_config.get('model_dir', 'saved_models'),
         model_variant=model_config.get('default_variant', '1.0x')
     )
