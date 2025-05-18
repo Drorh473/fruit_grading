@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import os
 from pathlib import Path
 from dotenv import load_dotenv
-from camera_simulator import CameraSimulator
+from Streamers.camera_simulator import CameraSimulator
 from tqdm import tqdm
 
 # Load environment variables

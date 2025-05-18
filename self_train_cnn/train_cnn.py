@@ -13,7 +13,7 @@ from torchvision.models import ShuffleNet_V2_X0_5_Weights, ShuffleNet_V2_X1_0_We
 from torchvision.models import ShuffleNet_V2_X1_5_Weights, ShuffleNet_V2_X2_0_Weights
 import torchvision.transforms as transforms
 
-from preprocessing_from_db import preprocessing_from_db
+from preprocessing.preprocessing_from_db import preprocessing_from_db
 from env_config import get_model_config, get_dataset_paths
 
 # Set device

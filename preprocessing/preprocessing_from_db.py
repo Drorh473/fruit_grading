@@ -10,24 +10,27 @@ from dotenv import load_dotenv
 import pymongo
 import time
 from bson.objectid import ObjectId
+
 # Load environment variables
 env_path = Path('.') / '.env'
 load_dotenv(dotenv_path=env_path)
+
 # Get MongoDB connection string from .env
 MONGODB_CONNECTION_STRING = os.getenv('MONGO_CONNECTION_STRING')
 if not MONGODB_CONNECTION_STRING:
     raise ValueError("MongoDB connection string not found in .env file")
+
 # Get dataset paths from environment
 PROCESSED_DATASET_PATH = os.getenv('PROCESSED_DATASET_PATH')
 STORED_DATASET_PATH = os.getenv('STORED_DATASET_PATH')
 MODEL_DIR = os.getenv('MODEL_DIR', 'saved_models')
-NUM_OF_CAMERAS = int(os.getenv('NUM_OF_CAMERAS'))
-IMAGE_SIZE = os.getenv('IMAGE_SIZE')
+DB_NAME = os.getenv('DB_NAME', 'fruit_rotation_db')
 BATCH_SIZE = int(os.getenv('BATCH_SIZE'))
-
+IMAGE_SIZE = (224, 224)
+NUM_OF_CAMERAS = int(os.getenv('NUM_OF_CAMERAS'))
 
 def custom_preprocessing(image, save_path=None):
-    """Apply preprocessing steps from the article:
+    """Apply preprocessing steps:
     1. Gaussian filtering for noise removal
     2. CLAHE for histogram equalization
     
@@ -83,19 +86,25 @@ def custom_preprocessing(image, save_path=None):
     
     return enhanced
 
-# Define this at the module level (outside any other function)
 def process_image(args):
-    image_path, output_dir = args  # Now getting output_dir from args
+    """Process a single image and save the preprocessed version"""
+    image_path, camera_num, output_dir = args
     try:
         # Parse path components
         parts = image_path.split(os.sep)
-        image_type = parts[-4] if len(parts) > 3 else "unknown"
-        quality_type = parts[-3] if len(parts) > 2 else "unknown"
-        fruit_type = parts[-2] if len(parts) > 1 else "unknown"
-        filename = parts[-1]
         
-        # Construct output path
-        output_subdir = os.path.join(output_dir, quality_type, image_type, fruit_type)
+        # Extract components from the path
+        filename = parts[-1]
+        set_type = parts[-4]
+        fruit_type = parts[-3]
+        object_id = parts[-2]
+        # Construct output path with same structure
+        if set_type and fruit_type and object_id:
+            output_subdir = os.path.join(output_dir, set_type, fruit_type, object_id)
+        else:
+            # Fallback if path structure not recognized
+            output_subdir = os.path.join(output_dir, "unknown")
+        
         output_path = os.path.join(output_subdir, filename)
         
         # Ensure output directory exists
@@ -113,11 +122,12 @@ def process_image(args):
         custom_preprocessing(img, save_path=output_path)
         
         # Extract document ID from filename
-        file_id = os.path.splitext(filename)[0]
+        file_id = filename.split(".")[0]
         
-        return file_id, output_path, None  # Success
+        return file_id , output_path , None  # Success
     except Exception as e:
-        return None, None, f"Error processing {image_path}: {e}"
+        return None, None , f"Error processing {image_path}: {e}"
+
 
 def preprocess_and_save_dataset(sequanceofcameras, output_dir=None, db_name=os.getenv('DB_NAME', "fruit_grading"), collection_name="images"):
     """Preprocess all images in the sequence of cameras and save them to the output directory"""
@@ -140,7 +150,7 @@ def preprocess_and_save_dataset(sequanceofcameras, output_dir=None, db_name=os.g
         print(f"Processing camera {cam_idx} with {len(camera)} images...")
         
         # Create args with camera number and output_dir for tracking
-        process_args = [(path, output_dir) for path in camera]  # Added output_dir to args
+        process_args = [(path, cam_idx, output_dir) for path in camera]  # Added output_dir to args
         
         # Use multiprocessing for image processing
         num_processes = max(1, multiprocessing.cpu_count() - 1)
@@ -204,19 +214,20 @@ def preprocess_and_save_dataset(sequanceofcameras, output_dir=None, db_name=os.g
     print(f"All processed images saved to {output_dir}")
 
 
-def load_dataset_split_by_Camera(db_name=os.getenv('DB_NAME'), collection_name="images"):
+def load_dataset_split_by_camera(db_name=os.getenv('DB_NAME'), collection_name="images"):
     #make an array of sequence cameras
     client = pymongo.MongoClient(MONGODB_CONNECTION_STRING)
     db = client[db_name]
     collection = db[collection_name]
     sequenceofcamera = [[] for _ in range(NUM_OF_CAMERAS+1)]  # Create list of empty lists
     for image in collection.find():
-        camera_id = image.get('camera')
+        camera_id = image.get('camera_id')
         if 1 <= camera_id <= NUM_OF_CAMERAS:
             sequenceofcamera[camera_id].append(image.get('path'))
     return sequenceofcamera
 
-def set_generator(set_type, db_name=os.getenv('DB_NAME'), collection_name="images", show_progress=True):
+def set_generator(set_type, db_name=DB_NAME, collection_name="images", show_progress=True):
+    """Create a batch generator for the specified set type"""
     client = pymongo.MongoClient(MONGODB_CONNECTION_STRING)
     db = client[db_name]
     collection = db[collection_name]
@@ -229,19 +240,15 @@ def set_generator(set_type, db_name=os.getenv('DB_NAME'), collection_name="image
             print(f"No documents found for set_type: {set_type}")
             return None, {}, 0
         
-        # Get categories and create class indices
-        categories = sorted(list(set(doc["category"] for doc in documents if "category" in doc)))
-        class_indices = {category: i for i, category in enumerate(categories)}
-        
-        print(f"Found {len(documents)} images for '{set_type}' with {len(categories)} categories")
+        print(f"Found {len(documents)} images for '{set_type}'")
         
         # Function to generate batches
         def batch_generator():
             # Create indices for the documents
             indices = list(range(len(documents)))
             
-            # Shuffle for training and validation
-            if set_type in ['training', 'validation']:
+            # Shuffle for training
+            if set_type == 'training':
                 np.random.shuffle(indices)
             
             # Calculate number of batches
@@ -258,37 +265,37 @@ def set_generator(set_type, db_name=os.getenv('DB_NAME'), collection_name="image
                 end_idx = min(start_idx + BATCH_SIZE, len(documents))
                 batch_indices = indices[start_idx:end_idx]
                 
-                # We'll collect valid images and labels first
+                # We'll collect valid images
                 batch_images = []
-                batch_labels = []
+                batch_orientations = []
                 
                 for idx in batch_indices:
                     doc = documents[idx]
                     
                     # Use processed_path if it exists, otherwise use regular path
                     img_path = doc.get("processed_path", doc.get("path"))
-                    if not img_path or "category" not in doc:
+                    if not img_path:
                         continue
                     
                     try:
                         # Load the image
                         img = cv2.imread(img_path)
-                        img = cv2.resize(img, (224, 224))
                         
                         if img is None:
                             continue
                         
+                        # Resize to standardized size
+                        img = cv2.resize(img, IMAGE_SIZE)
+                        
                         # Convert to RGB (OpenCV loads as BGR)
                         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
                         
-                        # Create one-hot label
-                        class_idx = class_indices[doc["category"]]
-                        label = np.zeros(len(categories))
-                        label[class_idx] = 1.0
+                        # Get orientation
+                        orientation = doc.get("orientation", 0)
                         
                         # Add to batch lists
                         batch_images.append(img)
-                        batch_labels.append(label)
+                        batch_orientations.append(orientation)
                     
                     except Exception as e:
                         print(f"Error loading {img_path}: {e}")
@@ -298,17 +305,16 @@ def set_generator(set_type, db_name=os.getenv('DB_NAME'), collection_name="image
                     continue
                 
                 # Convert lists to arrays
-                batch_x = np.array(batch_images , dtype=np.uint8)
-                batch_y = np.array(batch_labels , dtype=np.uint8)
+                batch_x = np.array(batch_images)
+                batch_y = np.array(batch_orientations)
                 
                 yield batch_x, batch_y
         
         # Add metadata to the generator function
         batch_generator.samples = len(documents)
         batch_generator.num_batches = (len(documents) + BATCH_SIZE - 1) // BATCH_SIZE
-        batch_generator.class_indices = class_indices
         
-        return batch_generator, class_indices, len(documents)
+        return batch_generator, {}, len(documents)
     
     except Exception as e:
         print(f"Error retrieving set type '{set_type}': {e}")
@@ -317,47 +323,137 @@ def set_generator(set_type, db_name=os.getenv('DB_NAME'), collection_name="image
     finally:
         # Close the MongoDB connection
         client.close()
-    
-def load_dataset_with_preprocessing(sequenceofcamera):
+
+def load_dataset_with_preprocessing():
     """
     Load dataset with custom preprocessing
     
-    Args:
-        sequanceofcamera: array of arrays containing the images paths
+    Returns:
+        train_gen, test_gen: Generators for training and testing data
     """
-    if not os.path.isdir(PROCESSED_DATASET_PATH):
-        preprocess_and_save_dataset(sequenceofcamera, PROCESSED_DATASET_PATH)
-    train_gen, class_indices, train_count = set_generator("training")
-    test_gen,_, test_count = set_generator("testing")
-    validation_gen, _, validation_count = set_generator("validation")
-        
-      # Create a dictionary of counts
-    counts = {
-        "training": train_count,
-        "validation": validation_count,
-        "testing": test_count
-    }
-    
-    # Print summary
-    print("\nDatasets summary:")
-    print(f"  Classes: {list(class_indices.keys())}")
-    print(f"  Training: {train_count} images")
-    print(f"  Validation: {validation_count} images")
-    print(f"  Testing: {test_count} images")
-    
-    # Return all the generators and related information
-    return train_gen, validation_gen, test_gen, class_indices, counts
-
-def preprocessing_from_db():
     # Check if PROCESSED_DATASET_PATH is set in .env
     if not PROCESSED_DATASET_PATH:
         print("Warning: PROCESSED_DATASET_PATH not set in .env file. Using default 'processed_dataset'.")
         processed_dir = "processed_dataset"
     else:
         processed_dir = PROCESSED_DATASET_PATH
-        
-    sequance = load_dataset_split_by_Camera()
     
-    train_gen, val_gen, test_gen, class_indices, counts = load_dataset_with_preprocessing(sequance)
+    # Get image paths by set type
+
+    sequencecamera = load_dataset_split_by_camera()
+    # Preprocess images if needed
+    if not os.path.isdir(processed_dir):
+        preprocess_and_save_dataset(sequencecamera, processed_dir)
     
-    return train_gen, val_gen, test_gen
+    # Create generators for training and testing
+    train_gen, _, train_count = set_generator("training")
+    test_gen, _, test_count = set_generator("testing")
+    
+    # Get counts
+    counts = {
+        "training": train_count,
+        "testing": test_count
+    }
+    
+    # Print summary
+    print("\nDatasets summary:")
+    print(f"  Training: {train_count} images")
+    print(f"  Testing: {test_count} images")
+    
+    # Return generators and counts
+    return train_gen, test_gen
+
+def preprocessing_from_db():
+    # Load dataset with preprocessing
+    train_gen, test_gen= load_dataset_with_preprocessing()
+    
+    # Return generators
+    return train_gen, test_gen
+
+def main():
+    """Main function to demonstrate preprocessing and data loading"""
+    print("=== Fruit Dataset Preprocessing and Loading ===\n")
+    
+    # Check if PROCESSED_DATASET_PATH is set in .env
+    if not PROCESSED_DATASET_PATH:
+        print("Warning: PROCESSED_DATASET_PATH not set in .env file. Using default 'processed_dataset'.")
+        processed_dir = "processed_dataset"
+    else:
+        processed_dir = PROCESSED_DATASET_PATH
+        print(f"Using processed dataset directory: {processed_dir}")
+    
+    # Step 1: Load dataset paths
+    print("\nStep 1: Loading dataset paths from database...")
+    sequence_of_sets = load_dataset_split_by_camera()
+    
+    # Step 2: Preprocess images if needed
+    if not os.path.isdir(processed_dir):
+        print("\nStep 2: Preprocessing images and saving to disk...")
+        preprocess_and_save_dataset(sequence_of_sets, processed_dir)
+    else:
+        print(f"\nStep 2: Skipping preprocessing as directory already exists: {processed_dir}")
+    
+    # Step 3: Create dataset generators
+    print("\nStep 3: Creating dataset generators...")
+    train_gen, test_gen = preprocessing_from_db()
+    
+    # Step 4: Display some example images
+    if train_gen:
+        print("\nStep 4: Displaying sample images from training set...")
+        try:
+            # Get a batch from the training generator
+            batch_x, batch_y = next(train_gen())
+            
+            # Display a few images with their orientations
+            plt.figure(figsize=(15, 5))
+            for i in range(min(5, len(batch_x))):
+                plt.subplot(1, 5, i+1)
+                plt.imshow(batch_x[i])
+                plt.title(f"Orientation: {batch_y[i]}")
+                plt.axis('off')
+            
+            plt.tight_layout()
+            
+            # Create MODEL_DIR if it doesn't exist
+            os.makedirs(MODEL_DIR, exist_ok=True)
+            
+            # Save figure
+            save_path = os.path.join(MODEL_DIR, "sample_training_images.png")
+            plt.savefig(save_path)
+            print(f"Sample images saved to: {save_path}")
+            
+            # Show plot
+            plt.show()
+            
+        except Exception as e:
+            print(f"Error displaying sample images: {e}")
+    else:
+        print("No training generator available.")
+    
+    # Step 5: Display dataset statistics
+    print("\nStep 5: Dataset statistics")
+    client = pymongo.MongoClient(MONGODB_CONNECTION_STRING)
+    db = client[DB_NAME]
+    collection = db["images"]
+    
+    # Get counts by set type
+    training_count = collection.count_documents({"set_type": "training"})
+    testing_count = collection.count_documents({"set_type": "testing"})
+    
+    # Get counts by fruit type
+    fruit_pipeline = [
+        {"$group": {"_id": "$fruit_type", "count": {"$sum": 1}}},
+        {"$sort": {"count": -1}}
+    ]  
+    # Print statistics
+    print(f"Total images: {training_count + testing_count}")
+    print(f"Training images: {training_count}")
+    print(f"Testing images: {testing_count}")
+    
+    # Close MongoDB connection
+    client.close()
+    
+    print("\n=== Preprocessing and data loading complete ===")
+
+if __name__ == "__main__":
+    main()

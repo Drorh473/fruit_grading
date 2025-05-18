@@ -1,8 +1,8 @@
 import torch
 import cv2
 import numpy as np
-from preprocessing_from_camera import custom_preprocessing
-from env_config import get_model_config
+from preprocessing.preprocessing_from_camera import custom_preprocessing
+import torchvision.models as models
 
 def register_hooks(model):
 
@@ -51,23 +51,11 @@ def preprocess_frame(frame, device):
         frame_rgb = frame
     
     # Apply custom preprocessing
-    processed = custom_preprocessing(frame_rgb)
-    
-    # Check if processed is a dictionary (which it will be according to your code)
-    if isinstance(processed, dict):
-        if 'normalized' in processed:
-            processed_frame = processed['normalized']
-        else:
-            # Fall back to enhanced image if normalized not available
-            processed_frame = processed.get('enhanced', processed_frame).astype(np.float32) / 255.0
-    else:
-        # If it's already a normalized array, use it directly
-        processed_frame = processed
+    processed_frame = custom_preprocessing(frame_rgb) 
     
     # Convert to PyTorch tensor and add batch dimension
     # Need to transpose from HWC to CHW format for PyTorch
     frame_tensor = torch.from_numpy(processed_frame).permute(2, 0, 1).unsqueeze(0).float().to(device)
-    
     return frame_tensor
 
 def extract_feature_maps(model, frame):
@@ -111,6 +99,11 @@ def extract_feature_maps(model, frame):
         # Clean up hooks to prevent memory leaks
         remove_hooks(hooks)
 
-def get_feature_maps_from_camera(model, frame):
+def get_feature_maps_from_camera( frame):
+    # Load pre-trained ShuffleNetV2 model
+    model = models.shufflenet_v2_x1_0(pretrained=True)
+    model.eval()  # Set to evaluation mode
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    model = model.to(device)
     # Simply call the extract_feature_maps function
     return extract_feature_maps(model, frame)

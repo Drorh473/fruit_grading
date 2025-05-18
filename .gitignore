@@ -1,4 +1,2 @@
-# Ignore processed datasets
-processed_dataset/
-dataset/
-FruitNetDataset/
+DataSets/
+gitignore.
