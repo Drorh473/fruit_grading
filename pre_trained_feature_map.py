@@ -49,7 +49,7 @@ def get_image_time_from_db(image_path):
         document = collection.find_one({"_id": file_id})
         if document:
             # Extract orientation/timestamp
-            time = document.get("time_stamp", 0)
+            time = document.get("timestamp", 0)
             return time
         
         # Default fallback
@@ -157,22 +157,16 @@ def group_features_by_object(feature_maps):
         path_parts = image_path.split(os.sep)
         
         # Look for object_id in the path
-        object_id = None
-        for part in path_parts:
-            if part.startswith('obj'):
-                object_id = part
-                break
-        
-        # Skip if no object_id found
-        if not object_id:
-            continue
-        
+        fruit_name = path_parts[-3]
+        object_id = path_parts[-2]
+        final_object_name = fruit_name + object_id
+
         # Initialize list for this object if not already present
-        if object_id not in object_features:
-            object_features[object_id] = []
+        if final_object_name not in object_features:
+            object_features[final_object_name] = []
         
         # Add features with time value to the list
-        object_features[object_id] = ({
+        object_features[final_object_name] = ({
             'features': data['featuremap'],
             'timestamp': data['timestamp'],
         })
@@ -252,6 +246,41 @@ def flatten_features(feature_map):
     
     return flattened_features
 
+def temporal_pooling(flattened_features):
+    """
+    Pool feature vectors across time frames for each object using AveragePooling1D.
+    
+    Args:
+        flattened_features: {obj_id: {'features': array, 'timestamp': value}}
+    Returns:
+        {obj_id: pooled_feature_vector}
+    """
+    pooled_vector = {} 
+    grouped_features = {}
+
+    for obj_id, data in flattened_features.items():
+         # Initialize list for new objects
+        if obj_id not in grouped_features:
+            grouped_features[obj_id] = []
+
+        # Add features to list
+        features = data['features']
+        grouped_features[obj_id].append(features)
+    
+    # Average features for each object
+    for obj_id, features_list in grouped_features.items():
+        if len(features_list) == 1:
+            # Single frame - no averaging needed
+            pooled_vector[obj_id] = features_list[0]
+        else:
+            # Multiple frames - stack and average across time dimension
+            stacked_features = np.stack(features_list)
+            # axis=0 means average across frames dimension
+            # (num_frames, feature_dim) -> (feature_dim,)
+            pooled_vector[obj_id] = np.mean(stacked_features, axis=0)
+
+    return pooled_vector
+
 def main():
     """
     Main function to extract features for all images and organize them by time
@@ -278,5 +307,7 @@ def main():
 
 if __name__ == "__main__":
     # Extract features for all images
-    feature_maps = main()
-    print(feature_maps)
+    feature_maps_after_flattening = main()
+    print("\nFlattening result: ", feature_maps_after_flattening)
+    pooled_vector = temporal_pooling(feature_maps_after_flattening)
+    print("\nPooling result: ", pooled_vector)

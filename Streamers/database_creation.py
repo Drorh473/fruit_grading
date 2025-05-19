@@ -15,7 +15,7 @@ from datetime import datetime, timedelta
 
 # Load environment variables
 env_path = Path('.') / '.env'
-load_dotenv(dotenv_path=env_path)
+load_dotenv(dotenv_path = env_path)
 
 # Get MongoDB connection string from .env
 MONGODB_CONNECTION_STRING = os.getenv('MONGO_CONNECTION_STRING')
