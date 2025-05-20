@@ -7,6 +7,7 @@ from tqdm import tqdm
 from pathlib import Path
 from dotenv import load_dotenv
 import pymongo
+from bson.objectid import ObjectId
 
 # Import the trained CNN
 from pre_trained_cnn import load_model, extract_features
@@ -25,15 +26,15 @@ BATCH_SIZE = int(os.getenv('BATCH_SIZE', 32))
 MONGO_CONNECTION_STRING = os.getenv('MONGO_CONNECTION_STRING')
 DB_NAME = os.getenv('DB_NAME', 'fruit_rotation_db')
 
-def get_image_time_from_db(image_path):
+def get_image_time_and_camera_from_db(image_path):
     """
-    Get the timestamp/orientation information for an image from the database
+    Get the timestamp and camera_id information for an image from the database
     
     Args:
         image_path: Path to the image
         
     Returns:
-        Timestamp or orientation value (integer)
+        Tuple of (timestamp, camera_id) or (None, None) if not found 
     """
     try:
         # Connect to MongoDB
@@ -44,20 +45,26 @@ def get_image_time_from_db(image_path):
         # Extract object_id from the filename
         filename = os.path.basename(image_path)
         file_id = os.path.splitext(filename)[0]
-        
+
+        # Convert to ObjectId 
+        object_id = ObjectId(file_id) 
+
         # Get the document from MongoDB
-        document = collection.find_one({"_id": file_id})
+        document = collection.find_one({"_id": object_id})
         if document:
-            # Extract orientation/timestamp
-            time = document.get("timestamp", 0)
-            return time
+            # Extract timestamp and camera_id
+            timestamp = document.get("timestamp")
+            camera_id = document.get("camera_id")
+            return timestamp, camera_id
         
         # Default fallback
-        return 0
+        print(f"No document found for image: {image_path}")
+        return None, None
         
     except Exception as e:
         print(f"Error getting time from DB for {image_path}: {e}")
-        return 0
+        return None, None
+
     finally:
         if 'client' in locals():
             client.close()
@@ -98,6 +105,11 @@ def batch_extract_features(input_dir, file_extensions='.png'):
             # Time the feature extraction
             start_time = time.time()
             
+            # Check if file exists before processing
+            if not os.path.isfile(image_path):
+                print(f"File not found: {image_path}")
+                continue
+
             # Load image and extract features
             # For batch processing, we load the image in extract_features to avoid duplication
             with torch.no_grad():
@@ -111,14 +123,15 @@ def batch_extract_features(input_dir, file_extensions='.png'):
             processing_times.append(processing_time)
             
             # Get time value from database
-            time_value = get_image_time_from_db(image_path)
+            time_value, camera_id = get_image_time_and_camera_from_db(image_path)
             
             # Reshape features to include time dimension
             features = np.transpose(features, (0, 2, 3, 1))[0]
             
             feature_map[image_path] = {
                 'featuremap': features,  
-                'timestamp' : time_value ,          
+                'timestamp' : time_value,  
+                'camera_id': camera_id         
             }  
             
         except Exception as e:
@@ -159,17 +172,24 @@ def group_features_by_object(feature_maps):
         # Look for object_id in the path
         fruit_name = path_parts[-3]
         object_id = path_parts[-2]
-        final_object_name = fruit_name + object_id
+        camera_id = data.get('camera_id')
+
+         # Skip entries without camera_id
+        if camera_id is None:
+            print(f"Warning: No camera_id for {image_path}, skipping")
+            continue
+        
+        # Create a unique key combining fruit type, object_id, and camera_id
+        final_object_key = f"{fruit_name}{object_id}_{camera_id}"
 
         # Initialize list for this object if not already present
-        if final_object_name not in object_features:
-            object_features[final_object_name] = []
-        
-        # Add features with time value to the list
-        object_features[final_object_name] = ({
-            'features': data['featuremap'],
-            'timestamp': data['timestamp'],
-        })
+        if final_object_key not in object_features:
+            object_features[final_object_key] = {
+                'features': data['featuremap'],
+                'timestamp': data['timestamp'],
+                'camera_id': camera_id,
+                'base_obj': f"{fruit_name}{object_id}"
+            }
     
     return object_features
 
@@ -241,7 +261,9 @@ def flatten_features(feature_map):
         # Store the flattened data
         flattened_features[obj_id] = {
             'features': flattened_data,
-            'timestamp': data['timestamp']
+            'timestamp': data['timestamp'],
+            'camera_id': data['camera_id'],
+            'base_obj': data['base_obj']
         }
     
     return flattened_features
@@ -251,35 +273,120 @@ def temporal_pooling(flattened_features):
     Pool feature vectors across time frames for each object using AveragePooling1D.
     
     Args:
-        flattened_features: {obj_id: {'features': array, 'timestamp': value}}
+        flattened_features: Dictionary {obj_id: {'features': array, 'timestamp': value, 'camera_id': id}}
     Returns:
-        {obj_id: pooled_feature_vector}
+       Dictionary {obj_id: pooled_feature_vector}
     """
+    # Dictionary to store the pooled feature vectors
     pooled_vector = {} 
     grouped_features = {}
 
-    for obj_id, data in flattened_features.items():
+    for obj_key, data in flattened_features.items():
          # Initialize list for new objects
-        if obj_id not in grouped_features:
-            grouped_features[obj_id] = []
+        if obj_key not in grouped_features:
+            grouped_features[obj_key] = []
 
-        # Add features to list
-        features = data['features']
-        grouped_features[obj_id].append(features)
+        # Add this feature and its timestamp to the list
+        grouped_features[obj_key].append({
+            'features': data['features'],
+            'timestamp': data['timestamp'],
+            'camera_id': data['camera_id'],
+            'base_obj': data['base_obj']
+        })
     
     # Average features for each object
-    for obj_id, features_list in grouped_features.items():
-        if len(features_list) == 1:
+    for obj_key, features_list in grouped_features.items():
+        # If we have timestamp information, sort features by timestamp
+        if features_list[0]['timestamp'] is not None:
+            try:
+                features_list.sort(key=lambda x: x['timestamp'])
+            except Exception as e:
+                print(f"Warning: Could not sort features by timestamp for {obj_id}: {e}")
+
+        # Extract just the feature arrays
+        feature_arrays = [item['features'] for item in features_list]
+
+        if len(feature_arrays) == 1:
             # Single frame - no averaging needed
-            pooled_vector[obj_id] = features_list[0]
+            # Store only the feature vector
+            pooled_vector[obj_key] = feature_arrays[0]
+
         else:
             # Multiple frames - stack and average across time dimension
-            stacked_features = np.stack(features_list)
+            stacked_features = np.stack(feature_arrays)
             # axis=0 means average across frames dimension
             # (num_frames, feature_dim) -> (feature_dim,)
-            pooled_vector[obj_id] = np.mean(stacked_features, axis=0)
+            pooled_vector[obj_key] = np.mean(stacked_features, axis=0)
 
     return pooled_vector
+
+def multi_view_fusion(pooled_vectors):
+    """
+    Combine feature vectors from multiple camera views for each object.
+    
+    Args:
+        pooled_vectors: Dictionary {obj_id: feature_array} containing pooled feature vectors
+    Returns:
+        Dictionary {object_id: fused_feature_vector}
+    """
+    # Dictionary to store the fused feature vectors
+    fused_vectors = {}
+    grouped_vectors = {}
+    
+    # Extract base object IDs from the combined fruit_type and object_id
+    for obj_key, feature_vector in pooled_vectors.items():
+        # Extract base object ID and camera ID from obj_key
+        # Format is "fruit_typeobj_id_camera_id"
+        parts = obj_key.split('_')
+        if len(parts) >= 2:
+            # Last part is camera_id, everything before is the base object
+            base_obj = parts[0]
+        else:
+            # If no underscore, use the whole key
+            base_obj = obj_key
+        
+        # Initialize list for this base object if not already present
+        if base_obj not in grouped_vectors:
+            grouped_vectors[base_obj] = []
+        
+        # Add this feature vector to the list
+        grouped_vectors[base_obj].append(feature_vector)
+    
+    # Apply fusion method to each group
+    for base_obj, vectors in grouped_vectors.items():
+        # Extract the object number for consistent output naming
+        obj_pos = base_obj.find('obj')
+        if obj_pos != -1:
+            obj_num = base_obj[obj_pos:]  # e.g., 'obj0003'
+        else:
+            obj_num = base_obj
+            
+        # Concatenate all feature vectors
+        if len(vectors) > 1:
+            # If we have multiple vectors, concatenate them
+            fused_vector = np.concatenate(vectors)
+        else:
+            # If we have only one vector, use it as is
+            fused_vector = vectors[0]
+            
+        # Store the fused vector with the base object ID
+        fused_vectors[base_obj] = fused_vector
+    
+    # Print some statistics about the fusion
+    print(f"\nMulti-view fusion complete using concateante method")
+    print(f"Number of base objects after fusion: {len(fused_vectors)}")
+    
+    # Calculate and print the dimensionality of fused vectors
+    if fused_vectors:
+        # Get dimension of first fused vector
+        sample_dim = next(iter(fused_vectors.values())).shape[0]
+        print(f"Fused vector dimensionality: {sample_dim}")
+        
+        # Get average number of cameras per object
+        avg_cameras = sum(len(v) for v in grouped_vectors.values()) / len(grouped_vectors)
+        print(f"Average cameras per object: {avg_cameras:.2f}")
+        
+    return fused_vectors
 
 def main():
     """
@@ -287,7 +394,7 @@ def main():
     
     Returns:
         Dictionary of temporal feature maps grouped by object_id,
-        with features in shape (t, h, w, c) where t is time/orientation
+        with features in shape (t, h, w, c) where t is time
     """
     # Extract features for training dataset
     training_features = get_all_feature_maps(dataset_type='training')
@@ -302,12 +409,27 @@ def main():
     print(f"  Training: {len(training_features)}")
     print(f"  Testing: {len(testing_features)}")
     
+    # Flatten features
     flatten_all_features = flatten_features(all_features)
-    return flatten_all_features
+
+    # Temporal pooling 
+    pooled_vectors = temporal_pooling(flatten_all_features)
+    print("\nPooling result (sample):")
+    if pooled_vectors:
+        for key in list(pooled_vectors.keys())[:3]:  # Show first 3 items
+            if isinstance(pooled_vectors[key], dict):
+                print(f"{key}: shape {pooled_vectors[key]['features'].shape}, camera_id: {pooled_vectors[key]['camera_id']}")
+            else:
+                print(f"{key}: shape {pooled_vectors[key].shape}")
+    
+    # Mult-view fusion
+    fused_vectors = multi_view_fusion(pooled_vectors)
+    print("\nFusion result (sample):")
+    if fused_vectors:
+        for key in list(fused_vectors.keys())[:3]:  # Show first 3 items
+            print(f"{key}: shape {fused_vectors[key].shape}")
+
+    return fused_vectors
 
 if __name__ == "__main__":
-    # Extract features for all images
-    feature_maps_after_flattening = main()
-    print("\nFlattening result: ", feature_maps_after_flattening)
-    pooled_vector = temporal_pooling(feature_maps_after_flattening)
-    print("\nPooling result: ", pooled_vector)
+    fused_feature_vectors = main()

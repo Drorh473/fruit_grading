@@ -95,9 +95,10 @@ def process_image(args):
         
         # Extract components from the path
         filename = parts[-1]
-        set_type = parts[-4]
-        fruit_type = parts[-3]
         object_id = parts[-2]
+        fruit_type = parts[-3]
+        set_type = parts[-4]
+        
         # Construct output path with same structure
         if set_type and fruit_type and object_id:
             output_subdir = os.path.join(output_dir, set_type, fruit_type, object_id)
