@@ -10,7 +10,6 @@ from tqdm import tqdm
 from dotenv import load_dotenv
 from pathlib import Path
 from bson.objectid import ObjectId
-import re
 from datetime import datetime, timedelta
 
 # Load environment variables
@@ -76,30 +75,22 @@ def collect_images(dataset_path=ORIGINAL_DATASET_PATH):
         frame_count = 0
         for obj_id in object_dirs:
             obj_dir = os.path.join(fruit_dir, obj_id)
-            
-            # Assign a random camera_id (between 1 and 4) for this object
-            camera_id = random.randint(1, NUM_OF_CAMERAS)
-            
+
             # Find all images for this object
             images = []
             for file in os.listdir(obj_dir):
                 if file.endswith(('.png', '.jpg', '.jpeg')):
                     images.append(file)
             
-            # Extract orientation from image names (im1.png, im2.png, etc.)
             for img_file in images:
-                # Extract orientation number
-                orientation_match = re.search(r'im(\d+)', img_file)
-                orientation = int(orientation_match.group(1)) if orientation_match else 0
-                
+                # Assign a random camera_id (between 1 and 4) for each image 
+                camera_id = random.randint(1, NUM_OF_CAMERAS)
+
                 img_path = os.path.join(obj_dir, img_file)
                 
                 # Generate timestamp for this frame
                 timestamp = sequence_start + (frame_count * frame_duration)
                 frame_count += 1
-                
-                # Convert timestamp to ISO format string for MongoDB storage
-                timestamp_str = timestamp.isoformat()
                 
                 # Get image dimensions
                 try:
@@ -116,15 +107,13 @@ def collect_images(dataset_path=ORIGINAL_DATASET_PATH):
                     "path": img_path,
                     "fruit_type": fruit_type,
                     "object_id": obj_id,      # Full object ID (e.g., "obj0001")
-                    "orientation": orientation,
-                    "camera_id": camera_id,   # Added camera_id field
-                    "timestamp": timestamp_str,  # Store as string for MongoDB compatibility
-                    "frame_number": frame_count,
+                    "camera_id": camera_id,   
+                    "timestamp": timestamp,  # Store as timestamp
                     "width": width,
                     "height": height,
                     "color": color_channels,
-                    "set_type": "",           # Will be set later
-                    "category": ""            # Left empty as requested
+                    "set_type": "",
+                    "category": ""  
                 }
                 
                 image_data.append(img_data)
