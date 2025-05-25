@@ -7,8 +7,8 @@ import torchvision.transforms as transforms
 from torchvision.models import (
     shufflenet_v2_x1_0, ShuffleNet_V2_X1_0_Weights,
     mobilenet_v3_large, MobileNet_V3_Large_Weights,
-    efficientnet_b0, EfficientNet_B0_Weights
 )
+import timm # import for the EfficientNet-Lite
 import cv2
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -60,12 +60,13 @@ def load_models():
     models['MobileNetV3'] = mobilenet
     feature_extractors['MobileNetV3'] = mobilenet.features
     
-    # EfficientNet-B0
-    efficientnet = efficientnet_b0(weights=EfficientNet_B0_Weights.IMAGENET1K_V1)
-    efficientnet = efficientnet.to(device)
-    efficientnet.eval()
-    models['EfficientNet-B0'] = efficientnet
-    feature_extractors['EfficientNet-B0'] = efficientnet.features
+    # EfficientNet-Lite
+    efficientnet_lite = timm.create_model('efficientnet_lite0', pretrained=True)
+    efficientnet_lite = efficientnet_lite.to(device)
+    efficientnet_lite.eval()
+    models['EfficientNet-Lite'] = efficientnet_lite
+    # Create feature extractor by removing classifier
+    feature_extractors['EfficientNet-Lite'] = nn.Sequential(*list(efficientnet_lite.children())[:-1])
     
     print("All models loaded successfully!")
     return models, feature_extractors, device
@@ -259,7 +260,7 @@ def run_model_comparison():
         'num_test_images': []
     }
     
-    model_names = ['ShuffleNetV2', 'MobileNetV3', 'EfficientNet-B0']
+    model_names = ['ShuffleNetV2', 'MobileNetV3', 'EfficientNet-Lite']
     
     for model_name in model_names:
         print(f"\n{'='*60}")
@@ -315,7 +316,7 @@ def save_and_visualize_results(results):
     
     # Create comprehensive visualization
     fig, axes = plt.subplots(2, 2, figsize=(20, 15))
-    fig.suptitle('Fruit Grading Model Comparison: ShuffleNetV2 vs MobileNetV3 vs EfficientNet-B0', fontsize=20)
+    fig.suptitle('Fruit Grading Model Comparison: ShuffleNetV2 vs MobileNetV3 vs EfficientNet-Lite', fontsize=20)
     
     # 1. Inference Time
     axes[0, 0].bar(results_df['model'], results_df['inference_time_avg_ms'], 
@@ -369,7 +370,7 @@ def main():
     print("="*80)
     print("FRUIT GRADING PROJECT - MODEL COMPARISON")
     print("="*80)
-    print("Comparing: ShuffleNetV2, MobileNetV3, EfficientNet-B0")
+    print("Comparing: ShuffleNetV2, MobileNetV3, EfficientNet-Lite")
     print(f"Target fruits: {TARGET_FRUITS}")
     print(f"Using your custom preprocessing pipeline")
     
