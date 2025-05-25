@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 from pymongo import MongoClient
+import matplotlib.pyplot as plt
 
 # Load environment variables
 env_path = Path('.') / '.env'
@@ -52,11 +53,11 @@ class CameraSimulator:
         print(f"Connecting to MongoDB database: {self.db_name}.{collection_name}")
         
         if MONGO_CONNECTION_STRING:
-            self.client = MongoClient(MONGO_CONNECTION_STRING)
+            self.client = pymongo.MongoClient(MONGO_CONNECTION_STRING)
         else:
             # Fallback to localhost if connection string not provided
-            print("Warning: MongoDB connection string not set in .env file. Using localhost.")
-            self.client = MongoClient("mongodb://localhost:27017/")
+            print("Warning: MongoDB connection string not set in .env file.")
+            return
             
         self.db = self.client[self.db_name]
         self.collection = self.db[collection_name]
@@ -178,9 +179,7 @@ class CameraSimulator:
             print(f"Error reading frame: {e}")
             return False, None, None
 
-# Example usage
 if __name__ == "__main__":
-    import matplotlib.pyplot as plt
     
     # Create camera simulator with environment settings
     cam = CameraSimulator()
