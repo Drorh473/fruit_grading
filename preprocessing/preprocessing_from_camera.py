@@ -45,6 +45,8 @@ def custom_preprocessing(image):
     
     # 2. Apply CLAHE for histogram equalization (on grayscale version)
     # Convert to Lab color space (L channel is the lightness)
+    # (L for lightness, and a* and b* for color coordinates) - The a* axis represents the red/green dimension,
+    # and the b* axis represents the yellow/blue dimension.
     lab = cv2.cvtColor(blurred, cv2.COLOR_RGB2LAB)
     l, a, b = cv2.split(lab)
     
