@@ -61,6 +61,8 @@ def custom_preprocessing(image, save_path=None):
     
     # 2. Apply CLAHE for histogram equalization (on grayscale version)
     # Convert to Lab color space (L channel is the lightness)
+    # (L for lightness, and a* and b* for color coordinates) - The a* axis represents the red/green dimension,
+    # and the b* axis represents the yellow/blue dimension.
     lab = cv2.cvtColor(blurred, cv2.COLOR_RGB2LAB)
     l, a, b = cv2.split(lab)
     
@@ -130,20 +132,20 @@ def process_image(args):
         return None, None , f"Error processing {image_path}: {e}"
 
 
-def preprocess_and_save_dataset(sequanceofcameras, output_dir=None, db_name=os.getenv('DB_NAME', "fruit_grading"), collection_name="images"):
+def preprocess_and_save_dataset(sequance_of_cameras, output_dir=None, db_name=os.getenv('DB_NAME', "fruit_grading"), collection_name="images"):
     """Preprocess all images in the sequence of cameras and save them to the output directory"""
     output_dir = output_dir or PROCESSED_DATASET_PATH
     print(f"Starting preprocessing and saving images from sequence of cameras to {output_dir}...")
     
     # Count total images for progress tracking
-    total_images = sum(len(camera) for camera in sequanceofcameras if camera)
+    total_images = sum(len(camera) for camera in sequance_of_cameras if camera)
     if total_images == 0:
         print("No images to process.")
         return output_dir
     
     # Process each camera's images
     all_results = []
-    for cam_idx, camera in enumerate(sequanceofcameras):
+    for cam_idx, camera in enumerate(sequance_of_cameras):
         if not camera:
             continue
             
@@ -151,7 +153,7 @@ def preprocess_and_save_dataset(sequanceofcameras, output_dir=None, db_name=os.g
         print(f"Processing camera {cam_idx} with {len(camera)} images...")
         
         # Create args with camera number and output_dir for tracking
-        process_args = [(path, cam_idx, output_dir) for path in camera]  # Added output_dir to args
+        process_args = [(path, cam_idx, output_dir) for path in camera]  
         
         # Use multiprocessing for image processing
         num_processes = max(1, multiprocessing.cpu_count() - 1)
@@ -220,12 +222,15 @@ def load_dataset_split_by_camera(db_name=os.getenv('DB_NAME'), collection_name="
     client = pymongo.MongoClient(MONGODB_CONNECTION_STRING)
     db = client[db_name]
     collection = db[collection_name]
-    sequenceofcamera = [[] for _ in range(NUM_OF_CAMERAS+1)]  # Create list of empty lists
+
+    sequance_of_cameras = [[] for _ in range(NUM_OF_CAMERAS+1)]  # Create list of empty lists
+
     for image in collection.find():
         camera_id = image.get('camera_id')
         if 1 <= camera_id <= NUM_OF_CAMERAS:
-            sequenceofcamera[camera_id].append(image.get('path'))
-    return sequenceofcamera
+            sequance_of_cameras[camera_id].append(image.get('path'))
+
+    return sequance_of_cameras
 
 def set_generator(set_type, db_name=DB_NAME, collection_name="images", show_progress=True):
     """Create a batch generator for the specified set type"""
@@ -268,7 +273,6 @@ def set_generator(set_type, db_name=DB_NAME, collection_name="images", show_prog
                 
                 # We'll collect valid images
                 batch_images = []
-                batch_orientations = []
                 
                 for idx in batch_indices:
                     doc = documents[idx]
@@ -291,12 +295,8 @@ def set_generator(set_type, db_name=DB_NAME, collection_name="images", show_prog
                         # Convert to RGB (OpenCV loads as BGR)
                         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
                         
-                        # Get orientation
-                        orientation = doc.get("orientation", 0)
-                        
                         # Add to batch lists
                         batch_images.append(img)
-                        batch_orientations.append(orientation)
                     
                     except Exception as e:
                         print(f"Error loading {img_path}: {e}")
@@ -307,9 +307,8 @@ def set_generator(set_type, db_name=DB_NAME, collection_name="images", show_prog
                 
                 # Convert lists to arrays
                 batch_x = np.array(batch_images)
-                batch_y = np.array(batch_orientations)
                 
-                yield batch_x, batch_y
+                yield batch_x
         
         # Add metadata to the generator function
         batch_generator.samples = len(documents)
@@ -341,10 +340,10 @@ def load_dataset_with_preprocessing():
     
     # Get image paths by set type
 
-    sequencecamera = load_dataset_split_by_camera()
+    sequence_camera = load_dataset_split_by_camera()
     # Preprocess images if needed
     if not os.path.isdir(processed_dir):
-        preprocess_and_save_dataset(sequencecamera, processed_dir)
+        preprocess_and_save_dataset(sequence_camera, processed_dir)
     
     # Create generators for training and testing
     train_gen, _, train_count = set_generator("training")
@@ -403,14 +402,13 @@ def main():
         print("\nStep 4: Displaying sample images from training set...")
         try:
             # Get a batch from the training generator
-            batch_x, batch_y = next(train_gen())
+            batch_x = next(train_gen())
             
             # Display a few images with their orientations
             plt.figure(figsize=(15, 5))
             for i in range(min(5, len(batch_x))):
                 plt.subplot(1, 5, i+1)
                 plt.imshow(batch_x[i])
-                plt.title(f"Orientation: {batch_y[i]}")
                 plt.axis('off')
             
             plt.tight_layout()

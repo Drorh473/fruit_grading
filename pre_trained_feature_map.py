@@ -12,6 +12,8 @@ from bson.objectid import ObjectId
 # Import the trained CNN
 from pre_trained_cnn import load_model, extract_features
 
+# Import activation functions
+from activation_functions import relu, softmax
 
 # Load environment variables
 env_path = Path('.') / '.env'
@@ -433,3 +435,5 @@ def main():
 
 if __name__ == "__main__":
     fused_feature_vectors = main()
+    after_relu = relu(fused_feature_vectors)
+    after_softmax = softmax(after_relu)

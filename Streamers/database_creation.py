@@ -141,7 +141,7 @@ def store_in_database(image_data, db_name, collection_name):
     return db_name, collection_name
 
 def split_data(db_name, collection_name, training_percentage=80, testing_percentage=20):
-    """Split data into training and testing sets (80/20 split)"""
+    """Split data into training and testing sets with 80/20 split per category"""
     start_time = time.time()
     
     # Verify percentages
@@ -153,35 +153,42 @@ def split_data(db_name, collection_name, training_percentage=80, testing_percent
     db = client[db_name]
     collection = db[collection_name]
     
-    # Group by fruit_type and object_id to ensure object-level split
-    groups = {}
+    # Get unique fruit types
+    fruit_types = collection.distinct("fruit_type")
     
-    # Get all documents
-    all_docs = list(collection.find({}, {"_id": 1, "fruit_type": 1, "object_id": 1}))
-    
-    # Group documents by fruit_type and object_id
-    for doc in all_docs:
-        group_key = f"{doc['fruit_type']}_{doc['object_id']}"
-        if group_key not in groups:
-            groups[group_key] = []
-        groups[group_key].append(doc["_id"])
-    
-    # Shuffle the group keys to randomize the split
-    group_keys = list(groups.keys())
-    random.shuffle(group_keys)
-    
-    # Calculate split point for groups
-    training_groups_count = int(len(group_keys) * (training_percentage / 100))
-    
-    # Assign groups to training or testing
     training_ids = []
     testing_ids = []
     
-    for i, key in enumerate(group_keys):
-        if i < training_groups_count:
-            training_ids.extend(groups[key])
-        else:
-            testing_ids.extend(groups[key])
+    # Process each fruit type separately
+    for fruit_type in fruit_types:
+        # Group by object_id within this fruit type
+        object_ids = collection.distinct("object_id", {"fruit_type": fruit_type})
+        
+        # Shuffle the object_ids to randomize the split
+        random.shuffle(object_ids)
+        
+        # Calculate split point for objects in this fruit type
+        training_objects_count = int(len(object_ids) * (training_percentage / 100))
+        
+        # Assign objects to training or testing
+        training_objects = object_ids[:training_objects_count]
+        testing_objects = object_ids[training_objects_count:]
+        
+        # Get document IDs for training set in this fruit type
+        if training_objects:
+            train_docs = collection.find(
+                {"fruit_type": fruit_type, "object_id": {"$in": training_objects}},
+                {"_id": 1}
+            )
+            training_ids.extend([doc["_id"] for doc in train_docs])
+        
+        # Get document IDs for testing set in this fruit type
+        if testing_objects:
+            test_docs = collection.find(
+                {"fruit_type": fruit_type, "object_id": {"$in": testing_objects}},
+                {"_id": 1}
+            )
+            testing_ids.extend([doc["_id"] for doc in test_docs])
     
     # Update database for training set
     if training_ids:
@@ -202,9 +209,16 @@ def split_data(db_name, collection_name, training_percentage=80, testing_percent
     testing_count = collection.count_documents({"set_type": "testing"})
     
     print("Data split results:")
-    print(f"  training: {training_count} images ({training_percentage}%)")
-    print(f"  testing: {testing_count} images ({testing_percentage}%)")
+    print(f" training: {training_count} images ({training_percentage}%)")
+    print(f" testing: {testing_count} images ({testing_percentage}%)")
     print(f"Split completed in {time.time() - start_time:.2f} seconds")
+    
+    # Print breakdown by fruit type for verification
+    for fruit_type in fruit_types:
+        train_count = collection.count_documents({"fruit_type": fruit_type, "set_type": "training"})
+        test_count = collection.count_documents({"fruit_type": fruit_type, "set_type": "testing"})
+        total = train_count + test_count
+        print(f"{fruit_type}: training={train_count} ({train_count/total*100:.1f}%), testing={test_count} ({test_count/total*100:.1f}%)")
     
     return db_name, collection_name
 
@@ -296,7 +310,6 @@ def update_data_directory(db_name, collection_name, data_dir=STORED_DATASET_PATH
     updates_made = 0
     errors = 0
     
-    # Use bulk operations for better performance
     bulk_operations = []
     MAX_BULK_SIZE = 500
     
@@ -322,8 +335,6 @@ def update_data_directory(db_name, collection_name, data_dir=STORED_DATASET_PATH
                     if not filename.lower().endswith('.png'):
                         continue
                     
-                    files_processed += 1
-                    
                     try:
                         #full path to the image file
                         image_path = os.path.join(obj_path, filename)
@@ -331,11 +342,7 @@ def update_data_directory(db_name, collection_name, data_dir=STORED_DATASET_PATH
                         # Extract ID from filename only (not full path)
                         image_id = os.path.splitext(filename)[0]
                         
-                        # Debug print for first few files
-                        if files_processed <= 3:
-                            print(f"Debug: filename={filename}, image_id={image_id}, path={image_path}")
-                        
-                        # Try with string ID first (most likely case for your setup)
+                        # Try with string ID first
                         object_id = ObjectId(image_id)
                 
                         # Create update operation - updating ONLY the path
@@ -353,6 +360,8 @@ def update_data_directory(db_name, collection_name, data_dir=STORED_DATASET_PATH
                             bulk_operations = []
                             
                             print(f"Processed {files_processed} files, updated {updates_made} records so far...")
+                        
+                        files_processed += 1
                             
                     except Exception as e:
                         errors += 1
