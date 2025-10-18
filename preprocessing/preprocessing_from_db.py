@@ -88,19 +88,18 @@ def custom_preprocessing(image, save_path=None):
 
 def process_image(args):
     """Process a single image and save the preprocessed version"""
-    image_path, camera_num, output_dir = args
+    image_path, output_dir = args
     try:
         # Parse path components
         parts = image_path.split(os.sep)
-        
+
         # Extract components from the path
         filename = parts[-1]
-        set_type = parts[-4]
-        fruit_type = parts[-3]
-        object_id = parts[-2]
+        camera_id = parts[-2]
+        set_type = parts[-3]
         # Construct output path with same structure
-        if set_type and fruit_type and object_id:
-            output_subdir = os.path.join(output_dir, set_type, fruit_type, object_id)
+        if set_type and camera_id:
+            output_subdir = os.path.join(output_dir, set_type, camera_id)
         else:
             # Fallback if path structure not recognized
             output_subdir = os.path.join(output_dir, "unknown")
@@ -150,7 +149,7 @@ def preprocess_and_save_dataset(sequanceofcameras, output_dir=None, db_name=os.g
         print(f"Processing camera {cam_idx} with {len(camera)} images...")
         
         # Create args with camera number and output_dir for tracking
-        process_args = [(path, cam_idx, output_dir) for path in camera]  # Added output_dir to args
+        process_args = [(path, output_dir) for path in camera]  # Added output_dir to args
         
         # Use multiprocessing for image processing
         num_processes = max(1, multiprocessing.cpu_count() - 1)
@@ -219,14 +218,14 @@ def load_dataset_split_by_camera(db_name=os.getenv('DB_NAME'), collection_name="
     client = pymongo.MongoClient(MONGODB_CONNECTION_STRING)
     db = client[db_name]
     collection = db[collection_name]
-    sequenceofcamera = [[] for _ in range(NUM_OF_CAMERAS+1)]  # Create list of empty lists
+    sequenceofcamera = [[] for _ in range(0,NUM_OF_CAMERAS)]  # Create list of empty lists
     for image in collection.find():
         camera_id = image.get('camera_id')
-        if 1 <= camera_id <= NUM_OF_CAMERAS:
+        if 0 <= camera_id <= NUM_OF_CAMERAS-1:
             sequenceofcamera[camera_id].append(image.get('path'))
     return sequenceofcamera
 
-def set_generator(set_type, db_name=DB_NAME, collection_name="images", show_progress=True):
+def set_generator(set_type, db_name=DB_NAME, collection_name="images"):
     """Create a batch generator for the specified set type"""
     client = pymongo.MongoClient(MONGODB_CONNECTION_STRING)
     db = client[db_name]
@@ -256,9 +255,7 @@ def set_generator(set_type, db_name=DB_NAME, collection_name="images", show_prog
             
             # Create iterator with optional progress bar
             batch_range = range(num_batches)
-            if show_progress:
-                batch_range = tqdm(batch_range, desc=f"{set_type} batches")
-            
+   
             # Generate batches
             for batch_idx in batch_range:
                 start_idx = batch_idx * BATCH_SIZE
@@ -267,7 +264,6 @@ def set_generator(set_type, db_name=DB_NAME, collection_name="images", show_prog
                 
                 # We'll collect valid images
                 batch_images = []
-                batch_orientations = []
                 
                 for idx in batch_indices:
                     doc = documents[idx]
@@ -290,12 +286,9 @@ def set_generator(set_type, db_name=DB_NAME, collection_name="images", show_prog
                         # Convert to RGB (OpenCV loads as BGR)
                         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
                         
-                        # Get orientation
-                        orientation = doc.get("orientation", 0)
                         
                         # Add to batch lists
                         batch_images.append(img)
-                        batch_orientations.append(orientation)
                     
                     except Exception as e:
                         print(f"Error loading {img_path}: {e}")
@@ -306,9 +299,8 @@ def set_generator(set_type, db_name=DB_NAME, collection_name="images", show_prog
                 
                 # Convert lists to arrays
                 batch_x = np.array(batch_images)
-                batch_y = np.array(batch_orientations)
                 
-                yield batch_x, batch_y
+                yield batch_x
         
         # Add metadata to the generator function
         batch_generator.samples = len(documents)
@@ -402,14 +394,13 @@ def main():
         print("\nStep 4: Displaying sample images from training set...")
         try:
             # Get a batch from the training generator
-            batch_x, batch_y = next(train_gen())
+            batch_x = next(train_gen())
             
-            # Display a few images with their orientations
+            # Display few images
             plt.figure(figsize=(15, 5))
             for i in range(min(5, len(batch_x))):
                 plt.subplot(1, 5, i+1)
                 plt.imshow(batch_x[i])
-                plt.title(f"Orientation: {batch_y[i]}")
                 plt.axis('off')
             
             plt.tight_layout()
