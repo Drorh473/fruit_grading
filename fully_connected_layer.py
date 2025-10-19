@@ -38,9 +38,9 @@ def knn_classify(feature_vector, reference_features, reference_labels, k=3, dist
     
     if not distances:
         return {
-            'predicted_class': 1,
-            'class_name': 'Standard',
-            'confidence': 0.33,
+            'predicted_class': None,
+            'class_name': None,
+            'confidence': None,
             'nearest_neighbors': []
         }
     
