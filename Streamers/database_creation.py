@@ -99,9 +99,6 @@ def collect_images(dataset_path=ORIGINAL_DATASET_PATH):
                 
                 # Process each image
                 for img_file in images:
-                    # Extract orientation number from filename
-                    orientation_match = re.search(r'(\d+)', img_file)
-                    orientation = int(orientation_match.group(1)) if orientation_match else 0
                     
                     img_path = os.path.join(angle_dir, img_file)
                     
@@ -124,7 +121,6 @@ def collect_images(dataset_path=ORIGINAL_DATASET_PATH):
                         "path": img_path,
                         "fruit_type": fruit_type,
                         "object_id": obj_id,
-                        "orientation": orientation,
                         "camera_id": camera_id,
                         "timestamp": timestamp,
                         "frame_number": frame_count,

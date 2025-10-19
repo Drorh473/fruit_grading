@@ -61,8 +61,6 @@ def custom_preprocessing(image, save_path=None):
     
     # 2. Apply CLAHE for histogram equalization (on grayscale version)
     # Convert to Lab color space (L channel is the lightness)
-    # (L for lightness, and a* and b* for color coordinates) - The a* axis represents the red/green dimension,
-    # and the b* axis represents the yellow/blue dimension.
     lab = cv2.cvtColor(blurred, cv2.COLOR_RGB2LAB)
     l, a, b = cv2.split(lab)
     
@@ -90,20 +88,18 @@ def custom_preprocessing(image, save_path=None):
 
 def process_image(args):
     """Process a single image and save the preprocessed version"""
-    image_path, camera_num, output_dir = args
+    image_path, output_dir = args
     try:
         # Parse path components
         parts = image_path.split(os.sep)
-        
+
         # Extract components from the path
         filename = parts[-1]
-        object_id = parts[-2]
-        fruit_type = parts[-3]
-        set_type = parts[-4]
-        
+        camera_id = parts[-2]
+        set_type = parts[-3]
         # Construct output path with same structure
-        if set_type and fruit_type and object_id:
-            output_subdir = os.path.join(output_dir, set_type, fruit_type, object_id)
+        if set_type and camera_id:
+            output_subdir = os.path.join(output_dir, set_type, camera_id)
         else:
             # Fallback if path structure not recognized
             output_subdir = os.path.join(output_dir, "unknown")
@@ -132,20 +128,20 @@ def process_image(args):
         return None, None , f"Error processing {image_path}: {e}"
 
 
-def preprocess_and_save_dataset(sequance_of_cameras, output_dir=None, db_name=os.getenv('DB_NAME', "fruit_grading"), collection_name="images"):
+def preprocess_and_save_dataset(sequanceofcameras, output_dir=None, db_name=os.getenv('DB_NAME', "fruit_grading"), collection_name="images"):
     """Preprocess all images in the sequence of cameras and save them to the output directory"""
     output_dir = output_dir or PROCESSED_DATASET_PATH
     print(f"Starting preprocessing and saving images from sequence of cameras to {output_dir}...")
     
     # Count total images for progress tracking
-    total_images = sum(len(camera) for camera in sequance_of_cameras if camera)
+    total_images = sum(len(camera) for camera in sequanceofcameras if camera)
     if total_images == 0:
         print("No images to process.")
         return output_dir
     
     # Process each camera's images
     all_results = []
-    for cam_idx, camera in enumerate(sequance_of_cameras):
+    for cam_idx, camera in enumerate(sequanceofcameras):
         if not camera:
             continue
             
@@ -153,7 +149,7 @@ def preprocess_and_save_dataset(sequance_of_cameras, output_dir=None, db_name=os
         print(f"Processing camera {cam_idx} with {len(camera)} images...")
         
         # Create args with camera number and output_dir for tracking
-        process_args = [(path, cam_idx, output_dir) for path in camera]  
+        process_args = [(path, output_dir) for path in camera]  # Added output_dir to args
         
         # Use multiprocessing for image processing
         num_processes = max(1, multiprocessing.cpu_count() - 1)
@@ -222,17 +218,14 @@ def load_dataset_split_by_camera(db_name=os.getenv('DB_NAME'), collection_name="
     client = pymongo.MongoClient(MONGODB_CONNECTION_STRING)
     db = client[db_name]
     collection = db[collection_name]
-
-    sequance_of_cameras = [[] for _ in range(NUM_OF_CAMERAS+1)]  # Create list of empty lists
-
+    sequenceofcamera = [[] for _ in range(0,NUM_OF_CAMERAS)]  # Create list of empty lists
     for image in collection.find():
         camera_id = image.get('camera_id')
-        if 1 <= camera_id <= NUM_OF_CAMERAS:
-            sequance_of_cameras[camera_id].append(image.get('path'))
+        if 0 <= camera_id <= NUM_OF_CAMERAS-1:
+            sequenceofcamera[camera_id].append(image.get('path'))
+    return sequenceofcamera
 
-    return sequance_of_cameras
-
-def set_generator(set_type, db_name=DB_NAME, collection_name="images", show_progress=True):
+def set_generator(set_type, db_name=DB_NAME, collection_name="images"):
     """Create a batch generator for the specified set type"""
     client = pymongo.MongoClient(MONGODB_CONNECTION_STRING)
     db = client[db_name]
@@ -262,9 +255,7 @@ def set_generator(set_type, db_name=DB_NAME, collection_name="images", show_prog
             
             # Create iterator with optional progress bar
             batch_range = range(num_batches)
-            if show_progress:
-                batch_range = tqdm(batch_range, desc=f"{set_type} batches")
-            
+   
             # Generate batches
             for batch_idx in batch_range:
                 start_idx = batch_idx * BATCH_SIZE
@@ -294,6 +285,7 @@ def set_generator(set_type, db_name=DB_NAME, collection_name="images", show_prog
                         
                         # Convert to RGB (OpenCV loads as BGR)
                         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+                        
                         
                         # Add to batch lists
                         batch_images.append(img)
@@ -340,10 +332,10 @@ def load_dataset_with_preprocessing():
     
     # Get image paths by set type
 
-    sequence_camera = load_dataset_split_by_camera()
+    sequencecamera = load_dataset_split_by_camera()
     # Preprocess images if needed
     if not os.path.isdir(processed_dir):
-        preprocess_and_save_dataset(sequence_camera, processed_dir)
+        preprocess_and_save_dataset(sequencecamera, processed_dir)
     
     # Create generators for training and testing
     train_gen, _, train_count = set_generator("training")
@@ -404,7 +396,7 @@ def main():
             # Get a batch from the training generator
             batch_x = next(train_gen())
             
-            # Display a few images with their orientations
+            # Display few images
             plt.figure(figsize=(15, 5))
             for i in range(min(5, len(batch_x))):
                 plt.subplot(1, 5, i+1)
