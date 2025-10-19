@@ -10,11 +10,12 @@ from tqdm import tqdm
 from dotenv import load_dotenv
 from pathlib import Path
 from bson.objectid import ObjectId
+import re
 from datetime import datetime, timedelta
 
 # Load environment variables
 env_path = Path('.') / '.env'
-load_dotenv(dotenv_path = env_path)
+load_dotenv(dotenv_path=env_path)
 
 # Get MongoDB connection string from .env
 MONGODB_CONNECTION_STRING = os.getenv('MONGO_CONNECTION_STRING')
@@ -75,48 +76,66 @@ def collect_images(dataset_path=ORIGINAL_DATASET_PATH):
         frame_count = 0
         for obj_id in object_dirs:
             obj_dir = os.path.join(fruit_dir, obj_id)
-
-            # Find all images for this object
-            images = []
-            for file in os.listdir(obj_dir):
-                if file.endswith(('.png', '.jpg', '.jpeg')):
-                    images.append(file)
             
-            for img_file in images:
-                # Assign a random camera_id (between 1 and 4) for each image 
-                camera_id = random.randint(1, NUM_OF_CAMERAS)
-
-                img_path = os.path.join(obj_dir, img_file)
+            # Find all angle directories inside object directory
+            angle_dirs = []
+            for item in os.listdir(obj_dir):
+                angle_path = os.path.join(obj_dir, item)
+                if os.path.isdir(angle_path):
+                    angle_dirs.append(item)
+            
+            # Process each angle directory
+            for angle_id in angle_dirs:
+                angle_dir = os.path.join(obj_dir, angle_id)
                 
-                # Generate timestamp for this frame
-                timestamp = sequence_start + (frame_count * frame_duration)
-                frame_count += 1
+                # Extract camera_id from angle_id (last character)
+                camera_id = int(angle_id[-1]) if angle_id[-1].isdigit() else 1
                 
-                # Get image dimensions
-                try:
-                    img = Image.open(img_path)
-                    width, height = img.size
-                    color_channels = 3 if img.mode == 'RGB' else 1
-                    img.close()
-                except Exception as e:
-                    print(f"Error processing {img_path}: {e}")
-                    continue
+                # Find all images in this angle directory
+                images = []
+                for file in os.listdir(angle_dir):
+                    if file.lower().endswith(('.png', '.jpg', '.jpeg')):
+                        images.append(file)
                 
-                # Create image metadata
-                img_data = {
-                    "path": img_path,
-                    "fruit_type": fruit_type,
-                    "object_id": obj_id,      # Full object ID (e.g., "obj0001")
-                    "camera_id": camera_id,   
-                    "timestamp": timestamp,  # Store as timestamp
-                    "width": width,
-                    "height": height,
-                    "color": color_channels,
-                    "set_type": "",
-                    "category": ""  
-                }
-                
-                image_data.append(img_data)
+                # Process each image
+                for img_file in images:
+                    # Extract orientation number from filename
+                    orientation_match = re.search(r'(\d+)', img_file)
+                    orientation = int(orientation_match.group(1)) if orientation_match else 0
+                    
+                    img_path = os.path.join(angle_dir, img_file)
+                    
+                    # Generate timestamp for this frame
+                    timestamp = sequence_start + (frame_count * frame_duration)
+                    frame_count += 1
+                    
+                    # Get image dimensions
+                    try:
+                        img = Image.open(img_path)
+                        width, height = img.size
+                        color_channels = 3 if img.mode == 'RGB' else 1
+                        img.close()
+                    except Exception as e:
+                        print(f"Error processing {img_path}: {e}")
+                        continue
+                    
+                    # Create image metadata
+                    img_data = {
+                        "path": img_path,
+                        "fruit_type": fruit_type,
+                        "object_id": obj_id,
+                        "orientation": orientation,
+                        "camera_id": camera_id,
+                        "timestamp": timestamp,
+                        "frame_number": frame_count,
+                        "width": width,
+                        "height": height,
+                        "color": color_channels,
+                        "set_type": "",
+                        "category": ""
+                    }
+                    
+                    image_data.append(img_data)
     
     print(f"Found {len(image_data)} images in {time.time() - start_time:.2f} seconds")
     return image_data
@@ -131,7 +150,7 @@ def store_in_database(image_data, db_name, collection_name):
     db = client[db_name]
     collection = db[collection_name]
     
-    # Insert in batches
+    # Insert in batches for large Database
     batch_size = 1000
     for i in tqdm(range(0, len(image_data), batch_size), desc="Inserting batches"):
         batch = image_data[i:i+batch_size]
@@ -140,8 +159,8 @@ def store_in_database(image_data, db_name, collection_name):
     print(f"Stored {len(image_data)} images in {time.time() - start_time:.2f} seconds")
     return db_name, collection_name
 
-def split_data(db_name, collection_name, training_percentage=80, testing_percentage=20):
-    """Split data into training and testing sets with 80/20 split per category"""
+def split_data(db_name, collection_name, training_percentage=66, testing_percentage=34):
+    """Split data into training and testing sets (66/34 split)"""
     start_time = time.time()
     
     # Verify percentages
@@ -153,42 +172,35 @@ def split_data(db_name, collection_name, training_percentage=80, testing_percent
     db = client[db_name]
     collection = db[collection_name]
     
-    # Get unique fruit types
-    fruit_types = collection.distinct("fruit_type")
+    # Group by fruit_type and object_id to ensure object-level split
+    groups = {}
     
+    # Get all documents
+    all_docs = list(collection.find({}, {"_id": 1, "fruit_type": 1, "object_id": 1, "camera_id": 1}))
+    
+    # Group documents by fruit_type and object_id
+    for doc in all_docs:
+        group_key = f"{doc['fruit_type']}_{doc['object_id']}_{doc['camera_id']}"
+        if group_key not in groups:
+            groups[group_key] = []
+        groups[group_key].append(doc["_id"])
+    
+    # Shuffle the group keys to randomize the split
+    group_keys = list(groups.keys())
+    random.shuffle(group_keys)
+    
+    # Calculate split point for groups
+    training_groups_count = int(len(group_keys) * (training_percentage / 100))
+    
+    # Assign groups to training or testing
     training_ids = []
     testing_ids = []
     
-    # Process each fruit type separately
-    for fruit_type in fruit_types:
-        # Group by object_id within this fruit type
-        object_ids = collection.distinct("object_id", {"fruit_type": fruit_type})
-        
-        # Shuffle the object_ids to randomize the split
-        random.shuffle(object_ids)
-        
-        # Calculate split point for objects in this fruit type
-        training_objects_count = int(len(object_ids) * (training_percentage / 100))
-        
-        # Assign objects to training or testing
-        training_objects = object_ids[:training_objects_count]
-        testing_objects = object_ids[training_objects_count:]
-        
-        # Get document IDs for training set in this fruit type
-        if training_objects:
-            train_docs = collection.find(
-                {"fruit_type": fruit_type, "object_id": {"$in": training_objects}},
-                {"_id": 1}
-            )
-            training_ids.extend([doc["_id"] for doc in train_docs])
-        
-        # Get document IDs for testing set in this fruit type
-        if testing_objects:
-            test_docs = collection.find(
-                {"fruit_type": fruit_type, "object_id": {"$in": testing_objects}},
-                {"_id": 1}
-            )
-            testing_ids.extend([doc["_id"] for doc in test_docs])
+    for i, key in enumerate(group_keys):
+        if i < training_groups_count:
+            training_ids.extend(groups[key])
+        else:
+            testing_ids.extend(groups[key])
     
     # Update database for training set
     if training_ids:
@@ -209,25 +221,18 @@ def split_data(db_name, collection_name, training_percentage=80, testing_percent
     testing_count = collection.count_documents({"set_type": "testing"})
     
     print("Data split results:")
-    print(f" training: {training_count} images ({training_percentage}%)")
-    print(f" testing: {testing_count} images ({testing_percentage}%)")
+    print(f"  training: {training_count} images ({training_percentage}%)")
+    print(f"  testing: {testing_count} images ({testing_percentage}%)")
     print(f"Split completed in {time.time() - start_time:.2f} seconds")
-    
-    # Print breakdown by fruit type for verification
-    for fruit_type in fruit_types:
-        train_count = collection.count_documents({"fruit_type": fruit_type, "set_type": "training"})
-        test_count = collection.count_documents({"fruit_type": fruit_type, "set_type": "testing"})
-        total = train_count + test_count
-        print(f"{fruit_type}: training={train_count} ({train_count/total*100:.1f}%), testing={test_count} ({test_count/total*100:.1f}%)")
     
     return db_name, collection_name
 
 def copy_image_file(args):
-    """Copy image file to the output directory"""
-    doc_id, path, fruit_type, object_id, set_type, output_dir = args
+    """Copy image file to the output directory organized by camera_id"""
+    doc_id, path, camera_id, set_type, output_dir = args
     
-    # Create target directory: output_dir/set_type/fruit_type/object_id
-    target_dir = os.path.join(output_dir, set_type, fruit_type, object_id)
+    # Create target directory: output_dir/set_type/camera_X
+    target_dir = os.path.join(output_dir, set_type, f"camera_{camera_id}")
     os.makedirs(target_dir, exist_ok=True)
     
     # Get file extension
@@ -243,8 +248,9 @@ def copy_image_file(args):
         print(f"Error copying {path}: {e}")
         return False
 
+
 def create_directory_structure(db_name, collection_name, output_dir=STORED_DATASET_PATH):
-    """Create directory structure and copy files"""
+    """Create directory structure and copy files organized by camera_id"""
     start_time = time.time()
     
     # Connect to MongoDB
@@ -256,24 +262,28 @@ def create_directory_structure(db_name, collection_name, output_dir=STORED_DATAS
     if os.path.exists(output_dir):
         shutil.rmtree(output_dir)
     
-    # Create main directories - only training and testing
+    # Create main directories for training and testing
     os.makedirs(os.path.join(output_dir, "training"), exist_ok=True)
     os.makedirs(os.path.join(output_dir, "testing"), exist_ok=True)
     
-    # Get all images with metadata
+    # Create camera subdirectories
+    for set_type in ["training", "testing"]:
+        for camera_id in range(0, NUM_OF_CAMERAS):
+            os.makedirs(os.path.join(output_dir, set_type, f"camera_{camera_id}"), exist_ok=True)
+    
+    # Get all images with metadata including camera_id
     all_images = list(collection.find({}, {
         "_id": 1,
         "path": 1,
-        "fruit_type": 1,
-        "object_id": 1,
+        "camera_id": 1,
         "set_type": 1
     }))
     
     # Prepare arguments for parallel copying
     copy_args = [
-        (str(doc["_id"]), doc["path"], doc["fruit_type"], doc["object_id"], 
+        (str(doc["_id"]), doc["path"], doc["camera_id"], 
          doc["set_type"], output_dir)
-        for doc in all_images if "set_type" in doc
+        for doc in all_images if "set_type" in doc and "camera_id" in doc
     ]
     
     # Use multiprocessing for copying
@@ -292,7 +302,7 @@ def create_directory_structure(db_name, collection_name, output_dir=STORED_DATAS
 
 def update_data_directory(db_name, collection_name, data_dir=STORED_DATASET_PATH):
     """
-    Scan the structured directory and update only the path field in database entries.
+    Scan the camera-based directory structure and update the path field in database entries.
     """
     start_time = time.time()
     
@@ -321,55 +331,51 @@ def update_data_directory(db_name, collection_name, data_dir=STORED_DATASET_PATH
             print(f"Warning: {set_type_dir} does not exist, skipping.")
             continue
         
-        for category in os.listdir(set_type_dir):
-            category_path = os.path.join(set_type_dir, category)
-            if not os.path.isdir(category_path):
+        # Iterate through camera folders (camera_0, camera_1, etc.)
+        for camera_folder in os.listdir(set_type_dir):
+            camera_path = os.path.join(set_type_dir, camera_folder)
+            if not os.path.isdir(camera_path):
                 continue
             
-            for obj in os.listdir(category_path):
-                obj_path = os.path.join(category_path, obj)
-                if not os.path.isdir(obj_path):
+            # Iterate through image files in the camera folder
+            for filename in os.listdir(camera_path):
+                if not filename.lower().endswith('.jpg'):
                     continue
                 
-                for filename in os.listdir(obj_path):
-                    if not filename.lower().endswith('.png'):
-                        continue
+                try:
+                    # Full path to the image file
+                    image_path = os.path.join(camera_path, filename)
                     
-                    try:
-                        #full path to the image file
-                        image_path = os.path.join(obj_path, filename)
-                        
-                        # Extract ID from filename only (not full path)
-                        image_id = os.path.splitext(filename)[0]
-                        
-                        # Try with string ID first
-                        object_id = ObjectId(image_id)
-                
-                        # Create update operation - updating ONLY the path
-                        bulk_operations.append(
-                            pymongo.UpdateOne(
-                                {"_id": object_id},
-                                {"$set": {"path": image_path}}
-                            )
+                    # Extract ID from filename
+                    image_id = os.path.splitext(filename)[0]
+                    
+                    # Convert to ObjectId
+                    object_id = ObjectId(image_id)
+                    
+                    # Create update operation
+                    bulk_operations.append(
+                        pymongo.UpdateOne(
+                            {"_id": object_id},
+                            {"$set": {"path": image_path}}
                         )
+                    )
                     
-                        # Execute bulk operation when batch size is reached
-                        if len(bulk_operations) >= MAX_BULK_SIZE:
-                            result = collection.bulk_write(bulk_operations, ordered=False)
-                            updates_made += result.modified_count
-                            bulk_operations = []
-                            
-                            print(f"Processed {files_processed} files, updated {updates_made} records so far...")
-                        
-                        files_processed += 1
-                            
-                    except Exception as e:
-                        errors += 1
-                        if errors < 10:
-                            print(f"Error processing {filename}: {e}")
-                        elif errors == 10:
-                            print("Too many errors, suppressing further error messages...")
-        
+                    # Execute bulk operation when batch size is reached
+                    if len(bulk_operations) >= MAX_BULK_SIZE:
+                        result = collection.bulk_write(bulk_operations, ordered=False)
+                        updates_made += result.modified_count
+                        bulk_operations = []
+                        print(f"Processed {files_processed} files, updated {updates_made} records so far...")
+                    
+                    files_processed += 1
+                    
+                except Exception as e:
+                    errors += 1
+                    if errors < 10:
+                        print(f"Error processing {filename}: {e}")
+                    elif errors == 10:
+                        print("Too many errors, suppressing further error messages...")
+    
     # Process any remaining operations
     if bulk_operations:
         try:
@@ -453,8 +459,8 @@ def process_dataset(dataset_path=ORIGINAL_DATASET_PATH, db_name=os.getenv('DB_NA
     image_data = collect_images(dataset_path)
     store_in_database(image_data, db_name, collection_name)
     
-    # Split data - 80% training, 20% testing
-    split_data(db_name, collection_name, 80, 20)
+    # Split data - 66% training, 34% testing
+    split_data(db_name, collection_name, 66, 34)
     
     # Create directory structure
     create_directory_structure(db_name, collection_name, STORED_DATASET_PATH)
