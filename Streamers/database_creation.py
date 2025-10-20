@@ -37,9 +37,9 @@ def create_database(db_name=os.getenv('DB_NAME', "fruit_rotation_db"), collectio
     
     # Create indexes for faster queries
     collection.create_index("fruit_type")
-    collection.create_index("object_id")      # Full object ID (e.g., obj0001)
+    collection.create_index("object_id")      # Full object ID
     collection.create_index("set_type")       # Training/testing
-    collection.create_index("camera_id")      # Added index for camera_id
+    collection.create_index("camera_id")
     
     print(f"Connected to MongoDB database: {db_name}, collection: {collection_name}")
     return db_name, collection_name
@@ -49,7 +49,7 @@ def collect_images(dataset_path=ORIGINAL_DATASET_PATH):
     start_time = time.time()
     image_data = []
     
-    # Get fruit types (top-level directories in dataset path)
+    # Get fruit types
     fruit_types = [d for d in os.listdir(dataset_path) 
                   if os.path.isdir(os.path.join(dataset_path, d))]
     
@@ -60,7 +60,7 @@ def collect_images(dataset_path=ORIGINAL_DATASET_PATH):
         sequence_start = datetime.now()
         frame_duration = timedelta(seconds=1.0/FPS)
         
-        # Find all object directories (like obj0000, obj0001, etc.)
+        # Find all object directories
         object_dirs = []
         for item in os.listdir(fruit_dir):
             if os.path.isdir(os.path.join(fruit_dir, item)) and item.startswith("obj"):
