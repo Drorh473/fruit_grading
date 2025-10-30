@@ -51,7 +51,7 @@ def extract_features_from_generator(generator, set_type):
             print(f"Warning: No metadata for batch {batch_count}")
             continue
         
-        print(f"Processing batch {batch_count} with {len(images)} images")
+        tqdm.write(f"Processing batch {batch_count} with {len(images)} images")
         
         # Process each image in batch
         for idx, image in enumerate(images):
@@ -187,7 +187,7 @@ def multi_view_fusion(pooled_vectors):
     if fused:
         sample_dim = next(iter(fused.values())).shape[0]
         avg_views = sum(len(v) for v in grouped.values()) / len(grouped)
-        print(f"Feature dimension: {sample_dim}")
+        print(f"Feature dimension: {sample_dim:,} features")
         print(f"Average views per object: {avg_views:.2f}")
     
     return fused
@@ -204,7 +204,7 @@ def process_features(train_generator, test_generator):
         Dictionary with final fused feature vectors
     """ 
     # 1. Extract features
-    print("\n1. Extracting features...")
+    print("\n Extracting features...")
     train_features = extract_features_from_generator(train_generator, 'training')
     test_features = extract_features_from_generator(test_generator, 'testing')
     
@@ -213,19 +213,19 @@ def process_features(train_generator, test_generator):
     print(f"\nTotal feature groups: {len(all_features)}")
     
     # 2. Flatten
-    print("\n2. Flattening features...")
+    print("\n Flattening features...")
     flattened = flatten_features(all_features)
     
     # 3. Temporal pooling
-    print("\n3. Temporal pooling...")
+    print("\n Temporal pooling...")
     pooled = temporal_pooling(flattened)
     
     # 4. Multi-view fusion
-    print("\n4. Multi-view fusion...")
+    print("\n Multi-view fusion...")
     fused = multi_view_fusion(pooled)
     
     # 5. Activation functions (optional)
-    print("\n5. Applying activation functions...")
+    print("\n Applying activation functions...")
     fused = relu(fused)
     fused = softmax(fused)
     print("Activation functions applied") 

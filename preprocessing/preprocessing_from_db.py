@@ -302,12 +302,11 @@ def set_generator(image_paths, metadata_dict):
         return None, {}, 0
     
     print(f"Creating generator for {len(image_paths)} images")
-    print(f"Sample paths: {image_paths[:3]}")  # DEBUG
-    print(f"Metadata dict has {len(metadata_dict)} entries")  # DEBUG
+
     
     # Function to generate batches
     def batch_generator():
-        print(f"[Generator] Starting batch generation for {len(image_paths)} images")  # DEBUG
+
         
         # Create indices for the paths
         indices = list(range(len(image_paths)))
@@ -317,15 +316,11 @@ def set_generator(image_paths, metadata_dict):
         
         # Calculate number of batches
         num_batches = (len(image_paths) + BATCH_SIZE - 1) // BATCH_SIZE
-        print(f"[Generator] Will create {num_batches} batches with batch size {BATCH_SIZE}")  # DEBUG
-        
         # Generate batches
         for batch_idx in range(num_batches):
             start_idx = batch_idx * BATCH_SIZE
             end_idx = min(start_idx + BATCH_SIZE, len(image_paths))
             batch_indices = indices[start_idx:end_idx]
-            
-            print(f"[Generator] Processing batch {batch_idx + 1}/{num_batches} (indices {start_idx} to {end_idx})")  # DEBUG
             
             # Collect valid images
             batch_images = []
@@ -378,14 +373,12 @@ def set_generator(image_paths, metadata_dict):
                 print(f"[Generator] Batch {batch_idx + 1} is empty, skipping")
                 continue
             
-            print(f"[Generator] Yielding batch {batch_idx + 1} with {len(batch_images)} images")  # DEBUG
             
             # Convert lists to arrays
             batch_x = np.array(batch_images)
             
             yield batch_x, batch_metadata
-        
-        print(f"[Generator] Finished generating all batches")  # DEBUG
+
     
     # Add metadata to the generator function
     batch_generator.samples = len(image_paths)
