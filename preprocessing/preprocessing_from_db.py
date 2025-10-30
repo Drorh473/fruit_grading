@@ -97,6 +97,8 @@ def process_image(args):
         filename = parts[-1]
         camera_id = parts[-2]
         set_type = parts[-3]
+        name, ext = os.path.splitext(filename)
+        filename = name + ext.lower()
         # Construct output path with same structure
         if set_type and camera_id:
             output_subdir = os.path.join(output_dir, set_type, camera_id)

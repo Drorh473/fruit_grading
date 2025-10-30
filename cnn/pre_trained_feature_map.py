@@ -3,8 +3,8 @@ import numpy as np
 import torch
 import time
 from tqdm import tqdm
-from pre_trained_cnn import load_model, extract_features
-from activation_functions import relu, softmax
+from cnn.pre_trained_cnn import load_model, extract_features
+from cnn.activation_functions import relu, softmax
 
 
 def extract_features_from_generator(generator, set_type):
@@ -19,7 +19,7 @@ def extract_features_from_generator(generator, set_type):
         Dictionary mapping keys to feature data
     """
     # Load model once
-    _, feature_extractor, device = load_model(pretrained=True)
+    _, feature_extractor, device = load_model()
     
     print(f"Extracting features from {set_type} generator...")
     
