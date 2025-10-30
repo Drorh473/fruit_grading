@@ -15,12 +15,9 @@ from preprocessing.preprocessing_from_db import custom_preprocessing
 # Set constants
 IMAGE_SIZE = (224, 224)
 
-def load_model(pretrained=True):
+def load_model():
     """
     Load ShuffleNetV2 model from torchvision
-    
-    Args:
-        pretrained: Whether to use pretrained weights
     
     Returns:
         model: The complete ShuffleNetV2 model
@@ -30,12 +27,8 @@ def load_model(pretrained=True):
     # Set device (use CUDA if available, otherwise CPU)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
-    # Load ShuffleNetV2 model
-    if pretrained:
-        model = shufflenet_v2_x1_0(weights=ShuffleNet_V2_X1_0_Weights.IMAGENET1K_V1)
-    else:
-        model = shufflenet_v2_x1_0(weights=None)
-        
+    model = shufflenet_v2_x1_0(weights=ShuffleNet_V2_X1_0_Weights.IMAGENET1K_V1)
+  
     # Move model to device
     model = model.to(device)
     
@@ -110,45 +103,40 @@ def custom_preprocessing_wrapper(image):
     
     return processed
 
-def extract_features(image_path, use_custom_preprocessing=False, pretrained=True):
+def extract_features(image_path):
     """
     Extract features from an image using ShuffleNetV2
     
     Args:
         image_path: Path to the image
         use_custom_preprocessing: Whether to use custom preprocessing
-        pretrained: Whether to use pretrained weights
     
     Returns:
         features: Feature maps extracted from the image (numpy array)
     """
     # Load model
-    _, feature_extractor, device = load_model(pretrained)
+    _, feature_extractor, device = load_model()
     
-    if use_custom_preprocessing:
         # Load image with OpenCV for custom preprocessing
-        img_cv = cv2.imread(image_path)
-        if img_cv is None:
-            raise ValueError(f"Could not read image: {image_path}")
+    img_cv = cv2.imread(image_path)
+    if img_cv is None:
+        raise ValueError(f"Could not read image: {image_path}")
             
-        img_cv = cv2.cvtColor(img_cv, cv2.COLOR_BGR2RGB)
-        img_cv = cv2.resize(img_cv, IMAGE_SIZE)
+    img_cv = cv2.cvtColor(img_cv, cv2.COLOR_BGR2RGB)
+    img_cv = cv2.resize(img_cv, IMAGE_SIZE)
         
         # Use imported custom preprocessing
-        processed_img = custom_preprocessing_wrapper(img_cv)
+    processed_img = custom_preprocessing_wrapper(img_cv)
         
         # Convert to tensor and normalize
-        transform = transforms.Compose([
+    transform = transforms.Compose([
             transforms.ToTensor(),
             transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-        ])
+    ])
         
-        img = transform(processed_img)
-        img = img.unsqueeze(0).to(device)
-    else:
-        # Use standard preprocessing
-        img = load_image(image_path, device)
-    
+    img = transform(processed_img)
+    img = img.unsqueeze(0).to(device)
+
     # Extract features
     with torch.no_grad():  # Disable gradient computation for inference
         features = feature_extractor(img)
@@ -158,14 +146,13 @@ def extract_features(image_path, use_custom_preprocessing=False, pretrained=True
     
     return features
 
-def visualize_features(image_path, features, output_dir=None):
+def visualize_features(image_path, features):
     """
     Visualize feature maps from ShuffleNetV2
     
     Args:
         image_path: Path to the original image
         features: Feature maps from the model
-        output_dir: Directory to save visualizations (if None, won't save)
     """
     # Load original image for visualization
     orig_img = cv2.imread(image_path)
@@ -201,14 +188,6 @@ def visualize_features(image_path, features, output_dir=None):
     plt.axis('off')
     
     plt.tight_layout()
-    
-    # Save visualization if output_dir is provided
-    if output_dir:
-        os.makedirs(output_dir, exist_ok=True)
-        output_path = os.path.join(output_dir, os.path.basename(image_path).split('.')[0] + '_features.png')
-        plt.savefig(output_path)
-        print(f"Visualization saved to: {output_path}")
-    
     plt.show()
     
     # Show individual feature channels
@@ -222,35 +201,26 @@ def visualize_features(image_path, features, output_dir=None):
         plt.axis('off')
     
     plt.tight_layout()
-    
-    # Save visualization if output_dir is provided
-    if output_dir:
-        channels_path = os.path.join(output_dir, os.path.basename(image_path).split('.')[0] + '_channels.png')
-        plt.savefig(channels_path)
-    
     plt.show()
 
-def get_feature_map(image_path, show_visualization=True, output_dir=None, use_custom_preprocessing=False):
+def get_feature_map(image_path, show_visualization=True):
     """
     Extract and optionally visualize features from an image
     
     Args:
         image_path: Path to the image
         show_visualization: Whether to show feature map visualization
-        output_dir: Directory to save visualizations (if None, won't save)
-        use_custom_preprocessing: Whether to use custom preprocessing pipeline
-    
     Returns:
         features: Feature maps extracted from the image
     """
     # Extract features
-    features = extract_features(image_path, use_custom_preprocessing)
+    features = extract_features(image_path)
     
     print(f"Feature map shape: {features.shape}")
     
     # Optionally visualize feature maps
     if show_visualization:
-        visualize_features(image_path, features, output_dir)
+        visualize_features(image_path, features)
     
     return features
 
@@ -259,15 +229,13 @@ def main():
     Main function to demonstrate feature extraction
     """
     # Define an example image path - replace with your own image path
-    image_path = r"C:\Users\dror\study\final_project\DataSets\processed_dataset\training\mandarins\obj0001\682999fcbde88bf1276b416e.png"
+    image_path = r"C:\GoogleDrive\Datasets\FruitsDataset\data\market\obj_0\an_0\IMG_3731.JPG"
     
     # Extract features with visualization
     features = get_feature_map(
         image_path,
-        show_visualization=True,
-        use_custom_preprocessing=True  # Using the imported custom preprocessing
+        show_visualization=True
     )
-    
     print("Feature extraction complete!")
     return features
 
