@@ -97,8 +97,6 @@ def process_image(args):
         filename = parts[-1]
         camera_id = parts[-2]
         set_type = parts[-3]
-        name, ext = os.path.splitext(filename)
-        filename = name + ext.lower()
         # Construct output path with same structure
         if set_type and camera_id:
             output_subdir = os.path.join(output_dir, set_type, camera_id)
@@ -131,15 +129,50 @@ def process_image(args):
 
 
 def preprocess_and_save_dataset(sequanceofcameras, output_dir=None, db_name=os.getenv('DB_NAME', "fruit_grading"), collection_name="images"):
-    """Preprocess all images in the sequence of cameras and save them to the output directory"""
+    """
+    Preprocess all images and return organized paths for training and testing
+    
+    Returns:
+        training_paths: List of paths for training images
+        testing_paths: List of paths for testing images
+        metadata_dict: Dictionary mapping paths to metadata
+    """
     output_dir = output_dir or PROCESSED_DATASET_PATH
     print(f"Starting preprocessing and saving images from sequence of cameras to {output_dir}...")
+    
+    # Connect to database to get set_type info
+    client = pymongo.MongoClient(MONGODB_CONNECTION_STRING)
+    db = client[db_name]
+    collection = db[collection_name]
+    
+    # Get all documents to know which images belong to training/testing
+    all_docs = list(collection.find())
+    
+    # Create lookup: original_path -> (set_type, metadata)
+    path_info = {}
+    for doc in all_docs:
+        original_path = doc.get('path')
+        path_info[original_path] = {
+            'set_type': doc.get('set_type'),
+            'fruit_type': doc.get('fruit_type'),
+            'object_id': doc.get('object_id'),
+            'camera_id': doc.get('camera_id'),
+            'timestamp': doc.get('timestamp'),
+            '_id': doc.get('_id')
+        }
+    
+    client.close()
     
     # Count total images for progress tracking
     total_images = sum(len(camera) for camera in sequanceofcameras if camera)
     if total_images == 0:
         print("No images to process.")
-        return output_dir
+        return [], [], {}
+    
+    # Storage for results
+    training_paths = []
+    testing_paths = []
+    metadata_dict = {}
     
     # Process each camera's images
     all_results = []
@@ -151,7 +184,7 @@ def preprocess_and_save_dataset(sequanceofcameras, output_dir=None, db_name=os.g
         print(f"Processing camera {cam_idx} with {len(camera)} images...")
         
         # Create args with camera number and output_dir for tracking
-        process_args = [(path, output_dir) for path in camera]  # Added output_dir to args
+        process_args = [(path, output_dir) for path in camera]
         
         # Use multiprocessing for image processing
         num_processes = max(1, multiprocessing.cpu_count() - 1)
@@ -165,10 +198,11 @@ def preprocess_and_save_dataset(sequanceofcameras, output_dir=None, db_name=os.g
         # Collect successful results for bulk database update
         updates = []
         errors = 0
-        for file_id, output_path, error in results:
+        
+        for i, (file_id, output_path, error) in enumerate(results):
             if error:
                 errors += 1
-                if errors <= 10:  # Limit error output
+                if errors <= 10:
                     print(error)
                 elif errors == 11:
                     print("Too many errors, suppressing further messages...")
@@ -179,6 +213,27 @@ def preprocess_and_save_dataset(sequanceofcameras, output_dir=None, db_name=os.g
                         {'_id': object_id},
                         {'$set': {'processed_path': output_path}}
                     ))
+                    
+                    # Get original path and its metadata
+                    original_path = camera[i]
+                    if original_path in path_info:
+                        info = path_info[original_path]
+                        set_type = info['set_type']
+                        
+                        # Add to appropriate list
+                        if set_type == 'training':
+                            training_paths.append(output_path)
+                        elif set_type == 'testing':
+                            testing_paths.append(output_path)
+                        
+                        # Store metadata
+                        metadata_dict[output_path] = {
+                            'fruit_type': info['fruit_type'],
+                            'object_id': info['object_id'],
+                            'camera_id': info['camera_id'],
+                            'timestamp': info['timestamp']
+                        }
+                    
                 except Exception as e:
                     print(f"Error with ID {file_id}: {e}")
         
@@ -188,7 +243,6 @@ def preprocess_and_save_dataset(sequanceofcameras, output_dir=None, db_name=os.g
             db = client[db_name]
             collection = db[collection_name]
             
-            # Update in batches of 500
             batch_size = 500
             update_count = 0
             for i in range(0, len(updates), batch_size):
@@ -200,19 +254,21 @@ def preprocess_and_save_dataset(sequanceofcameras, output_dir=None, db_name=os.g
                     print(f"Database error during batch update: {e}")
             
             client.close()
-            
             print(f"Updated {update_count} database records for camera {cam_idx}")
         
         elapsed_time = time.time() - start_time
         print(f"Camera {cam_idx} processing completed in {elapsed_time:.2f} seconds")
         
-        # Save results for reporting
         all_results.extend(results)
     
     # Final statistics
     success_count = sum(1 for r in all_results if r[0] is not None)
     print(f"Preprocessing complete: {success_count}/{total_images} images successfully processed")
     print(f"All processed images saved to {output_dir}")
+    print(f"Training images: {len(training_paths)}")
+    print(f"Testing images: {len(testing_paths)}")
+    
+    return training_paths, testing_paths, metadata_dict
 
 
 def load_dataset_split_by_camera(db_name=os.getenv('DB_NAME'), collection_name="images"):
@@ -227,103 +283,115 @@ def load_dataset_split_by_camera(db_name=os.getenv('DB_NAME'), collection_name="
             sequenceofcamera[camera_id].append(image.get('path'))
     return sequenceofcamera
 
-def set_generator(set_type, db_name=DB_NAME, collection_name="images"):
-    """Create a batch generator for the specified set type"""
-    client = pymongo.MongoClient(MONGODB_CONNECTION_STRING)
-    db = client[db_name]
-    collection = db[collection_name]
+def set_generator(image_paths, metadata_dict):
+    """
+    Create a batch generator for the given image paths
     
-    try:
-        # Get documents for this set_type
-        documents = list(collection.find({"set_type": set_type}))
+    Args:
+        image_paths: List of image paths
+        metadata_dict: Dictionary mapping paths to metadata
         
-        if not documents:
-            print(f"No documents found for set_type: {set_type}")
-            return None, {}, 0
-        
-        print(f"Found {len(documents)} images for '{set_type}'")
-        
-        # Function to generate batches
-        def batch_generator():
-            # Create indices for the documents
-            indices = list(range(len(documents)))
-            
-            # Shuffle for training
-            if set_type == 'training':
-                np.random.shuffle(indices)
-            
-            # Calculate number of batches
-            num_batches = (len(documents) + BATCH_SIZE - 1) // BATCH_SIZE
-            
-            # Create iterator with optional progress bar
-            batch_range = range(num_batches)
-   
-            # Generate batches
-            for batch_idx in batch_range:
-                start_idx = batch_idx * BATCH_SIZE
-                end_idx = min(start_idx + BATCH_SIZE, len(documents))
-                batch_indices = indices[start_idx:end_idx]
-                
-                # We'll collect valid images
-                batch_images = []
-                batch_metadata = []
-                for idx in batch_indices:
-                    doc = documents[idx]
-                    
-                    # Use processed_path if it exists, otherwise use regular path
-                    img_path = doc.get("processed_path", doc.get("path"))
-                    if not img_path:
-                        continue
-                    
-                    try:
-                        # Load the image
-                        img = cv2.imread(img_path)
-                        
-                        if img is None:
-                            continue
-                        
-                        # Resize to standardized size
-                        img = cv2.resize(img, IMAGE_SIZE)
-                        
-                        # Convert to RGB (OpenCV loads as BGR)
-                        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-                        
-                        
-                        # Add to batch lists
-                        batch_images.append(img)
-                        batch_metadata.append({
-                            'fruit_type': doc.get('fruit_type'),
-                            'object_id': doc.get('object_id'),
-                            'camera_id': doc.get('camera_id'),
-                            'timestamp': doc.get('timestamp')
-                        })
-                    
-                    except Exception as e:
-                        print(f"Error loading {img_path}: {e}")
-                
-                # Skip empty batches
-                if not batch_images:
-                    continue
-                
-                # Convert lists to arrays
-                batch_x = np.array(batch_images)
-                
-                yield batch_x,batch_metadata
-        
-        # Add metadata to the generator function
-        batch_generator.samples = len(documents)
-        batch_generator.num_batches = (len(documents) + BATCH_SIZE - 1) // BATCH_SIZE
-        
-        return batch_generator, {}, len(documents)
+    Returns:
+        batch_generator: Generator function
+        metadata: Empty dict (for compatibility)
+        count: Number of images
+    """
     
-    except Exception as e:
-        print(f"Error retrieving set type '{set_type}': {e}")
+    if not image_paths:
+        print(f"No images provided")
         return None, {}, 0
     
-    finally:
-        # Close the MongoDB connection
-        client.close()
-
+    print(f"Creating generator for {len(image_paths)} images")
+    print(f"Sample paths: {image_paths[:3]}")  # DEBUG
+    print(f"Metadata dict has {len(metadata_dict)} entries")  # DEBUG
+    
+    # Function to generate batches
+    def batch_generator():
+        print(f"[Generator] Starting batch generation for {len(image_paths)} images")  # DEBUG
+        
+        # Create indices for the paths
+        indices = list(range(len(image_paths)))
+        
+        # Shuffle
+        np.random.shuffle(indices)
+        
+        # Calculate number of batches
+        num_batches = (len(image_paths) + BATCH_SIZE - 1) // BATCH_SIZE
+        print(f"[Generator] Will create {num_batches} batches with batch size {BATCH_SIZE}")  # DEBUG
+        
+        # Generate batches
+        for batch_idx in range(num_batches):
+            start_idx = batch_idx * BATCH_SIZE
+            end_idx = min(start_idx + BATCH_SIZE, len(image_paths))
+            batch_indices = indices[start_idx:end_idx]
+            
+            print(f"[Generator] Processing batch {batch_idx + 1}/{num_batches} (indices {start_idx} to {end_idx})")  # DEBUG
+            
+            # Collect valid images
+            batch_images = []
+            batch_metadata = []
+            
+            files_not_found = 0
+            files_failed_load = 0
+            
+            for idx in batch_indices:
+                img_path = image_paths[idx]
+                
+                # Check if file exists
+                if not os.path.exists(img_path):
+                    files_not_found += 1
+                    if files_not_found <= 3:  # Show first 3
+                        print(f"[Generator] File not found: {img_path}")
+                    continue
+                
+                try:
+                    # Load the image
+                    img = cv2.imread(img_path)
+                    
+                    if img is None:
+                        files_failed_load += 1
+                        if files_failed_load <= 3:  # Show first 3
+                            print(f"[Generator] Failed to load: {img_path}")
+                        continue
+                    
+                    # Resize to standardized size
+                    img = cv2.resize(img, IMAGE_SIZE)
+                    
+                    # Convert to RGB (OpenCV loads as BGR)
+                    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+                    
+                    # Add to batch lists
+                    batch_images.append(img)
+                    batch_metadata.append(metadata_dict.get(img_path, {}))
+                
+                except Exception as e:
+                    print(f"[Generator] Error loading {img_path}: {e}")
+            
+            # Report issues
+            if files_not_found > 0:
+                print(f"[Generator] {files_not_found} files not found in this batch")
+            if files_failed_load > 0:
+                print(f"[Generator] {files_failed_load} files failed to load in this batch")
+            
+            # Skip empty batches
+            if not batch_images:
+                print(f"[Generator] Batch {batch_idx + 1} is empty, skipping")
+                continue
+            
+            print(f"[Generator] Yielding batch {batch_idx + 1} with {len(batch_images)} images")  # DEBUG
+            
+            # Convert lists to arrays
+            batch_x = np.array(batch_images)
+            
+            yield batch_x, batch_metadata
+        
+        print(f"[Generator] Finished generating all batches")  # DEBUG
+    
+    # Add metadata to the generator function
+    batch_generator.samples = len(image_paths)
+    batch_generator.num_batches = (len(image_paths) + BATCH_SIZE - 1) // BATCH_SIZE
+    
+    return batch_generator, {}, len(image_paths)
 def load_dataset_with_preprocessing():
     """
     Load dataset with custom preprocessing
@@ -338,121 +406,62 @@ def load_dataset_with_preprocessing():
     else:
         processed_dir = PROCESSED_DATASET_PATH
     
-    # Get image paths by set type
-
-    sequencecamera = load_dataset_split_by_camera()
-    # Preprocess images if needed
+    # Load sequence of cameras
+    print("Loading dataset split by camera...")
+    sequence_camera = load_dataset_split_by_camera()
+    
+    # Check if preprocessing is needed
     if not os.path.isdir(processed_dir):
-        preprocess_and_save_dataset(sequencecamera, processed_dir)
+        # Preprocess images and get organized paths
+        print("Preprocessing images...")
+        training_paths, testing_paths, metadata_dict = preprocess_and_save_dataset(
+            sequence_camera, processed_dir
+        )
+    else:
+        # Load from database if already preprocessed
+        print("Loading preprocessed paths from database...")
+        client = pymongo.MongoClient(MONGODB_CONNECTION_STRING)
+        db = client[DB_NAME]
+        collection = db["images"]
+        
+        # Get training paths
+        training_docs = list(collection.find({"set_type": "training"}))
+        training_paths = [doc.get('processed_path') or doc.get('path') 
+                         for doc in training_docs]
+        
+        # Get testing paths
+        testing_docs = list(collection.find({"set_type": "testing"}))
+        testing_paths = [doc.get('processed_path') or doc.get('path') 
+                        for doc in testing_docs]
+        
+        # Create metadata dict
+        metadata_dict = {}
+        for doc in training_docs + testing_docs:
+            path = doc.get('processed_path') or doc.get('path')
+            metadata_dict[path] = {
+                'fruit_type': doc.get('fruit_type'),
+                'object_id': doc.get('object_id'),
+                'camera_id': doc.get('camera_id'),
+                'timestamp': doc.get('timestamp')
+            }
+        
+        client.close()
     
-    # Create generators for training and testing
-    train_gen, _, train_count = set_generator("training")
-    test_gen, _, test_count = set_generator("testing")
-    
-    # Get counts
-    counts = {
-        "training": train_count,
-        "testing": test_count
-    }
+    # Create generators
+    print("\nCreating generators...")
+    train_gen, _, train_count = set_generator(training_paths, metadata_dict)
+    test_gen, _, test_count = set_generator(testing_paths, metadata_dict)
     
     # Print summary
     print("\nDatasets summary:")
     print(f"  Training: {train_count} images")
     print(f"  Testing: {test_count} images")
     
-    # Return generators and counts
+    # Return generators
     return train_gen, test_gen
-
 def preprocessing_from_db():
     # Load dataset with preprocessing
     train_gen, test_gen= load_dataset_with_preprocessing()
     
     # Return generators
     return train_gen, test_gen
-
-def main():
-    """Main function to demonstrate preprocessing and data loading"""
-    print("=== Fruit Dataset Preprocessing and Loading ===\n")
-    
-    # Check if PROCESSED_DATASET_PATH is set in .env
-    if not PROCESSED_DATASET_PATH:
-        print("Warning: PROCESSED_DATASET_PATH not set in .env file. Using default 'processed_dataset'.")
-        processed_dir = "processed_dataset"
-    else:
-        processed_dir = PROCESSED_DATASET_PATH
-        print(f"Using processed dataset directory: {processed_dir}")
-    
-    # Step 1: Load dataset paths
-    print("\nStep 1: Loading dataset paths from database...")
-    sequence_of_sets = load_dataset_split_by_camera()
-    
-    # Step 2: Preprocess images if needed
-    if not os.path.isdir(processed_dir):
-        print("\nStep 2: Preprocessing images and saving to disk...")
-        preprocess_and_save_dataset(sequence_of_sets, processed_dir)
-    else:
-        print(f"\nStep 2: Skipping preprocessing as directory already exists: {processed_dir}")
-    
-    # Step 3: Create dataset generators
-    print("\nStep 3: Creating dataset generators...")
-    train_gen, test_gen = preprocessing_from_db()
-    
-    # Step 4: Display some example images
-    if train_gen:
-        print("\nStep 4: Displaying sample images from training set...")
-        try:
-            # Get a batch from the training generator
-            batch_x = next(train_gen())
-            
-            # Display few images
-            plt.figure(figsize=(15, 5))
-            for i in range(min(5, len(batch_x))):
-                plt.subplot(1, 5, i+1)
-                plt.imshow(batch_x[i])
-                plt.axis('off')
-            
-            plt.tight_layout()
-            
-            # Create MODEL_DIR if it doesn't exist
-            os.makedirs(MODEL_DIR, exist_ok=True)
-            
-            # Save figure
-            save_path = os.path.join(MODEL_DIR, "sample_training_images.png")
-            plt.savefig(save_path)
-            print(f"Sample images saved to: {save_path}")
-            
-            # Show plot
-            plt.show()
-            
-        except Exception as e:
-            print(f"Error displaying sample images: {e}")
-    else:
-        print("No training generator available.")
-    
-    # Step 5: Display dataset statistics
-    print("\nStep 5: Dataset statistics")
-    client = pymongo.MongoClient(MONGODB_CONNECTION_STRING)
-    db = client[DB_NAME]
-    collection = db["images"]
-    
-    # Get counts by set type
-    training_count = collection.count_documents({"set_type": "training"})
-    testing_count = collection.count_documents({"set_type": "testing"})
-    
-    # Get counts by fruit type
-    fruit_pipeline = [
-        {"$group": {"_id": "$fruit_type", "count": {"$sum": 1}}},
-        {"$sort": {"count": -1}}
-    ]  
-    # Print statistics
-    print(f"Total images: {training_count + testing_count}")
-    print(f"Training images: {training_count}")
-    print(f"Testing images: {testing_count}")
-    
-    # Close MongoDB connection
-    client.close()
-    
-    print("\n=== Preprocessing and data loading complete ===")
-
-if __name__ == "__main__":
-    main()

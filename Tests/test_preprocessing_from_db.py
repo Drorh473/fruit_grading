@@ -211,40 +211,74 @@ class TestDatabaseFunctions(unittest.TestCase):
         total_images = sum(len(cam) for cam in sequence)
         self.assertGreater(total_images, 0)
     
-    def test_set_generator_training(self):
-        """Test generator for training set"""
-        gen, metadata, count = set_generator(
-            "training",
-            db_name=TEST_DB_NAME,
-            collection_name=TEST_COLLECTION_NAME
-        )
-        
-        # Should return None if no processed images exist
-        # But count should reflect database entries
-        self.assertIsNotNone(count)
-        self.assertGreaterEqual(count, 0)
-    
-    def test_set_generator_testing(self):
-        """Test generator for testing set"""
-        gen, metadata, count = set_generator(
-            "testing",
-            db_name=TEST_DB_NAME,
-            collection_name=TEST_COLLECTION_NAME
-        )
-        
-        self.assertIsNotNone(count)
-        self.assertGreaterEqual(count, 0)
-    
-    def test_set_generator_invalid_set_type(self):
-        """Test generator with invalid set type"""
-        gen, metadata, count = set_generator(
-            "invalid_set",
-            db_name=TEST_DB_NAME,
-            collection_name=TEST_COLLECTION_NAME
-        )
-        
-        self.assertEqual(count, 0)
+    # In test_preprocessing_from_db.py
 
+def test_set_generator_training(self):
+    """Test generator for training set"""
+    # Get training paths from database
+    client = pymongo.MongoClient(MONGODB_CONNECTION_STRING)
+    db = client[TEST_DB_NAME]
+    collection = db[TEST_COLLECTION_NAME]
+    
+    training_docs = list(collection.find({"set_type": "training"}))
+    training_paths = [doc.get('processed_path') or doc.get('path') 
+                     for doc in training_docs]
+    
+    # Create metadata dict
+    metadata_dict = {}
+    for doc in training_docs:
+        path = doc.get('processed_path') or doc.get('path')
+        metadata_dict[path] = {
+            'fruit_type': doc.get('fruit_type'),
+            'object_id': doc.get('object_id'),
+            'camera_id': doc.get('camera_id'),
+            'timestamp': doc.get('timestamp')
+        }
+    
+    client.close()
+    
+    # Call new set_generator
+    gen, metadata, count = set_generator(training_paths, metadata_dict)
+    
+    self.assertIsNotNone(count)
+    self.assertGreaterEqual(count, 0)
+
+def test_set_generator_testing(self):
+    """Test generator for testing set"""
+    # Get testing paths from database
+    client = pymongo.MongoClient(MONGODB_CONNECTION_STRING)
+    db = client[TEST_DB_NAME]
+    collection = db[TEST_COLLECTION_NAME]
+    
+    testing_docs = list(collection.find({"set_type": "testing"}))
+    testing_paths = [doc.get('processed_path') or doc.get('path') 
+                    for doc in testing_docs]
+    
+    # Create metadata dict
+    metadata_dict = {}
+    for doc in testing_docs:
+        path = doc.get('processed_path') or doc.get('path')
+        metadata_dict[path] = {
+            'fruit_type': doc.get('fruit_type'),
+            'object_id': doc.get('object_id'),
+            'camera_id': doc.get('camera_id'),
+            'timestamp': doc.get('timestamp')
+        }
+    
+    client.close()
+    
+    # Call new set_generator
+    gen, metadata, count = set_generator(testing_paths, metadata_dict)
+    
+    self.assertIsNotNone(count)
+    self.assertGreaterEqual(count, 0)
+
+def test_set_generator_invalid_set_type(self):
+    """Test generator with invalid set type"""
+    # Invalid set type means empty paths
+    gen, metadata, count = set_generator([], {})
+    
+    self.assertEqual(count, 0)
 
 class TestPreprocessingIntegration(unittest.TestCase):
     """Integration tests for preprocessing pipeline"""

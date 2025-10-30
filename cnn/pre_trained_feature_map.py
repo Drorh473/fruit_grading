@@ -12,7 +12,7 @@ def extract_features_from_generator(generator, set_type):
     Extract features from a batch generator
     
     Args:
-        generator: Generator that yields batches of (images, metadata) or just images
+        generator: Generator function that yields batches of (images, metadata)
         set_type: 'training' or 'testing'
         
     Returns:
@@ -27,8 +27,11 @@ def extract_features_from_generator(generator, set_type):
     batch_count = 0
     image_count = 0
     
+    # Check if generator has num_batches attribute for progress bar
+    num_batches = getattr(generator, 'num_batches', None)
+    
     # Process each batch from generator
-    for batch in tqdm(generator(), desc=f"Processing {set_type}"):
+    for batch in tqdm(generator(), total=num_batches, desc=f"Processing {set_type}"):
         batch_count += 1
         
         # Handle different batch formats
@@ -37,6 +40,18 @@ def extract_features_from_generator(generator, set_type):
         else:
             images = batch
             metadata = None
+        
+        # Check if we actually have images
+        if images is None or len(images) == 0:
+            print(f"Warning: Empty batch {batch_count}")
+            continue
+        
+        # Check if we have metadata
+        if metadata is None or len(metadata) == 0:
+            print(f"Warning: No metadata for batch {batch_count}")
+            continue
+        
+        print(f"Processing batch {batch_count} with {len(images)} images")
         
         # Process each image in batch
         for idx, image in enumerate(images):
@@ -69,14 +84,16 @@ def extract_features_from_generator(generator, set_type):
                     feature_map[key] = []
                     
                 feature_map[key].append({
-                        'features': features,
-                        'timestamp': meta.get('timestamp')
+                    'features': features,
+                    'timestamp': meta.get('timestamp')
                 })
     
                 image_count += 1
                 
             except Exception as e:
                 print(f"Error processing image {idx} in batch {batch_count}: {e}")
+                import traceback
+                traceback.print_exc()
                 continue
     
     print(f"Extracted features from {image_count} images in {batch_count} batches")
