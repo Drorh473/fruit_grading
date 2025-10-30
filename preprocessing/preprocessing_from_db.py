@@ -264,7 +264,7 @@ def set_generator(set_type, db_name=DB_NAME, collection_name="images"):
                 
                 # We'll collect valid images
                 batch_images = []
-                
+                batch_metadata = []
                 for idx in batch_indices:
                     doc = documents[idx]
                     
@@ -289,6 +289,12 @@ def set_generator(set_type, db_name=DB_NAME, collection_name="images"):
                         
                         # Add to batch lists
                         batch_images.append(img)
+                        batch_metadata.append({
+                            'fruit_type': doc.get('fruit_type'),
+                            'object_id': doc.get('object_id'),
+                            'camera_id': doc.get('camera_id'),
+                            'timestamp': doc.get('timestamp')
+                        })
                     
                     except Exception as e:
                         print(f"Error loading {img_path}: {e}")
@@ -300,7 +306,7 @@ def set_generator(set_type, db_name=DB_NAME, collection_name="images"):
                 # Convert lists to arrays
                 batch_x = np.array(batch_images)
                 
-                yield batch_x
+                yield batch_x,batch_metadata
         
         # Add metadata to the generator function
         batch_generator.samples = len(documents)
