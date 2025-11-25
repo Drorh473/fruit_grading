@@ -33,7 +33,6 @@ def custom_preprocessing(image, save_path=None):
     """Apply preprocessing steps:
     1. Gaussian filtering for noise removal
     2. CLAHE for histogram equalization
-    
     Args:
         image: Input image to process
         save_path: If provided, save the processed image to this path
@@ -46,7 +45,7 @@ def custom_preprocessing(image, save_path=None):
             image = image.astype(np.uint8)
     
     h, w = image.shape[:2]
-    max_dim = 224  # Maximum dimension size
+    max_dim = 224 
     if h != max_dim or w != max_dim:
         # Calculate the ratio to resize
         ratio = max_dim / max(h, w)
@@ -56,11 +55,11 @@ def custom_preprocessing(image, save_path=None):
     # Save original image for comparison
     original = image.copy()
     
-    # 1. Apply Gaussian filter with kernel size 3x3 and sigma=0.01
+    # 1. Apply Gaussian filter with kernel size 3x3 and sigma=0.001
     blurred = cv2.GaussianBlur(original, (3, 3), 0.001)
     
-    # 2. Apply CLAHE for histogram equalization (on grayscale version)
-    # Convert to Lab color space (L channel is the lightness)
+    # 2. Apply CLAHE for histogram equalization
+    # Convert to Lab color space
     lab = cv2.cvtColor(blurred, cv2.COLOR_RGB2LAB)
     l, a, b = cv2.split(lab)
     
@@ -123,7 +122,7 @@ def process_image(args):
         # Extract document ID from filename
         file_id = filename.split(".")[0]
         
-        return file_id , output_path , None  # Success
+        return file_id , output_path , None
     except Exception as e:
         return None, None , f"Error processing {image_path}: {e}"
 
@@ -131,7 +130,6 @@ def process_image(args):
 def preprocess_and_save_dataset(sequanceofcameras, output_dir=None, db_name=os.getenv('DB_NAME', "fruit_grading"), collection_name="images"):
     """
     Preprocess all images and return organized paths for training and testing
-    
     Returns:
         training_paths: List of paths for training images
         testing_paths: List of paths for testing images
@@ -272,7 +270,7 @@ def preprocess_and_save_dataset(sequanceofcameras, output_dir=None, db_name=os.g
 
 
 def load_dataset_split_by_camera(db_name=os.getenv('DB_NAME'), collection_name="images"):
-    #make an array of sequence cameras
+    # Make an array of sequence cameras
     client = pymongo.MongoClient(MONGODB_CONNECTION_STRING)
     db = client[db_name]
     collection = db[collection_name]
@@ -286,14 +284,12 @@ def load_dataset_split_by_camera(db_name=os.getenv('DB_NAME'), collection_name="
 def set_generator(image_paths, metadata_dict):
     """
     Create a batch generator for the given image paths
-    
     Args:
         image_paths: List of image paths
         metadata_dict: Dictionary mapping paths to metadata
-        
     Returns:
         batch_generator: Generator function
-        metadata: Empty dict (for compatibility)
+        metadata: Empty dict
         count: Number of images
     """
     
@@ -303,11 +299,9 @@ def set_generator(image_paths, metadata_dict):
     
     print(f"Creating generator for {len(image_paths)} images")
 
-    
     # Function to generate batches
     def batch_generator():
 
-        
         # Create indices for the paths
         indices = list(range(len(image_paths)))
         
@@ -316,6 +310,7 @@ def set_generator(image_paths, metadata_dict):
         
         # Calculate number of batches
         num_batches = (len(image_paths) + BATCH_SIZE - 1) // BATCH_SIZE
+
         # Generate batches
         for batch_idx in range(num_batches):
             start_idx = batch_idx * BATCH_SIZE
@@ -362,7 +357,6 @@ def set_generator(image_paths, metadata_dict):
                 except Exception as e:
                     print(f"[Generator] Error loading {img_path}: {e}")
             
-            # Report issues
             if files_not_found > 0:
                 print(f"[Generator] {files_not_found} files not found in this batch")
             if files_failed_load > 0:
@@ -373,22 +367,20 @@ def set_generator(image_paths, metadata_dict):
                 print(f"[Generator] Batch {batch_idx + 1} is empty, skipping")
                 continue
             
-            
             # Convert lists to arrays
             batch_x = np.array(batch_images)
             
             yield batch_x, batch_metadata
 
-    
     # Add metadata to the generator function
     batch_generator.samples = len(image_paths)
     batch_generator.num_batches = (len(image_paths) + BATCH_SIZE - 1) // BATCH_SIZE
     
     return batch_generator, {}, len(image_paths)
+
 def load_dataset_with_preprocessing():
     """
     Load dataset with custom preprocessing
-    
     Returns:
         train_gen, test_gen: Generators for training and testing data
     """
@@ -449,12 +441,6 @@ def load_dataset_with_preprocessing():
     print("\nDatasets summary:")
     print(f"  Training: {train_count} images")
     print(f"  Testing: {test_count} images")
-    
-    # Return generators
-    return train_gen, test_gen
-def preprocessing_from_db():
-    # Load dataset with preprocessing
-    train_gen, test_gen= load_dataset_with_preprocessing()
     
     # Return generators
     return train_gen, test_gen

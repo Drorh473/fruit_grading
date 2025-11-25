@@ -1,6 +1,5 @@
 import os
 import sys
-import argparse
 import unittest
 from pathlib import Path
 from dotenv import load_dotenv
@@ -107,9 +106,10 @@ def extract_features(train_gen, test_gen):
     print("="*60 + "\n")
     
     try:
-        fused_features = process_features(train_gen, test_gen)
+        fused_features_test = process_features(test_gen, 'testing')
+        fused_features_train = process_features(train_gen, 'training')
         print(f"\n Feature extraction complete")
-        print(f"  Total fused feature vectors: {len(fused_features)}")
+        print(f"  Total fused feature vectors: {len(fused_features_test)+len(fused_features_train)}")
         return True
     except Exception as e:
         print(f"\n Feature extraction failed: {e}")

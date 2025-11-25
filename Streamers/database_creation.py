@@ -10,7 +10,6 @@ from tqdm import tqdm
 from dotenv import load_dotenv
 from pathlib import Path
 from bson.objectid import ObjectId
-import re
 from datetime import datetime, timedelta
 
 # Load environment variables
@@ -474,13 +473,3 @@ def process_dataset(dataset_path=ORIGINAL_DATASET_PATH, db_name=os.getenv('DB_NA
     
     print(f"Dataset processing complete in {time.time() - start_time:.2f} seconds")
     return db_name, collection_name
-
-if __name__ == "__main__":
-    # Use environment variables or command line
-    if not ORIGINAL_DATASET_PATH:
-        print("Warning: ORIGINAL_DATASET_PATH not set in .env file")
-        dataset_path = input("Please enter the path to the dataset: ")
-    else:
-        dataset_path = ORIGINAL_DATASET_PATH
-    
-    db_name, collection_name = process_dataset(dataset_path)

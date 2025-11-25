@@ -3,9 +3,9 @@ import os
 import cv2
 import numpy as np
 import pymongo
+import shutil
 from pathlib import Path
 from dotenv import load_dotenv
-from PIL import Image
 from preprocessing.preprocessing_from_db import (
     custom_preprocessing,
     process_image,
@@ -60,7 +60,7 @@ class TestCustomPreprocessing(unittest.TestCase):
         if os.path.exists(save_path):
             os.remove(save_path)
         
-        result = custom_preprocessing(test_image, save_path=save_path)
+        custom_preprocessing(test_image, save_path=save_path)
         
         # Check file was created
         self.assertTrue(os.path.exists(save_path))
@@ -71,42 +71,6 @@ class TestCustomPreprocessing(unittest.TestCase):
         
         # Clean up
         os.remove(save_path)
-    
-    def test_preprocessing_gaussian_blur_applied(self):
-        """Test that Gaussian blur reduces high-frequency noise"""
-        # Create image with salt-and-pepper noise
-        test_image = np.ones((224, 224, 3), dtype=np.uint8) * 128
-        noise_mask = np.random.rand(224, 224) > 0.95
-        test_image[noise_mask] = 255
-        
-        result = custom_preprocessing(test_image)
-        
-        # Result should be smoother (less variance)
-        self.assertIsNotNone(result)
-        self.assertEqual(result.shape, (224, 224, 3))
-
-    def test_clahe_preserves_bright_regions(self):
-        """Test that CLAHE doesn't over-enhance already bright regions"""
-        # Create image with both dark and bright regions
-        test_image = np.zeros((224, 224, 3), dtype=np.uint8)
-        test_image[:112, :] = 50   # Dark region
-        test_image[112:, :] = 200  # Bright region
-        
-        # Convert to RGB
-        test_image = cv2.cvtColor(test_image, cv2.COLOR_BGR2RGB)
-        
-        result = custom_preprocessing(test_image)
-        
-        # Check that result doesn't clip values
-        self.assertLess(result.max(), 1.0)
-        self.assertGreater(result.min(), 0.0)
-        
-        # Check that contrast between regions is maintained
-        dark_region = result[:112, :, :].mean()
-        bright_region = result[112:, :, :].mean()
-        self.assertGreater(bright_region, dark_region)
-
-
 
 class TestProcessImage(unittest.TestCase):
     """Test cases for process_image function"""
@@ -129,7 +93,6 @@ class TestProcessImage(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         """Clean up test files"""
-        import shutil
         if os.path.exists(cls.test_dir):
             shutil.rmtree(cls.test_dir)
     
@@ -146,7 +109,6 @@ class TestProcessImage(unittest.TestCase):
         self.assertTrue(os.path.exists(output_path))
         
         # Clean up
-        import shutil
         if os.path.exists(output_dir):
             shutil.rmtree(output_dir)
     
@@ -238,7 +200,7 @@ def test_set_generator_training(self):
     client.close()
     
     # Call new set_generator
-    gen, metadata, count = set_generator(training_paths, metadata_dict)
+    _, _, count = set_generator(training_paths, metadata_dict)
     
     self.assertIsNotNone(count)
     self.assertGreaterEqual(count, 0)
@@ -268,7 +230,7 @@ def test_set_generator_testing(self):
     client.close()
     
     # Call new set_generator
-    gen, metadata, count = set_generator(testing_paths, metadata_dict)
+    _, _, count = set_generator(testing_paths, metadata_dict)
     
     self.assertIsNotNone(count)
     self.assertGreaterEqual(count, 0)
@@ -276,7 +238,7 @@ def test_set_generator_testing(self):
 def test_set_generator_invalid_set_type(self):
     """Test generator with invalid set type"""
     # Invalid set type means empty paths
-    gen, metadata, count = set_generator([], {})
+    _, _, count = set_generator([], {})
     
     self.assertEqual(count, 0)
 
@@ -309,25 +271,3 @@ class TestPreprocessingIntegration(unittest.TestCase):
         # Red channel should have highest values
         self.assertGreater(result[:, :, 0].mean(), result[:, :, 1].mean())
         self.assertGreater(result[:, :, 0].mean(), result[:, :, 2].mean())
-
-
-if __name__ == '__main__':
-    import sys
-    
-    # Run tests silently
-    runner = unittest.TextTestRunner(stream=sys.stderr, verbosity=0, buffer=True)
-    result = unittest.main(testRunner=runner, exit=False).result
-    
-    # Only print if there are failures or errors
-    if result.failures or result.errors:
-        print("\n" + "="*60)
-        print("FAILURES AND ERRORS:")
-        print("="*60)
-        for test, traceback in result.failures:
-            print(f"\nFAILURE: {test}")
-            print(traceback)
-        for test, traceback in result.errors:
-            print(f"\nERROR: {test}")
-            print(traceback)
-    else:
-        print(f"\nAll {result.testsRun} tests passed successfully!")

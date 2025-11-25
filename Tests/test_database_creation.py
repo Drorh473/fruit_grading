@@ -149,25 +149,3 @@ class TestDatabaseCreation(unittest.TestCase):
         ratio = training_count / 100
         self.assertGreater(ratio, 0.6)  # At least 60%
         self.assertLess(ratio, 0.68)     # At most 68%
-
-
-if __name__ == '__main__':
-    import sys
-    
-    # Run tests silently
-    runner = unittest.TextTestRunner(stream=sys.stderr, verbosity=0, buffer=True)
-    result = unittest.main(testRunner=runner, exit=False).result
-    
-    # Only print if there are failures or errors
-    if result.failures or result.errors:
-        print("\n" + "="*60)
-        print("FAILURES AND ERRORS:")
-        print("="*60)
-        for test, traceback in result.failures:
-            print(f"\nFAILURE: {test}")
-            print(traceback)
-        for test, traceback in result.errors:
-            print(f"\nERROR: {test}")
-            print(traceback)
-    else:
-        print(f"\nAll {result.testsRun} tests passed successfully!")

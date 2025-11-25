@@ -35,11 +35,9 @@ def load_model():
 def extract_features_from_generator(generator, set_type):
     """
     Extract features from a batch generator
-    
     Args:
         generator: Generator function that yields batches of (images, metadata)
         set_type: 'training' or 'testing'
-        
     Returns:
         Dictionary mapping keys to feature data
     """
@@ -128,13 +126,12 @@ def extract_features_from_generator(generator, set_type):
 def flatten_features(feature_map):
     """
     Flatten spatial dimensions
-    
     Args:
         feature_map: Dictionary with lists of features
-        
     Returns:
         Dictionary with flattened features
     """
+
     flattened = {}
     
     for key, feature_list in feature_map.items():
@@ -153,13 +150,12 @@ def flatten_features(feature_map):
 def temporal_pooling(flattened_features):
     """
     Average features across time
-    
     Args:
         flattened_features: Dictionary with flattened features per timestep
-        
     Returns:
         Dictionary with pooled features
     """
+
     # Group by key
     grouped = {}
     for timestep_key, data in flattened_features.items():
@@ -182,13 +178,12 @@ def temporal_pooling(flattened_features):
 def multi_view_fusion(pooled_vectors):
     """
     Concatenate features from different cameras
-    
     Args:
         pooled_vectors: Dictionary with pooled features
-        
     Returns:
         Dictionary with fused features
     """
+
     # Group by object (remove camera suffix)
     grouped = {}
     for key, features in pooled_vectors.items():
@@ -217,41 +212,29 @@ def multi_view_fusion(pooled_vectors):
     
     return fused
 
-def process_features(train_generator, test_generator):
+def process_features(generator, set_type):
     """
-    Complete pipeline: Extract → Flatten → Pool → Fuse → Activate
-    
+    Complete pipeline: Extract → Flatten → Pool → Fuse 
     Args:
-        train_generator: Generator for training images
-        test_generator: Generator for testing images
-        
+        generator: Generator for images
+        set_type: 'training' or 'testing'
     Returns:
         Dictionary with final fused feature vectors
     """ 
-    # 1. Extract features
+    # Extract features
     print("\n Extracting features...")
-    train_features = extract_features_from_generator(train_generator, 'training')
-    test_features = extract_features_from_generator(test_generator, 'testing')
+    features = extract_features_from_generator(generator, set_type)
     
-    # Combine
-    all_features = {**train_features, **test_features}
-    print(f"\nTotal feature groups: {len(all_features)}")
-    
-    # 2. Flatten
+    # Flatten
     print("\n Flattening features...")
-    flattened = flatten_features(all_features)
+    flattened = flatten_features(features)
     
-    # 3. Temporal pooling
+    # Temporal pooling
     print("\n Temporal pooling...")
     pooled = temporal_pooling(flattened)
     
-    # 4. Multi-view fusion
+    # Multi-view fusion
     print("\n Multi-view fusion...")
     fused = multi_view_fusion(pooled)
     
-    # 5. Activation functions (optional)
-    print("\n Applying activation functions...")
-    fused = relu(fused)
-    fused = softmax(fused)
-    print("Activation functions applied") 
     return fused
