@@ -129,7 +129,7 @@ def run_full_pipeline(skip_tests=True):
     
     # Step 1: Database setup
     if not setup_database():
-        print("\n✗ Pipeline failed at database setup")
+        print("\n Pipeline failed at database setup")
         return False
     
     # Step 2: Preprocessing
@@ -145,7 +145,7 @@ def run_full_pipeline(skip_tests=True):
     
     # Success
     print("\n" + "="*60)
-    print("✓ PIPELINE COMPLETED SUCCESSFULLY")
+    print("PIPELINE COMPLETED SUCCESSFULLY")
     print("="*60 + "\n")
     return True
 

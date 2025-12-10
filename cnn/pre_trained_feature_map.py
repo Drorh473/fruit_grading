@@ -4,9 +4,6 @@ from tqdm import tqdm
 from torchvision.models import shufflenet_v2_x1_0, ShuffleNet_V2_X1_0_Weights
 from cnn.activation_functions import relu, softmax
 
-# Constants
-IMAGE_SIZE = (224, 224)
-
 def load_model():
     """
     Load ShuffleNetV2 model from torchvision

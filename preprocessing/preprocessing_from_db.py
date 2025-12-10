@@ -355,8 +355,8 @@ def set_generator(image_paths, metadata_dict):
                     
                     # Add to batch lists
                     batch_images.append(img)
-                    batch_metadata.append(metadata_dict.get(img_path, {}))
-                
+                    img_data_dict = metadata_dict.get(img_path, {})
+                    batch_metadata.append(img_data_dict['fruit_type'])
                 except Exception as e:
                     print(f"[Generator] Error loading {img_path}: {e}")
             
@@ -372,8 +372,8 @@ def set_generator(image_paths, metadata_dict):
             
             # Convert lists to arrays
             batch_x = np.array(batch_images)
-            
-            yield batch_x, batch_metadata
+            batch_y = np.array(batch_metadata)
+            yield batch_x, batch_y
 
     # Add metadata to the generator function
     batch_generator.samples = len(image_paths)
