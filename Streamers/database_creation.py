@@ -105,16 +105,6 @@ def collect_images(dataset_path=ORIGINAL_DATASET_PATH):
                     timestamp = sequence_start + (frame_count * frame_duration)
                     frame_count += 1
                     
-                    # Get image dimensions
-                    try:
-                        img = Image.open(img_path)
-                        width, height = img.size
-                        color_channels = 3 if img.mode == 'RGB' else 1
-                        img.close()
-                    except Exception as e:
-                        print(f"Error processing {img_path}: {e}")
-                        continue
-                    
                     # Create image metadata
                     img_data = {
                         "path": img_path,
@@ -123,9 +113,9 @@ def collect_images(dataset_path=ORIGINAL_DATASET_PATH):
                         "camera_id": camera_id,
                         "timestamp": timestamp,
                         "frame_number": frame_count,
-                        "width": width,
-                        "height": height,
-                        "color": color_channels,
+                        "width": 224,
+                        "height": 224,
+                        "color": 3,
                         "set_type": "",
                         "category": ""
                     }
