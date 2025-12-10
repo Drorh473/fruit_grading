@@ -87,23 +87,26 @@ def custom_preprocessing(image, save_path=None):
 
 def process_image(args):
     """Process a single image and save the preprocessed version"""
-    image_path, output_dir = args
+    image_path, output_dir, metadata = args
     try:
         # Parse path components
-        parts = image_path.split(os.sep)
-
-        # Extract components from the path
-        filename = parts[-1]
-        camera_id = parts[-2]
-        set_type = parts[-3]
+        set_type = metadata.get('set_type')
+        camera_id = metadata.get('camera_id')
+        file_id = str(metadata.get('_id'))
+        
+        # Get file extension from original path
+        _, ext = os.path.splitext(image_path)
+        if not ext:
+            ext = '.jpg' 
+        
         # Construct output path with same structure
-        if set_type and camera_id:
-            output_subdir = os.path.join(output_dir, set_type, camera_id)
+        if set_type and camera_id is not None:
+            output_subdir = os.path.join(output_dir, set_type, f"camera_{camera_id}")
         else:
-            # Fallback if path structure not recognized
+            # Fallback if metadata incomplete
             output_subdir = os.path.join(output_dir, "unknown")
         
-        output_path = os.path.join(output_subdir, filename)
+        output_path = os.path.join(output_subdir, f"{file_id}{ext}")
         
         # Ensure output directory exists
         os.makedirs(output_subdir, exist_ok=True)
@@ -181,8 +184,11 @@ def preprocess_and_save_dataset(sequanceofcameras, output_dir=None, db_name=os.g
         start_time = time.time()
         print(f"Processing camera {cam_idx} with {len(camera)} images...")
         
-        # Create args with camera number and output_dir for tracking
-        process_args = [(path, output_dir) for path in camera]
+        # Create args with metadata for each image
+        process_args = []
+        for path in camera:
+            metadata = path_info.get(path, {})
+            process_args.append((path, output_dir, metadata))
         
         # Use multiprocessing for image processing
         num_processes = max(1, multiprocessing.cpu_count() - 1)
