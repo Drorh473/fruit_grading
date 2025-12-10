@@ -122,9 +122,6 @@ def process_image(args):
         # Apply preprocessing and save
         custom_preprocessing(img, save_path=output_path)
         
-        # Extract document ID from filename
-        file_id = filename.split(".")[0]
-        
         return file_id , output_path , None
     except Exception as e:
         return None, None , f"Error processing {image_path}: {e}"
