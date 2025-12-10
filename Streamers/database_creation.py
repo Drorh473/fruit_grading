@@ -27,7 +27,7 @@ STORED_DATASET_PATH = os.getenv('STORED_DATASET_PATH', "./processed_fruits")
 NUM_OF_CAMERAS = int(os.getenv('NUM_OF_CAMERAS', 4))  # Default to 4 cameras
 FPS = int(os.getenv('FPS', 30))  # Frames per second
 
-def create_database(db_name=os.getenv('DB_NAME', "fruit_rotation_db"), collection_name="images"):
+def create_database(db_name=os.getenv('DB_NAME'), collection_name="images"):
     """Create MongoDB database for storing fruit image metadata"""
     # Connect to MongoDB
     client = pymongo.MongoClient(MONGODB_CONNECTION_STRING)
@@ -47,8 +47,8 @@ def collect_images(dataset_path=ORIGINAL_DATASET_PATH):
     """Collect all images from the dataset with their metadata"""
     start_time = time.time()
     image_data = []
-    width = os.getenv('IMAGE_SIZE_W') 
-    height = os.getenv('IMAGE_SIZE_H')
+    width = int(os.getenv('IMAGE_SIZE_W')) 
+    height = int(os.getenv('IMAGE_SIZE_H'))
     
     # Get fruit types
     fruit_types = [d for d in os.listdir(dataset_path) 
@@ -424,7 +424,7 @@ def print_summary(db_name, collection_name):
     
     client.close()
 
-def process_dataset(dataset_path=ORIGINAL_DATASET_PATH, db_name=os.getenv('DB_NAME', "fruit_rotation_db"), collection_name="images"):
+def process_dataset(dataset_path=ORIGINAL_DATASET_PATH, db_name=os.getenv('DB_NAME'), collection_name="images"):
     """Process the full dataset pipeline"""
     # Create flag file path
     processed_path = STORED_DATASET_PATH
