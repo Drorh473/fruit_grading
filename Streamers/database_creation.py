@@ -47,6 +47,8 @@ def collect_images(dataset_path=ORIGINAL_DATASET_PATH):
     """Collect all images from the dataset with their metadata"""
     start_time = time.time()
     image_data = []
+    width = os.getenv('IMAGE_SIZE_W') 
+    height = os.getenv('IMAGE_SIZE_H')
     
     # Get fruit types
     fruit_types = [d for d in os.listdir(dataset_path) 
@@ -113,8 +115,8 @@ def collect_images(dataset_path=ORIGINAL_DATASET_PATH):
                         "camera_id": camera_id,
                         "timestamp": timestamp,
                         "frame_number": frame_count,
-                        "width": 224,
-                        "height": 224,
+                        "width": width,
+                        "height": height,
                         "color": 3,
                         "set_type": "",
                         "category": ""

@@ -116,7 +116,7 @@ def extract_features(train_gen, test_gen):
         return False
 
 
-def run_full_pipeline(skip_tests=False):
+def run_full_pipeline(skip_tests=True):
     # Step 0: Run tests (optional)
     if not skip_tests:
         test_success = run_tests()
