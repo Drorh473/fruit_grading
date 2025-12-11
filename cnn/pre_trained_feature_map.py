@@ -1,8 +1,14 @@
 import numpy as np
 import torch
+import os
 from tqdm import tqdm
 from torchvision.models import shufflenet_v2_x1_0, ShuffleNet_V2_X1_0_Weights
-from cnn.activation_functions import relu, softmax
+from pathlib import Path
+from dotenv import load_dotenv
+
+env_path = Path('.') / '.env'
+load_dotenv(dotenv_path=env_path)
+label_dict = os.getenv('LABEL_MAPPING')
 
 def load_model():
     """
@@ -105,7 +111,8 @@ def extract_features_from_generator(generator, set_type):
                     
                 feature_map[key].append({
                     'features': features,
-                    'timestamp': meta.get('timestamp')
+                    'timestamp': meta.get('timestamp'),
+                    'label': label_dict[meta.get('fruit_type')]
                 })
     
                 image_count += 1
@@ -211,7 +218,7 @@ def multi_view_fusion(pooled_vectors):
 
 def process_features(generator, set_type):
     """
-    Complete pipeline: Extract → Flatten → Pool → Fuse 
+    Extract → Flatten → Pool → Fuse 
     Args:
         generator: Generator for images
         set_type: 'training' or 'testing'

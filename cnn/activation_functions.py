@@ -1,68 +1,22 @@
 import numpy as np
+def relu(x):
+    """ReLU activation function"""
+    return np.maximum(0, x)
 
 
-def relu(feature_vectors):
+def relu_derivative(x):
+    """Derivative of ReLU"""
+    return (x > 0).astype(float)
+
+
+def softmax(x):
     """
-    Apply ReLU activation to feature vectors.
+    Softmax activation function (numerically stable)
     Args:
-        feature_vectors: Dictionary mapping object IDs to feature arrays
+        x: Input array (batch_size, num_classes)
     Returns:
-        Dictionary with ReLU applied to all feature vectors
+        Softmax probabilities
     """
-    if not isinstance(feature_vectors, dict):
-        raise TypeError("Input must be a dictionary of feature vectors")
-    
-    relu_vectors = {}
-    
-    for obj_id, feature_array in feature_vectors.items():
-        if not isinstance(feature_array, np.ndarray):
-            # Try to convert to numpy array
-            feature_array = np.array(feature_array)
-        
-        # Apply ReLU: max(0, x)
-        relu_vectors[obj_id] = np.maximum(0, feature_array)
-         
-    return relu_vectors
-
-
-def softmax(feature_vectors):
-    """
-    Apply Softmax activation to feature vectors.
-    Args:
-        feature_vectors: Dictionary mapping object IDs to feature arrays
-    Returns:
-        Dictionary with Softmax applied to all feature vectors
-    """
-    if not isinstance(feature_vectors, dict):
-        raise TypeError("Input must be a dictionary of feature vectors")
-    
-    softmax_vectors = {}
-    
-    for obj_id, feature_array in feature_vectors.items():
-        if not isinstance(feature_array, np.ndarray):
-            # Try to convert to numpy array
-            feature_array = np.array(feature_array)
-        
-        # Prevents overflow when computing exp() of large numbers
-        shifted_array = feature_array - np.max(feature_array)
-        
-        # Compute exp
-        exp_array = np.exp(shifted_array)
-        
-        # Normalize by sum to get probabilities
-        sum_exp = np.sum(exp_array)
-        
-        # Handle edge case where sum is 0
-        if sum_exp == 0:
-            print(f"Warning: Sum of exponentials is 0 for {obj_id}, using uniform distribution")
-            softmax_vectors[obj_id] = np.ones_like(feature_array) / len(feature_array)
-        else:
-            softmax_vectors[obj_id] = exp_array / sum_exp
-    
-    # Verify that all vectors sum to 1.0
-    for obj_id, vector in softmax_vectors.items():
-        vector_sum = np.sum(vector)
-        if not np.isclose(vector_sum, 1.0, rtol=1e-5):
-            print(f"Warning: Softmax vector {obj_id} sums to {vector_sum}, not 1.0")
-    
-    return softmax_vectors
+    # Subtract max for numerical stability
+    exp_x = np.exp(x - np.max(x, axis=1, keepdims=True))
+    return exp_x / np.sum(exp_x, axis=1, keepdims=True)

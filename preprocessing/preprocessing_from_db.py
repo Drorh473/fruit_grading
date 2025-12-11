@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 import pymongo
 import time
 from bson.objectid import ObjectId
+import json
 
 # Load environment variables
 env_path = Path('.') / '.env'
@@ -356,7 +357,7 @@ def set_generator(image_paths, metadata_dict):
                     # Add to batch lists
                     batch_images.append(img)
                     img_data_dict = metadata_dict.get(img_path, {})
-                    batch_metadata.append(img_data_dict['fruit_type'])
+                    batch_metadata.append(img_data_dict)
                 except Exception as e:
                     print(f"[Generator] Error loading {img_path}: {e}")
             
