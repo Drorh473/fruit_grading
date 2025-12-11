@@ -39,9 +39,18 @@ def extract_and_fuse_features(generator):
 
 
 def get_feature_vector(fused_features, object_id):
-    """Get feature vector for specific object ID."""
+    """
+    Get feature vector for specific object ID.
+    
+    Args:
+        fused_features: Dictionary with format {key: {'features': np.array, 'label': int, 'fruit_type': str}}
+        object_id: Object ID to search for
+        
+    Returns:
+        Feature vector (numpy array) or None if not found
+    """
     for key in fused_features.keys():
         if object_id in key:
-            return fused_features[key]
+            return fused_features[key]['features']  # Return just the features array
     
     return None

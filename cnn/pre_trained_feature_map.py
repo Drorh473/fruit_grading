@@ -8,7 +8,13 @@ from dotenv import load_dotenv
 
 env_path = Path('.') / '.env'
 load_dotenv(dotenv_path=env_path)
-label_dict = os.getenv('LABEL_MAPPING')
+
+# Define label mapping as a constant
+LABEL_DICT = {
+    'market': 0,
+    'standard': 1,
+    'unknown': 2
+}
 
 def load_model():
     """
@@ -42,7 +48,7 @@ def extract_features_from_generator(generator, set_type):
         generator: Generator function that yields batches of (images, metadata)
         set_type: 'training' or 'testing'
     Returns:
-        Dictionary mapping keys to feature data
+        Dictionary mapping keys to feature data with labels
     """
     # Load model once
     _, feature_extractor, device = load_model()
@@ -104,7 +110,8 @@ def extract_features_from_generator(generator, set_type):
                 
                 # Create key
                 meta = metadata[idx]
-                key = f"{meta.get('fruit_type')}_{meta.get('object_id')}_{meta.get('camera_id')}"
+                fruit_type = meta.get('fruit_type', 'unknown')
+                key = f"{fruit_type}_{meta.get('object_id')}_{meta.get('camera_id')}"
                     
                 if key not in feature_map:
                     feature_map[key] = []
@@ -112,7 +119,8 @@ def extract_features_from_generator(generator, set_type):
                 feature_map[key].append({
                     'features': features,
                     'timestamp': meta.get('timestamp'),
-                    'label': label_dict[meta.get('fruit_type')]
+                    'label': LABEL_DICT.get(fruit_type, 2),  # Store label here
+                    'fruit_type': fruit_type
                 })
     
                 image_count += 1
@@ -131,11 +139,10 @@ def flatten_features(feature_map):
     """
     Flatten spatial dimensions
     Args:
-        feature_map: Dictionary with lists of features
+        feature_map: Dictionary with lists of features (with labels)
     Returns:
-        Dictionary with flattened features
+        Dictionary with flattened features (preserving labels)
     """
-
     flattened = {}
     
     for key, feature_list in feature_map.items():
@@ -146,7 +153,9 @@ def flatten_features(feature_map):
             timestep_key = f"{key}_t{idx}"
             flattened[timestep_key] = {
                 'features': flat_features,
-                'group_key': key
+                'group_key': key,
+                'label': item['label'],  # Preserve label
+                'fruit_type': item['fruit_type']  # Preserve fruit_type
             }
     
     return flattened
@@ -157,65 +166,100 @@ def temporal_pooling(flattened_features):
     Args:
         flattened_features: Dictionary with flattened features per timestep
     Returns:
-        Dictionary with pooled features
+        Dictionary with pooled features (preserving labels)
     """
-
     # Group by key
     grouped = {}
     for timestep_key, data in flattened_features.items():
         group_key = data['group_key']
         if group_key not in grouped:
-            grouped[group_key] = []
-        grouped[group_key].append(data['features'])
+            grouped[group_key] = {
+                'features': [],
+                'label': data['label'],  # All timesteps have same label
+                'fruit_type': data['fruit_type']
+            }
+        grouped[group_key]['features'].append(data['features'])
     
     # Average
     pooled = {}
-    for key, features_list in grouped.items():
+    for key, data in grouped.items():
+        features_list = data['features']
         if len(features_list) == 1:
-            pooled[key] = features_list[0]
+            pooled_features = features_list[0]
         else:
-            pooled[key] = np.mean(np.stack(features_list), axis=0)
+            pooled_features = np.mean(np.stack(features_list), axis=0)
+        
+        pooled[key] = {
+            'features': pooled_features,
+            'label': data['label'],
+            'fruit_type': data['fruit_type']
+        }
     
     print(f"Temporal pooling: {len(pooled)} groups")
     return pooled
 
-def multi_view_fusion(pooled_vectors):
+def multi_view_fusion(pooled_vectors, target_views=4):
     """
     Concatenate features from different cameras
+    Ensures consistent output dimension by padding or truncating views
+    
     Args:
         pooled_vectors: Dictionary with pooled features
+        target_views: Target number of views (default 4 for 4 cameras)
     Returns:
-        Dictionary with fused features
+        Dictionary with fused features (preserving labels)
     """
-
     # Group by object (remove camera suffix)
     grouped = {}
-    for key, features in pooled_vectors.items():
-        # Try to extract base object ID
+    for key, data in pooled_vectors.items():
+        # Try to extract base object ID (remove camera_id)
         parts = key.rsplit('_', 1)  # Split from right
         base_key = parts[0] if len(parts) > 1 else key
         
         if base_key not in grouped:
-            grouped[base_key] = []
-        grouped[base_key].append(features)
+            grouped[base_key] = {
+                'features': [],
+                'label': data['label'],
+                'fruit_type': data['fruit_type']
+            }
+        grouped[base_key]['features'].append(data['features'])
     
-    # Concatenate
+    # Concatenate with padding/truncating
     fused = {}
-    for key, vectors in grouped.items():
-        if len(vectors) == 1:
-            fused[key] = vectors[0]
-        else:
-            fused[key] = np.concatenate(vectors)
+    feature_dim_per_view = None
+    
+    for key, data in grouped.items():
+        vectors = data['features']
+        
+        # Get feature dimension from first vector
+        if feature_dim_per_view is None:
+            feature_dim_per_view = vectors[0].shape[0]
+        
+        # Pad or truncate to target number of views
+        if len(vectors) < target_views:
+            # Pad with zeros
+            padding_needed = target_views - len(vectors)
+            zero_vector = np.zeros(feature_dim_per_view, dtype=vectors[0].dtype)
+            vectors.extend([zero_vector] * padding_needed)
+        elif len(vectors) > target_views:
+            # Truncate (keep first N views)
+            vectors = vectors[:target_views]
+        
+        # Concatenate
+        fused_features = np.concatenate(vectors)
+        
+        fused[key] = {
+            'features': fused_features,
+            'label': data['label'],
+            'fruit_type': data['fruit_type']
+        }
     
     print(f"Multi-view fusion: {len(fused)} objects")
     if fused:
-        sample_dim = next(iter(fused.values())).shape[0]
-        avg_views = sum(len(v) for v in grouped.values()) / len(grouped)
-        print(f"Feature dimension: {sample_dim:,} features")
-        print(f"Average views per object: {avg_views:.2f}")
+        sample_dim = next(iter(fused.values()))['features'].shape[0]
+        print(f"Feature dimension: {sample_dim:,} features ({target_views} views × {feature_dim_per_view:,})")
     
     return fused
-
 def process_features(generator, set_type):
     """
     Extract → Flatten → Pool → Fuse 
@@ -223,22 +267,22 @@ def process_features(generator, set_type):
         generator: Generator for images
         set_type: 'training' or 'testing'
     Returns:
-        Dictionary with final fused feature vectors
+        Dictionary with final fused feature vectors (with labels)
     """ 
     # Extract features
-    print("\n Extracting features...")
+    print("\n✓ Extracting features...")
     features = extract_features_from_generator(generator, set_type)
     
     # Flatten
-    print("\n Flattening features...")
+    print("\n✓ Flattening features...")
     flattened = flatten_features(features)
     
     # Temporal pooling
-    print("\n Temporal pooling...")
+    print("\n✓ Temporal pooling...")
     pooled = temporal_pooling(flattened)
     
     # Multi-view fusion
-    print("\n Multi-view fusion...")
+    print("\n✓ Multi-view fusion...")
     fused = multi_view_fusion(pooled)
     
     return fused

@@ -6,12 +6,15 @@ import numpy as np
 from dotenv import load_dotenv
 
 # Load environment variables
-env_path = Path('.') / '.env'
+env_path = Path(__file__).parent.parent / '.env' 
 load_dotenv(dotenv_path=env_path)
-PROJECT_DIR = '/mnt/project'
-if PROJECT_DIR not in sys.path:
-    sys.path.insert(0, PROJECT_DIR)
+PROJECT_ROOT = Path(__file__).parent.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 MODEL_DIR = os.getenv('MODEL_DIR')
+STORED_DATASET_PATH = os.getenv('STORED_DATASET_PATH')
+PROCESSED_DATASET_PATH = os.getenv('PROCESSED_DATASET_PATH')
+
 # Import pipeline components
 from Streamers.database_creation import process_dataset
 from preprocessing.preprocessing_from_db import load_dataset_with_preprocessing
@@ -112,7 +115,7 @@ def extract_features(train_gen, test_gen):
         fused_features_train = process_features(train_gen, 'training')
         print(f"\n Feature extraction complete")
         print(f"  Total fused feature vectors: {len(fused_features_test)+len(fused_features_train)}")
-        return True
+        return fused_features_train, fused_features_test 
     except Exception as e:
         print(f"\n Feature extraction failed: {e}")
         return False
@@ -124,7 +127,7 @@ def train_classifier(train_features, test_features,
     
     Args:
         train_features: Dictionary with fused feature vectors from training set
-                       Format: {key: {'features': np.array, 'label': int}}
+                       Format: {key: {'features': np.array, 'label': int, 'fruit_type': str}}
         test_features: Dictionary with fused feature vectors from test set
         hidden_dim: Hidden layer dimension
         epochs: Number of training epochs
@@ -132,14 +135,20 @@ def train_classifier(train_features, test_features,
     
     Returns:
         params: Trained parameters
-        label_mapping: Label mapping dictionary
         results: Dictionary with evaluation results
     """
     print("\n" + "="*60)
     print("STEP 4: CLASSIFIER TRAINING")
     print("="*60 + "\n")
     
-    try:        
+    try:
+        # Label mapping
+        label_mapping = {
+            'market': 0,
+            'standard': 1,
+            'premium': 2
+        }
+        
         # Prepare training data from fused features
         print("Preparing training data from fused features...")
         X_train_list = []
@@ -147,9 +156,9 @@ def train_classifier(train_features, test_features,
         
         for key, data in train_features.items():
             X_train_list.append(data['features'])
-            y_train_list.append(data['label'])  # Label already stored!
+            y_train_list.append(data['label'])
         
-        X_train = np.array(X_train_list)
+        X_train = np.array(X_train_list, dtype=np.float32)
         y_train = np.array(y_train_list, dtype=np.int64)
         
         # Prepare testing data from fused features
@@ -159,16 +168,33 @@ def train_classifier(train_features, test_features,
         
         for key, data in test_features.items():
             X_test_list.append(data['features'])
-            y_test_list.append(data['label'])  # Label already stored!
+            y_test_list.append(data['label'])
         
-        X_test = np.array(X_test_list)
+        X_test = np.array(X_test_list, dtype=np.float32)
         y_test = np.array(y_test_list, dtype=np.int64)
         
         # Get dimensions
         input_dim = X_train.shape[1]
-        num_classes = 3
+        num_classes = len(label_mapping)
         
-        print(f"Training for {epochs} epochs...")
+        print(f"\nDataset info:")
+        print(f"  Training samples: {len(X_train)}")
+        print(f"  Testing samples: {len(X_test)}")
+        print(f"  Feature dimension: {input_dim:,}")
+        print(f"  Number of classes: {num_classes}")
+        
+        # Check label distribution
+        print(f"\nTraining label distribution:")
+        for fruit_type, label in sorted(label_mapping.items(), key=lambda x: x[1]):
+            count = np.sum(y_train == label)
+            print(f"  {fruit_type}: {count} samples")
+        
+        print(f"\nTesting label distribution:")
+        for fruit_type, label in sorted(label_mapping.items(), key=lambda x: x[1]):
+            count = np.sum(y_test == label)
+            print(f"  {fruit_type}: {count} samples")
+        
+        print(f"\nTraining for {epochs} epochs...")
         params, history = train(
             X_train, y_train,
             X_test, y_test,
@@ -176,7 +202,7 @@ def train_classifier(train_features, test_features,
             hidden_dim=hidden_dim,
             num_classes=num_classes,
             epochs=epochs,
-            batch_size=32,  # Mini-batches for gradient descent
+            batch_size=32,
             learning_rate=learning_rate,
             verbose=True
         )
@@ -201,24 +227,178 @@ def train_classifier(train_features, test_features,
         os.makedirs(MODEL_DIR, exist_ok=True)
         model_path = os.path.join(MODEL_DIR, 'fruit_classifier.pkl')
         save_model(params, history, input_dim, hidden_dim, num_classes, model_path)
-                
+        
         results = {
             'train_loss': train_loss,
             'train_accuracy': train_acc,
             'test_loss': test_loss,
             'test_accuracy': test_acc,
             'history': history,
+            'X_test': X_test,
+            'y_test': y_test,
+            'params': params,
+            'label_mapping': label_mapping
         }
         
-        print(f"\n Classifier training complete")
+        print(f"\n✓ Classifier training complete")
         return params, results
         
     except Exception as e:
-        print(f"\n Classifier training failed: {e}")
+        print(f"\n✗ Classifier training failed: {e}")
         import traceback
         traceback.print_exc()
-        return None, None, None
-
+        return None, None
+def train_classifier(train_features, test_features, 
+                    hidden_dim=32, epochs=100, learning_rate=0.001):
+    """
+    Step 4: Train fully connected classifier
+    
+    Args:
+        train_features: Dictionary with fused feature vectors from training set
+        test_features: Dictionary with fused feature vectors from test set
+        hidden_dim: Hidden layer dimension
+        epochs: Number of training epochs
+        learning_rate: Learning rate
+    
+    Returns:
+        params: Trained parameters
+        results: Dictionary with evaluation results
+    """
+    print("\n" + "="*60)
+    print("STEP 4: CLASSIFIER TRAINING")
+    print("="*60 + "\n")
+    
+    try:
+        # Label mapping
+        label_mapping = {
+            'market': 0,
+            'standard': 1,
+            'premium': 2
+        }
+        
+        if train_features:
+            first_key = list(train_features.keys())[0]
+            first_value = train_features[first_key]        
+        # Prepare training data from fused features
+        print("\nPreparing training data from fused features...")
+        X_train_list = []
+        y_train_list = []
+        
+        for key, data in train_features.items():
+            # Handle both old structure (numpy array) and new structure (dict)
+            if isinstance(data, dict):
+                X_train_list.append(data['features'])
+                y_train_list.append(data['label'])
+            elif isinstance(data, np.ndarray):
+                # Fallback: extract label from key
+                print(f"WARNING: Found numpy array instead of dict for key: {key}")
+                fruit_type = key.split('_')[0]
+                X_train_list.append(data)
+                y_train_list.append(label_mapping.get(fruit_type, 2))
+            else:
+                print(f"ERROR: Unexpected data type for key {key}: {type(data)}")
+                continue
+        
+        X_train = np.array(X_train_list, dtype=np.float32)
+        y_train = np.array(y_train_list, dtype=np.int64)
+        
+        # Prepare testing data from fused features
+        print("Preparing testing data from fused features...")
+        X_test_list = []
+        y_test_list = []
+        
+        for key, data in test_features.items():
+            # Handle both old structure (numpy array) and new structure (dict)
+            if isinstance(data, dict):
+                X_test_list.append(data['features'])
+                y_test_list.append(data['label'])
+            elif isinstance(data, np.ndarray):
+                # Fallback: extract label from key
+                fruit_type = key.split('_')[0]
+                X_test_list.append(data)
+                y_test_list.append(label_mapping.get(fruit_type, 2))
+            else:
+                print(f"ERROR: Unexpected data type for key {key}: {type(data)}")
+                continue
+        
+        X_test = np.array(X_test_list, dtype=np.float32)
+        y_test = np.array(y_test_list, dtype=np.int64)
+        
+        # Get dimensions
+        input_dim = X_train.shape[1]
+        num_classes = len(label_mapping)
+        
+        print(f"\nDataset info:")
+        print(f"  Training samples: {len(X_train)}")
+        print(f"  Testing samples: {len(X_test)}")
+        print(f"  Feature dimension: {input_dim:,}")
+        print(f"  Number of classes: {num_classes}")
+        
+        # Check label distribution
+        print(f"\nTraining label distribution:")
+        for fruit_type, label in sorted(label_mapping.items(), key=lambda x: x[1]):
+            count = np.sum(y_train == label)
+            print(f"  {fruit_type}: {count} samples")
+        
+        print(f"\nTesting label distribution:")
+        for fruit_type, label in sorted(label_mapping.items(), key=lambda x: x[1]):
+            count = np.sum(y_test == label)
+            print(f"  {fruit_type}: {count} samples")
+        
+        print(f"\nTraining for {epochs} epochs...")
+        params, history = train(
+            X_train, y_train,
+            X_test, y_test,
+            input_dim=input_dim,
+            hidden_dim=hidden_dim,
+            num_classes=num_classes,
+            epochs=epochs,
+            batch_size=32,
+            learning_rate=learning_rate,
+            verbose=True
+        )
+        
+        # Final evaluation
+        print("\n" + "="*60)
+        print("FINAL EVALUATION")
+        print("="*60)
+        
+        train_loss, train_acc = evaluate(X_train, y_train, params, num_classes)
+        test_loss, test_acc = evaluate(X_test, y_test, params, num_classes)
+        
+        print(f"\nTraining set:")
+        print(f"  Loss: {train_loss:.4f}")
+        print(f"  Accuracy: {train_acc:.4f} ({train_acc*100:.2f}%)")
+        
+        print(f"\nTest set:")
+        print(f"  Loss: {test_loss:.4f}")
+        print(f"  Accuracy: {test_acc:.4f} ({test_acc*100:.2f}%)")
+        
+        # Save model
+        os.makedirs(MODEL_DIR, exist_ok=True)
+        model_path = os.path.join(MODEL_DIR, 'fruit_classifier.pkl')
+        save_model(params, history, input_dim, hidden_dim, num_classes, model_path)
+        
+        results = {
+            'train_loss': train_loss,
+            'train_accuracy': train_acc,
+            'test_loss': test_loss,
+            'test_accuracy': test_acc,
+            'history': history,
+            'X_test': X_test,
+            'y_test': y_test,
+            'params': params,
+            'label_mapping': label_mapping
+        }
+        
+        print(f"\n✓ Classifier training complete")
+        return params, results
+        
+    except Exception as e:
+        print(f"\n✗ Classifier training failed: {e}")
+        import traceback
+        traceback.print_exc()
+        return None, None
 def generate_confusion_matrix(results):
     """
     Step 5 (Optional): Generate confusion matrix from training results
@@ -256,45 +436,70 @@ def run_full_pipeline(skip_tests=True,
     if not skip_tests:
         test_success = run_tests()
         if not test_success:
-            print("\ns Warning: Some tests failed. Continue anyway? (y/n)")
+            print("\n⚠ Warning: Some tests failed. Continue anyway? (y/n)")
             response = input().strip().lower()
             if response != 'y':
                 print("Pipeline aborted.")
                 return False
     
-    # Step 1: Database setup
-    if not setup_database():
-        print("\n Pipeline failed at database setup")
-        return False
+    # Check if dataset folder exists (from .env)
+    stored_dataset_exists = os.path.exists(STORED_DATASET_PATH) if STORED_DATASET_PATH else False
+    processed_dataset_exists = os.path.exists(PROCESSED_DATASET_PATH) if PROCESSED_DATASET_PATH else False
     
-    # Step 2: Preprocessing
-    train_gen , test_gen = preprocess_data()
-    if not train_gen and not test_gen:
-        print("\n Pipeline failed at preprocessing")
-        return False
+    # Step 1: Database setup (skip if stored dataset exists)
+    if stored_dataset_exists:
+        print("\n" + "="*60)
+        print("STEP 1: DATABASE SETUP - SKIPPED (Dataset folder exists)")
+        print("="*60 + "\n")
+        print(f"✓ Using existing dataset at: {STORED_DATASET_PATH}")
+    else:
+        if not setup_database():
+            print("\n✗ Pipeline failed at database setup")
+            return False
+    
+    # Step 2: Preprocessing (skip if processed folder exists)
+    if processed_dataset_exists:
+        print("\n" + "="*60)
+        print("STEP 2: DATA PREPROCESSING - SKIPPED (Processed folder exists)")
+        print("="*60 + "\n")
+        print(f"✓ Using existing preprocessed data at: {PROCESSED_DATASET_PATH}")
+        
+        # Still need to load the data
+        print("Loading preprocessed data...")
+        train_gen, test_gen = preprocess_data()
+        if not train_gen or not test_gen:
+            print("\n✗ Pipeline failed at loading preprocessed data")
+            return False
+    else:
+        train_gen, test_gen = preprocess_data()
+        if not train_gen or not test_gen:
+            print("\n✗ Pipeline failed at preprocessing")
+            return False
     
     # Step 3: Feature extraction
-    train_features , test_features = extract_features(train_gen , test_gen)
-    if not train_features or test_features:
-        print("\n Pipeline failed at feature extraction")
+    train_features, test_features = extract_features(train_gen, test_gen)
+    if not train_features or not test_features:
+        print("\n✗ Pipeline failed at feature extraction")
         return False
     
-    params, label_mapping, results = train_classifier(
+    # Step 4: Train classifier
+    params, results = train_classifier(
         train_features, test_features,
         hidden_dim=hidden_dim,
         epochs=epochs,
         learning_rate=learning_rate
     )
     if params is None:
-        print("\n Pipeline failed at classifier training")
+        print("\n✗ Pipeline failed at classifier training")
         return False
+    label_mapping = results['label_mapping']    # Step 5: Generate confusion matrix
     cm = generate_confusion_matrix(results)
     if cm is not None:
         results['confusion_matrix'] = cm
     
     # Success
     print("\n" + "="*60)
-    print(" COMPLETE PIPELINE FINISHED SUCCESSFULLY")
+    print("✓ COMPLETE PIPELINE FINISHED SUCCESSFULLY")
     print("="*60)
     print(f"\nFinal Results:")
     print(f"  Classes: {len(label_mapping)}")
@@ -329,7 +534,6 @@ def run_full_pipeline(skip_tests=True,
     print("\n" + "="*60 + "\n")
     
     return True
-
 def main():
         run_full_pipeline(
         skip_tests=True,       
