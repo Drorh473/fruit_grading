@@ -3,8 +3,7 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 import pickle
-from cnn.activation_functions import relu,softmax,relu_derivative
-# Load environment variables
+from cnn.activation_functions import relu, softmax, relu_derivative
 env_path = Path('.') / '.env'
 load_dotenv(dotenv_path=env_path)
 

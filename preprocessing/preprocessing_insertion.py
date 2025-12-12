@@ -6,7 +6,6 @@ from dotenv import load_dotenv
 from tqdm import tqdm
 from multiprocessing import Pool
 
-# Add project to path
 PROJECT_DIR = '/mnt/project'
 if PROJECT_DIR not in sys.path:
     sys.path.insert(0, PROJECT_DIR)
