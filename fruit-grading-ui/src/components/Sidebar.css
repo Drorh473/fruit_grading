@@ -23,7 +23,6 @@
 }
 
 .logo-icon {
-  font-size: 2rem;
   width: 48px;
   height: 48px;
   display: flex;
@@ -31,6 +30,11 @@
   justify-content: center;
   background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
   border-radius: 12px;
+  color: white;
+}
+
+.logo-icon svg {
+  color: white;
 }
 
 .logo-text h1 {
@@ -45,6 +49,53 @@
   color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 1px;
+}
+
+/* User Info Section */
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-lg) var(--spacing-xl);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-light);
+}
+
+.user-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 700;
+  font-size: 1.125rem;
+  flex-shrink: 0;
+}
+
+.user-details {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  min-width: 0;
+}
+
+.user-name {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.user-role {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .sidebar-nav {
@@ -91,6 +142,34 @@
 .sidebar-footer {
   padding: var(--spacing-lg) var(--spacing-xl);
   border-top: 1px solid var(--border);
+}
+
+/* Logout Button */
+.logout-button {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  width: 100%;
+  padding: var(--spacing-md);
+  background: var(--bg-light);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  margin-bottom: var(--spacing-md);
+}
+
+.logout-button:hover {
+  background: var(--bg-dark);
+  border-color: var(--error);
+  color: var(--error);
+}
+
+.logout-button svg {
+  font-size: 1.125rem;
 }
 
 .version-info p {
