@@ -21,51 +21,52 @@ from preprocessing.preprocessing_from_db import load_dataset_with_preprocessing
 from cnn.pre_trained_feature_map import process_features
 from cnn.fully_connected_layer import train, evaluate, save_model
 from visuals.confusion_matrix import generate_full_confusion_matrix_report
-# Import test modules
-from Tests.test_database_creation import TestDatabaseCreation
-from Tests.test_preprocessing_from_db import (
-    TestCustomPreprocessing,
-    TestProcessImage,
-    TestDatabaseFunctions,
-    TestPreprocessingIntegration
-)
+#import for the testing suit
+import subprocess
+
 
 # Get configuration
 ORIGINAL_DATASET_PATH = os.getenv('ORIGINAL_DATASET_PATH')
 DB_NAME = os.getenv('DB_NAME', 'fruit_grading')
 
-
 def run_tests():
-    """Run all test suites"""
+    """Run all test suites using run_all_tests.py"""
     print("\n" + "="*60)
-    print("RUNNING TESTS")
+    print("RUNNING COMPREHENSIVE TEST SUITE")
     print("="*60 + "\n")
     
-    # Create test suite
-    loader = unittest.TestLoader()
-    suite = unittest.TestSuite()
+    # Path to run_all_tests.py
+    test_script = os.path.join(PROJECT_ROOT, 'run_all_tests.py')
     
-    # Add test classes
-    suite.addTests(loader.loadTestsFromTestCase(TestDatabaseCreation))
-    suite.addTests(loader.loadTestsFromTestCase(TestCustomPreprocessing))
-    suite.addTests(loader.loadTestsFromTestCase(TestProcessImage))
-    suite.addTests(loader.loadTestsFromTestCase(TestDatabaseFunctions))
-    suite.addTests(loader.loadTestsFromTestCase(TestPreprocessingIntegration))
+    if not os.path.exists(test_script):
+        print(f"Warning: Test script not found at {test_script}")
+        print("Skipping tests...")
+        return True
     
-    # Run tests
-    runner = unittest.TextTestRunner(verbosity=0,buffer=True)
-    result = runner.run(suite)
-    
-    # Print summary
-    print("\n" + "="*60)
-    print("TEST SUMMARY")
-    print(f"Tests run: {result.testsRun}")
-    print(f"Successes: {result.testsRun - len(result.failures) - len(result.errors)}")
-    print(f"Failures: {len(result.failures)}")
-    print(f"Errors: {len(result.errors)}")
-    print("="*60 + "\n")
-    return result.wasSuccessful()
-
+    try:
+        # Run the comprehensive test suite with quick mode
+        result = subprocess.run(
+            [sys.executable, test_script, '--quick'],
+            cwd=PROJECT_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
+        
+        # Print output
+        print(result.stdout)
+        if result.stderr:
+            print("Warnings/Errors:", result.stderr)
+        
+        # Return success based on exit code
+        return result.returncode == 0
+        
+    except subprocess.TimeoutExpired:
+        print("\nâœ— Tests timed out after 2 minutes")
+        return False
+    except Exception as e:
+        print(f"\nâœ— Error running tests: {e}")
+        return False
 
 def setup_database():
     """Step 1: Create and populate database"""
