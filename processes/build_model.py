@@ -249,9 +249,9 @@ def train_classifier(train_features, test_features,
         traceback.print_exc()
         return None, None
 def train_classifier(train_features, test_features, 
-                    hidden_dim=32, epochs=100, learning_rate=0.001):
+                    hidden_dim=32, epochs=100, learning_rate=0.001, lambda_reg=0.01):
     """
-    Step 4: Train fully connected classifier
+    Step 4: Train fully connected classifier with L2 regularization
     
     Args:
         train_features: Dictionary with fused feature vectors from training set
@@ -259,13 +259,14 @@ def train_classifier(train_features, test_features,
         hidden_dim: Hidden layer dimension
         epochs: Number of training epochs
         learning_rate: Learning rate
+        lambda_reg: L2 regularization strength
     
     Returns:
         params: Trained parameters
         results: Dictionary with evaluation results
     """
     print("\n" + "="*60)
-    print("STEP 4: CLASSIFIER TRAINING")
+    print("STEP 4: CLASSIFIER TRAINING (with L2 Regularization)")
     print("="*60 + "\n")
     
     try:
@@ -276,50 +277,36 @@ def train_classifier(train_features, test_features,
             'premium': 2
         }
         
-        if train_features:
-            first_key = list(train_features.keys())[0]
-            first_value = train_features[first_key]        
-        # Prepare training data from fused features
-        print("\nPreparing training data from fused features...")
+        # Prepare training data
+        print("Preparing training data from fused features...")
         X_train_list = []
         y_train_list = []
         
         for key, data in train_features.items():
-            # Handle both old structure (numpy array) and new structure (dict)
             if isinstance(data, dict):
                 X_train_list.append(data['features'])
                 y_train_list.append(data['label'])
             elif isinstance(data, np.ndarray):
-                # Fallback: extract label from key
-                print(f"WARNING: Found numpy array instead of dict for key: {key}")
                 fruit_type = key.split('_')[0]
                 X_train_list.append(data)
                 y_train_list.append(label_mapping.get(fruit_type, 2))
-            else:
-                print(f"ERROR: Unexpected data type for key {key}: {type(data)}")
-                continue
         
         X_train = np.array(X_train_list, dtype=np.float32)
         y_train = np.array(y_train_list, dtype=np.int64)
         
-        # Prepare testing data from fused features
+        # Prepare testing data
         print("Preparing testing data from fused features...")
         X_test_list = []
         y_test_list = []
         
         for key, data in test_features.items():
-            # Handle both old structure (numpy array) and new structure (dict)
             if isinstance(data, dict):
                 X_test_list.append(data['features'])
                 y_test_list.append(data['label'])
             elif isinstance(data, np.ndarray):
-                # Fallback: extract label from key
                 fruit_type = key.split('_')[0]
                 X_test_list.append(data)
                 y_test_list.append(label_mapping.get(fruit_type, 2))
-            else:
-                print(f"ERROR: Unexpected data type for key {key}: {type(data)}")
-                continue
         
         X_test = np.array(X_test_list, dtype=np.float32)
         y_test = np.array(y_test_list, dtype=np.int64)
@@ -333,6 +320,7 @@ def train_classifier(train_features, test_features,
         print(f"  Testing samples: {len(X_test)}")
         print(f"  Feature dimension: {input_dim:,}")
         print(f"  Number of classes: {num_classes}")
+        print(f"  L2 Regularization: λ = {lambda_reg}")
         
         # Check label distribution
         print(f"\nTraining label distribution:")
@@ -355,6 +343,7 @@ def train_classifier(train_features, test_features,
             epochs=epochs,
             batch_size=32,
             learning_rate=learning_rate,
+            lambda_reg=lambda_reg,  # Pass lambda_reg here
             verbose=True
         )
         
@@ -363,8 +352,8 @@ def train_classifier(train_features, test_features,
         print("FINAL EVALUATION")
         print("="*60)
         
-        train_loss, train_acc = evaluate(X_train, y_train, params, num_classes)
-        test_loss, test_acc = evaluate(X_test, y_test, params, num_classes)
+        train_loss, train_acc = evaluate(X_train, y_train, params, num_classes, lambda_reg)
+        test_loss, test_acc = evaluate(X_test, y_test, params, num_classes, lambda_reg)
         
         print(f"\nTraining set:")
         print(f"  Loss: {train_loss:.4f}")
@@ -431,7 +420,7 @@ def generate_confusion_matrix(results):
 
 
 def run_full_pipeline(skip_tests=True, 
-                     hidden_dim=256, epochs=100, learning_rate=0.001):
+                     hidden_dim=256, epochs=100, learning_rate=0.001, lambda_reg = 0.01):
     # Step 0: Run tests (optional)
     if not skip_tests:
         test_success = run_tests()
@@ -487,8 +476,10 @@ def run_full_pipeline(skip_tests=True,
         train_features, test_features,
         hidden_dim=hidden_dim,
         epochs=epochs,
-        learning_rate=learning_rate
+        learning_rate=learning_rate,
+        lambda_reg=lambda_reg
     )
+    
     if params is None:
         print("\n✗ Pipeline failed at classifier training")
         return False
@@ -537,9 +528,10 @@ def run_full_pipeline(skip_tests=True,
 def main():
         run_full_pipeline(
         skip_tests=True,       
-        hidden_dim=256,       
+        hidden_dim=16,       
         epochs=100,           
-        learning_rate=0.001    
+        learning_rate=0.0005,
+        lambda_reg=0.001   
     )
 if __name__ == "__main__":
     main()

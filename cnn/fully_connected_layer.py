@@ -66,17 +66,19 @@ def forward_pass(X, params):
 
 
 # Loss Computation
-def compute_loss(y_pred, y_true, num_classes):
+def compute_loss(y_pred, y_true, num_classes, params=None, lambda_reg=0.0):
     """
-    Compute cross-entropy loss
+    Compute cross-entropy loss with optional L2 regularization
     
     Args:
         y_pred: Predicted probabilities (batch_size, num_classes)
         y_true: True labels (batch_size,) or one-hot (batch_size, num_classes)
         num_classes: Number of classes
+        params: Dictionary with network parameters (needed for L2 regularization)
+        lambda_reg: L2 regularization strength (0 = no regularization)
     
     Returns:
-        Loss value
+        Loss value (cross-entropy + L2 penalty)
     """
     batch_size = y_pred.shape[0]
     
@@ -90,21 +92,28 @@ def compute_loss(y_pred, y_true, num_classes):
     # Cross-entropy loss (with numerical stability)
     epsilon = 1e-15
     y_pred_clipped = np.clip(y_pred, epsilon, 1 - epsilon)
-    loss = -np.sum(y_true_onehot * np.log(y_pred_clipped)) / batch_size
+    ce_loss = -np.sum(y_true_onehot * np.log(y_pred_clipped)) / batch_size
     
-    return loss
+    # Add L2 regularization if params provided and lambda_reg > 0
+    if params is not None and lambda_reg > 0:
+        l2_penalty = lambda_reg * (np.sum(params['W1']**2) + np.sum(params['W2']**2))
+        total_loss = ce_loss + l2_penalty
+        return total_loss
+    
+    return ce_loss
 
 
 # Backward Pass
-def backward_pass(y_true, params, cache, num_classes):
+def backward_pass(y_true, params, cache, num_classes, lambda_reg=0.0):
     """
-    Backward pass (backpropagation)
+    Backward pass (backpropagation) with optional L2 regularization
     
     Args:
         y_true: True labels (batch_size,) or one-hot (batch_size, num_classes)
         params: Dictionary with network parameters
         cache: Dictionary with cached values from forward pass
         num_classes: Number of classes
+        lambda_reg: L2 regularization strength (0 = no regularization)
     
     Returns:
         grads: Dictionary with gradients (dW1, db1, dW2, db2)
@@ -121,8 +130,10 @@ def backward_pass(y_true, params, cache, num_classes):
     # Gradient of loss w.r.t Z2 (softmax + cross-entropy)
     dZ2 = cache['A2'] - y_true_onehot
     
-    # Gradients for W2 and b2
+    # Gradients for W2 and b2 (with L2 regularization on W2)
     dW2 = np.dot(cache['A1'].T, dZ2) / batch_size
+    if lambda_reg > 0:
+        dW2 += 2 * lambda_reg * params['W2']  # L2 gradient
     db2 = np.sum(dZ2, axis=0, keepdims=True) / batch_size
     
     # Gradient w.r.t A1
@@ -131,8 +142,10 @@ def backward_pass(y_true, params, cache, num_classes):
     # Gradient w.r.t Z1 (through ReLU)
     dZ1 = dA1 * relu_derivative(cache['Z1'])
     
-    # Gradients for W1 and b1
+    # Gradients for W1 and b1 (with L2 regularization on W1)
     dW1 = np.dot(cache['X'].T, dZ1) / batch_size
+    if lambda_reg > 0:
+        dW1 += 2 * lambda_reg * params['W1']  # L2 gradient
     db1 = np.sum(dZ1, axis=0, keepdims=True) / batch_size
     
     grads = {
@@ -143,7 +156,6 @@ def backward_pass(y_true, params, cache, num_classes):
     }
     
     return grads
-
 
 # Parameter Update
 def update_parameters(params, grads, learning_rate):
@@ -167,9 +179,9 @@ def update_parameters(params, grads, learning_rate):
 
 
 # Training Step
-def train_step(X, y, params, num_classes, learning_rate):
+def train_step(X, y, params, num_classes, learning_rate, lambda_reg=0.0):
     """
-    Single training step (forward + backward + update)
+    Single training step (forward + backward + update) with L2 regularization
     
     Args:
         X: Input features (batch_size, input_dim)
@@ -177,6 +189,7 @@ def train_step(X, y, params, num_classes, learning_rate):
         params: Dictionary with network parameters
         num_classes: Number of classes
         learning_rate: Learning rate
+        lambda_reg: L2 regularization strength
     
     Returns:
         loss: Loss value
@@ -186,15 +199,15 @@ def train_step(X, y, params, num_classes, learning_rate):
     # Forward pass
     y_pred, cache = forward_pass(X, params)
     
-    # Compute loss
-    loss = compute_loss(y_pred, y, num_classes)
+    # Compute loss (with L2 regularization)
+    loss = compute_loss(y_pred, y, num_classes, params, lambda_reg)
     
     # Compute accuracy
     predictions = np.argmax(y_pred, axis=1)
     accuracy = np.mean(predictions == y)
     
-    # Backward pass
-    grads = backward_pass(y, params, cache, num_classes)
+    # Backward pass (with L2 regularization)
+    grads = backward_pass(y, params, cache, num_classes, lambda_reg)
     
     # Update parameters
     params = update_parameters(params, grads, learning_rate)
@@ -222,22 +235,23 @@ def predict(X, params):
 
 
 # Evaluation
-def evaluate(X, y, params, num_classes):
+def evaluate(X, y, params, num_classes, lambda_reg=0.0):
     """
-    Evaluate the model
+    Evaluate the model with optional L2 regularization
     
     Args:
         X: Input features
         y: True labels
         params: Dictionary with network parameters
         num_classes: Number of classes
+        lambda_reg: L2 regularization strength
     
     Returns:
         loss: Loss value
         accuracy: Accuracy value
     """
     y_pred, _ = forward_pass(X, params)
-    loss = compute_loss(y_pred, y, num_classes)
+    loss = compute_loss(y_pred, y, num_classes, params, lambda_reg)
     predictions = np.argmax(y_pred, axis=1)
     accuracy = np.mean(predictions == y)
     
@@ -323,9 +337,9 @@ def train_from_generator(train_generator, val_generator, input_dim, hidden_dim, 
 
 # Training Loop (for pre-loaded numpy arrays)
 def train(X_train, y_train, X_val, y_val, input_dim, hidden_dim, num_classes,
-          epochs=100, batch_size=32, learning_rate=0.001, verbose=True):
+          epochs=100, batch_size=32, learning_rate=0.001, lambda_reg=0.0, verbose=True):
     """
-    Train the neural network with pre-loaded data
+    Train the neural network with pre-loaded data and L2 regularization
     
     Args:
         X_train: Training features (numpy array)
@@ -338,6 +352,7 @@ def train(X_train, y_train, X_val, y_val, input_dim, hidden_dim, num_classes,
         epochs: Number of training epochs
         batch_size: Batch size for mini-batch training
         learning_rate: Learning rate
+        lambda_reg: L2 regularization strength (0 = no regularization)
         verbose: Print training progress
     
     Returns:
@@ -376,7 +391,7 @@ def train(X_train, y_train, X_val, y_val, input_dim, hidden_dim, num_classes,
             y_batch = y_train_shuffled[start_idx:end_idx]
             
             loss, accuracy, params = train_step(X_batch, y_batch, params, 
-                                               num_classes, learning_rate)
+                                               num_classes, learning_rate, lambda_reg)
             epoch_losses.append(loss)
             epoch_accuracies.append(accuracy)
         
@@ -389,7 +404,7 @@ def train(X_train, y_train, X_val, y_val, input_dim, hidden_dim, num_classes,
         
         # Validation
         if X_val is not None and y_val is not None:
-            val_loss, val_acc = evaluate(X_val, y_val, params, num_classes)
+            val_loss, val_acc = evaluate(X_val, y_val, params, num_classes, lambda_reg)
             history['val_loss'].append(val_loss)
             history['val_accuracy'].append(val_acc)
             
