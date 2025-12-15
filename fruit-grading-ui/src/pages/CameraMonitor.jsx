@@ -27,25 +27,18 @@ const CameraMonitor = ({ systemStatus, setSystemStatus }) => {
   const toggleCamera = (cameraId, e) => {
     e.stopPropagation();
 
-    const currentStatus = systemStatus.cameras[cameraId];
-    const action = currentStatus ? "shutdown" : "start";
+    // Update system status immediately without confirmation
+    const newCameras = [...systemStatus.cameras];
+    newCameras[cameraId] = !newCameras[cameraId];
 
-    if (
-      window.confirm(`Are you sure you want to ${action} Camera ${cameraId}?`)
-    ) {
-      // Update system status
-      const newCameras = [...systemStatus.cameras];
-      newCameras[cameraId] = !newCameras[cameraId];
+    setSystemStatus({
+      ...systemStatus,
+      cameras: newCameras,
+    });
 
-      setSystemStatus({
-        ...systemStatus,
-        cameras: newCameras,
-      });
-
-      console.log(
-        `Camera ${cameraId} ${newCameras[cameraId] ? "started" : "shutdown"}`
-      );
-    }
+    console.log(
+      `Camera ${cameraId} ${newCameras[cameraId] ? "started" : "shutdown"}`
+    );
   };
 
   const handleRefresh = (cameraId) => {
@@ -59,23 +52,17 @@ const CameraMonitor = ({ systemStatus, setSystemStatus }) => {
   };
 
   const startAllCameras = () => {
-    if (window.confirm("Start all cameras?")) {
-      setSystemStatus({
-        ...systemStatus,
-        cameras: [true, true, true, true],
-      });
-    }
+    setSystemStatus({
+      ...systemStatus,
+      cameras: [true, true, true, true],
+    });
   };
 
   const shutdownAllCameras = () => {
-    if (
-      window.confirm("Shutdown all cameras? This will affect system operation.")
-    ) {
-      setSystemStatus({
-        ...systemStatus,
-        cameras: [false, false, false, false],
-      });
-    }
+    setSystemStatus({
+      ...systemStatus,
+      cameras: [false, false, false, false],
+    });
   };
 
   const activeCamerasCount = systemStatus.cameras.filter((c) => c).length;
@@ -107,27 +94,12 @@ const CameraMonitor = ({ systemStatus, setSystemStatus }) => {
 
       {/* System Status Alert */}
       {activeCamerasCount < 4 && (
-        <div
-          className="card"
-          style={{
-            background: "rgba(243, 156, 18, 0.1)",
-            border: "1px solid var(--warning)",
-          }}
-        >
-          <div
-            style={{
-              padding: "var(--spacing-md)",
-              display: "flex",
-              alignItems: "center",
-              gap: "var(--spacing-md)",
-            }}
-          >
-            <FiVideoOff
-              style={{ fontSize: "1.5rem", color: "var(--warning)" }}
-            />
+        <div className="alert-warning-card">
+          <div className="alert-warning-content">
+            <FiVideoOff className="alert-warning-icon" />
             <div>
-              <strong style={{ color: "var(--warning)" }}>Warning: </strong>
-              <span style={{ color: "var(--text-primary)" }}>
+              <strong className="alert-warning-title">Warning: </strong>
+              <span className="alert-warning-text">
                 {4 - activeCamerasCount} camera
                 {4 - activeCamerasCount > 1 ? "s" : ""} offline. Multi-view
                 fusion requires all 4 cameras for optimal classification.
