@@ -3,12 +3,6 @@
   max-width: 1600px;
 }
 
-.header-actions {
-  display: flex;
-  gap: var(--spacing-md);
-  flex-wrap: wrap;
-}
-
 .btn-icon {
   background: transparent;
   border: 1px solid var(--border);
@@ -23,78 +17,16 @@
   transition: all var(--transition-fast);
 }
 
-.btn-icon:hover:not(:disabled) {
+.btn-icon:hover {
   border-color: var(--accent-primary);
   color: var(--accent-primary);
-}
-
-.btn-icon:disabled {
-  opacity: 0.3;
-  cursor: not-allowed;
-}
-
-.btn-icon-shutdown {
-  border-color: var(--error);
-  color: var(--error);
-}
-
-.btn-icon-shutdown:hover:not(:disabled) {
-  background: rgba(231, 76, 60, 0.1);
-}
-
-.btn-icon-start {
-  border-color: var(--success);
-  color: var(--success);
-}
-
-.btn-icon-start:hover:not(:disabled) {
-  background: rgba(39, 174, 96, 0.1);
-}
-
-.btn-sm {
-  padding: var(--spacing-xs) var(--spacing-md);
-  font-size: 0.75rem;
-}
-
-/* Warning Alert */
-.alert-warning-card {
-  background: rgba(243, 156, 18, 0.1);
-  border: 1px solid var(--warning);
-  border-radius: 8px;
-  margin-bottom: var(--spacing-xl);
-}
-
-.alert-warning-content {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--spacing-lg);
-  padding: var(--spacing-lg);
-}
-
-.alert-warning-icon {
-  font-size: 1.75rem;
-  color: var(--warning);
-  flex-shrink: 0;
-  margin-top: 2px;
-}
-
-.alert-warning-title {
-  color: var(--warning);
-  font-weight: 600;
-  font-size: 0.875rem;
-}
-
-.alert-warning-text {
-  color: var(--text-primary);
-  font-size: 0.875rem;
-  line-height: 1.6;
 }
 
 /* Camera Grid */
 .camera-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: var(--spacing-lg);
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--spacing-md);
   margin-bottom: var(--spacing-xl);
 }
 
@@ -115,14 +47,6 @@
 .camera-card.selected {
   border-color: var(--accent-primary);
   box-shadow: 0 0 0 3px rgba(22, 160, 133, 0.1);
-}
-
-.camera-card.camera-offline {
-  opacity: 0.7;
-}
-
-.camera-card.camera-offline:hover {
-  border-color: var(--error);
 }
 
 .camera-header {
@@ -293,32 +217,111 @@
   line-height: 1.5;
 }
 
-/* Animation */
-@keyframes pulse {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.5;
-  }
+/* Camera System Health */
+.camera-health-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--spacing-md);
 }
 
-/* Responsive */
-@media (max-width: 768px) {
-  .camera-monitor {
-    padding: var(--spacing-md);
-  }
+.camera-health-card {
+  background: var(--bg-light);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: var(--spacing-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  transition: all var(--transition-normal);
+}
 
-  .header-actions {
-    width: 100%;
-  }
+.camera-health-card:hover {
+  border-color: var(--accent-primary);
+  transform: translateY(-2px);
+}
 
-  .header-actions button {
-    flex: 1;
-  }
+.camera-health-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding-bottom: var(--spacing-md);
+  border-bottom: 1px solid var(--border);
+}
 
-  .camera-grid {
-    grid-template-columns: 1fr;
-  }
+.camera-health-title {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.camera-health-name {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.camera-health-angle {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.health-indicator {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.health-good {
+  background: var(--success);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.health-error {
+  background: var(--error);
+}
+
+.camera-health-metrics {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--spacing-md);
+}
+
+.health-metric {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.health-metric-label {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.health-metric-value {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.metric-success {
+  color: var(--success);
+}
+
+.metric-warning {
+  color: var(--warning);
+}
+
+.camera-health-footer {
+  display: flex;
+  gap: var(--spacing-sm);
+  padding-top: var(--spacing-md);
+  border-top: 1px solid var(--border);
+}
+
+.btn-sm {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  font-size: 0.75rem;
 }
