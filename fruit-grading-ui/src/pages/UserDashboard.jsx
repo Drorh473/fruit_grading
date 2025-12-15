@@ -1,18 +1,24 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { FiBarChart2, FiClock, FiCheckCircle } from 'react-icons/fi';
-import { useAuth } from '../context/AuthContext';
-import './UserDashboard.css';
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import {
+  FiBarChart2,
+  FiClock,
+  FiCheckCircle,
+  FiCamera,
+  FiAlertCircle,
+} from "react-icons/fi";
+import { useAuth } from "../context/AuthContext";
+import "./UserDashboard.css";
 
-const UserDashboard = () => {
+const UserDashboard = ({ systemStatus }) => {
   const [recentResults, setRecentResults] = useState([]);
   const [stats, setStats] = useState({
     totalToday: 0,
     marketCount: 0,
     standardCount: 0,
-    rejectCount: 0
+    rejectCount: 0,
   });
-  
+
   const navigate = useNavigate();
   const { user } = useAuth();
 
@@ -24,11 +30,36 @@ const UserDashboard = () => {
   const fetchRecentResults = async () => {
     // Mock data - replace with actual API call
     const mockResults = [
-      { id: 'obj0014', type: 'market', confidence: 0.95, timestamp: '2025-12-12 14:30:22' },
-      { id: 'obj0013', type: 'standard', confidence: 0.88, timestamp: '2025-12-12 14:28:15' },
-      { id: 'obj0012', type: 'reject', confidence: 0.92, timestamp: '2025-12-12 14:25:08' },
-      { id: 'obj0011', type: 'market', confidence: 0.89, timestamp: '2025-12-12 14:20:45' },
-      { id: 'obj0010', type: 'standard', confidence: 0.91, timestamp: '2025-12-12 14:18:33' },
+      {
+        id: "obj0014",
+        type: "market",
+        confidence: 0.95,
+        timestamp: "2025-12-12 14:30:22",
+      },
+      {
+        id: "obj0013",
+        type: "standard",
+        confidence: 0.88,
+        timestamp: "2025-12-12 14:28:15",
+      },
+      {
+        id: "obj0012",
+        type: "reject",
+        confidence: 0.92,
+        timestamp: "2025-12-12 14:25:08",
+      },
+      {
+        id: "obj0011",
+        type: "market",
+        confidence: 0.89,
+        timestamp: "2025-12-12 14:20:45",
+      },
+      {
+        id: "obj0010",
+        type: "standard",
+        confidence: 0.91,
+        timestamp: "2025-12-12 14:18:33",
+      },
     ];
     setRecentResults(mockResults);
   };
@@ -39,24 +70,73 @@ const UserDashboard = () => {
       totalToday: 47,
       marketCount: 28,
       standardCount: 13,
-      rejectCount: 6
+      rejectCount: 6,
     });
   };
+
+  const activeCamerasCount =
+    systemStatus?.cameras?.filter((c) => c).length || 0;
+  const allCamerasActive = activeCamerasCount === 4;
 
   return (
     <div className="user-dashboard">
       <div className="page-header">
         <div>
           <h1>Welcome, {user?.username}</h1>
-          <p className="page-subtitle">Operator Dashboard - View Classification Results</p>
+          <p className="page-subtitle">
+            Operator Dashboard - View Classification Results
+          </p>
         </div>
       </div>
+
+      {/* System Status Alert - Show warning if cameras offline */}
+      {!allCamerasActive && (
+        <div
+          className="card"
+          style={{
+            background: "rgba(243, 156, 18, 0.1)",
+            border: "1px solid var(--warning)",
+            marginBottom: "var(--spacing-lg)",
+          }}
+        >
+          <div
+            style={{
+              padding: "var(--spacing-md)",
+              display: "flex",
+              alignItems: "center",
+              gap: "var(--spacing-md)",
+            }}
+          >
+            <FiAlertCircle
+              style={{
+                fontSize: "1.5rem",
+                color: "var(--warning)",
+                flexShrink: 0,
+              }}
+            />
+            <div>
+              <strong style={{ color: "var(--warning)" }}>
+                System Notice:{" "}
+              </strong>
+              <span style={{ color: "var(--text-primary)" }}>
+                {4 - activeCamerasCount} camera
+                {4 - activeCamerasCount > 1 ? "s are" : " is"} currently
+                offline. Classification accuracy may be affected. Please contact
+                an administrator if this persists.
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Summary Cards */}
       <div className="grid grid-4">
         <div className="summary-card">
-          <div className="summary-icon" style={{ background: 'rgba(52, 152, 219, 0.1)' }}>
-            <FiClock style={{ color: 'var(--info)' }} />
+          <div
+            className="summary-icon"
+            style={{ background: "rgba(52, 152, 219, 0.1)" }}
+          >
+            <FiClock style={{ color: "var(--info)" }} />
           </div>
           <div className="summary-content">
             <p className="summary-label">Processed Today</p>
@@ -65,8 +145,11 @@ const UserDashboard = () => {
         </div>
 
         <div className="summary-card">
-          <div className="summary-icon" style={{ background: 'rgba(39, 174, 96, 0.1)' }}>
-            <FiCheckCircle style={{ color: 'var(--success)' }} />
+          <div
+            className="summary-icon"
+            style={{ background: "rgba(39, 174, 96, 0.1)" }}
+          >
+            <FiCheckCircle style={{ color: "var(--success)" }} />
           </div>
           <div className="summary-content">
             <p className="summary-label">Market Grade</p>
@@ -75,8 +158,11 @@ const UserDashboard = () => {
         </div>
 
         <div className="summary-card">
-          <div className="summary-icon" style={{ background: 'rgba(52, 152, 219, 0.1)' }}>
-            <FiCheckCircle style={{ color: 'var(--info)' }} />
+          <div
+            className="summary-icon"
+            style={{ background: "rgba(52, 152, 219, 0.1)" }}
+          >
+            <FiCheckCircle style={{ color: "var(--info)" }} />
           </div>
           <div className="summary-content">
             <p className="summary-label">Standard Grade</p>
@@ -85,8 +171,11 @@ const UserDashboard = () => {
         </div>
 
         <div className="summary-card">
-          <div className="summary-icon" style={{ background: 'rgba(231, 76, 60, 0.1)' }}>
-            <FiCheckCircle style={{ color: 'var(--error)' }} />
+          <div
+            className="summary-icon"
+            style={{ background: "rgba(231, 76, 60, 0.1)" }}
+          >
+            <FiCheckCircle style={{ color: "var(--error)" }} />
           </div>
           <div className="summary-content">
             <p className="summary-label">Rejected</p>
@@ -95,19 +184,74 @@ const UserDashboard = () => {
         </div>
       </div>
 
+      {/* Camera System Status Card */}
+      <div className="card">
+        <div className="card-header">
+          <h2 className="card-title">
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "var(--spacing-sm)",
+              }}
+            >
+              <FiCamera />
+              Camera System Status
+            </div>
+          </h2>
+          <span
+            className={`status-badge ${
+              allCamerasActive ? "status-success" : "status-warning"
+            }`}
+          >
+            {activeCamerasCount} / 4 Active
+          </span>
+        </div>
+        <div className="grid grid-4">
+          {systemStatus?.cameras?.map((status, index) => (
+            <div key={index} className="camera-status-item-user">
+              <div
+                className={`camera-indicator-user ${
+                  status ? "active" : "inactive"
+                }`}
+              >
+                <FiCamera />
+              </div>
+              <div>
+                <p className="camera-label-user">Camera {index}</p>
+                <p className="camera-angle-user">
+                  {
+                    ["Front View", "Right View", "Back View", "Left View"][
+                      index
+                    ]
+                  }
+                </p>
+                <span
+                  className={`status-badge ${
+                    status ? "status-success" : "status-error"
+                  }`}
+                >
+                  {status ? "Active" : "Offline"}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {/* Recent Results */}
       <div className="card">
         <div className="card-header">
           <h2 className="card-title">Recent Classification Results</h2>
-          <button 
+          <button
             className="btn btn-primary"
-            onClick={() => navigate('/results')}
+            onClick={() => navigate("/results")}
           >
             <FiBarChart2 />
             View All Results
           </button>
         </div>
-        
+
         {recentResults.length > 0 ? (
           <div className="table-container">
             <table>
@@ -122,7 +266,9 @@ const UserDashboard = () => {
               <tbody>
                 {recentResults.map((result) => (
                   <tr key={result.id}>
-                    <td><code>{result.id}</code></td>
+                    <td>
+                      <code>{result.id}</code>
+                    </td>
                     <td>
                       <span className={`type-badge type-${result.type}`}>
                         {result.type}
@@ -130,8 +276,8 @@ const UserDashboard = () => {
                     </td>
                     <td>
                       <div className="confidence-bar-small">
-                        <div 
-                          className="confidence-fill" 
+                        <div
+                          className="confidence-fill"
                           style={{ width: `${result.confidence * 100}%` }}
                         />
                         <span className="confidence-text">

@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { FiDatabase, FiCpu, FiActivity, FiCheckCircle } from 'react-icons/fi';
-import './Dashboard.css';
+import React, { useState, useEffect } from "react";
+import { FiDatabase, FiCpu, FiActivity, FiCheckCircle } from "react-icons/fi";
+import "./Dashboard.css";
 
 const Dashboard = ({ systemStatus, processingStats }) => {
   const [recentResults, setRecentResults] = useState([]);
@@ -13,37 +13,62 @@ const Dashboard = ({ systemStatus, processingStats }) => {
   const fetchRecentResults = async () => {
     // Mock data - replace with actual API call
     setRecentResults([
-      { id: 'obj0014', type: 'market', confidence: 0.95, timestamp: '2025-12-12 14:30:22' },
-      { id: 'obj0013', type: 'standard', confidence: 0.88, timestamp: '2025-12-12 14:28:15' },
-      { id: 'obj0012', type: 'reject', confidence: 0.92, timestamp: '2025-12-12 14:25:08' }
+      {
+        id: "obj0014",
+        type: "market",
+        confidence: 0.95,
+        timestamp: "2025-12-12 14:30:22",
+      },
+      {
+        id: "obj0013",
+        type: "standard",
+        confidence: 0.88,
+        timestamp: "2025-12-12 14:28:15",
+      },
+      {
+        id: "obj0012",
+        type: "reject",
+        confidence: 0.92,
+        timestamp: "2025-12-12 14:25:08",
+      },
     ]);
   };
 
   const getStatusColor = (status) => {
-    return status ? 'status-success' : 'status-error';
+    return status ? "status-success" : "status-error";
   };
 
   const getStatusText = (status) => {
-    return status ? 'Connected' : 'Disconnected';
+    return status ? "Connected" : "Disconnected";
   };
 
   return (
     <div className="dashboard">
       <div className="page-header">
         <h1>System Dashboard</h1>
-        <p className="page-subtitle">Monitor your fruit grading system status and performance</p>
+      </div>
+
+      <div className="page-description">
+        <p>Monitor your fruit grading system status and performance</p>
       </div>
 
       {/* System Status Cards */}
       <div className="grid grid-4">
         <div className="stat-card">
-          <div className="stat-icon" style={{ background: 'rgba(22, 160, 133, 0.1)' }}>
-            <FiDatabase style={{ color: 'var(--accent-primary)' }} />
+          <div
+            className="stat-icon"
+            style={{ background: "rgba(22, 160, 133, 0.1)" }}
+          >
+            <FiDatabase style={{ color: "var(--accent-primary)" }} />
           </div>
           <div className="stat-content">
             <p className="stat-label">Database</p>
             <h3 className="stat-value">
-              <span className={`status-badge ${getStatusColor(systemStatus.database === 'connected')}`}>
+              <span
+                className={`status-badge ${getStatusColor(
+                  systemStatus.database === "connected"
+                )}`}
+              >
                 {systemStatus.database}
               </span>
             </h3>
@@ -51,13 +76,20 @@ const Dashboard = ({ systemStatus, processingStats }) => {
         </div>
 
         <div className="stat-card">
-          <div className="stat-icon" style={{ background: 'rgba(52, 152, 219, 0.1)' }}>
-            <FiCpu style={{ color: 'var(--accent-secondary)' }} />
+          <div
+            className="stat-icon"
+            style={{ background: "rgba(52, 152, 219, 0.1)" }}
+          >
+            <FiCpu style={{ color: "var(--accent-secondary)" }} />
           </div>
           <div className="stat-content">
             <p className="stat-label">Model Status</p>
             <h3 className="stat-value">
-              <span className={`status-badge ${getStatusColor(systemStatus.model === 'loaded')}`}>
+              <span
+                className={`status-badge ${getStatusColor(
+                  systemStatus.model === "loaded"
+                )}`}
+              >
                 {systemStatus.model}
               </span>
             </h3>
@@ -65,8 +97,11 @@ const Dashboard = ({ systemStatus, processingStats }) => {
         </div>
 
         <div className="stat-card">
-          <div className="stat-icon" style={{ background: 'rgba(243, 156, 18, 0.1)' }}>
-            <FiActivity style={{ color: 'var(--warning)' }} />
+          <div
+            className="stat-icon"
+            style={{ background: "rgba(243, 156, 18, 0.1)" }}
+          >
+            <FiActivity style={{ color: "var(--warning)" }} />
           </div>
           <div className="stat-content">
             <p className="stat-label">Processed Today</p>
@@ -75,13 +110,18 @@ const Dashboard = ({ systemStatus, processingStats }) => {
         </div>
 
         <div className="stat-card">
-          <div className="stat-icon" style={{ background: 'rgba(39, 174, 96, 0.1)' }}>
-            <FiCheckCircle style={{ color: 'var(--success)' }} />
+          <div
+            className="stat-icon"
+            style={{ background: "rgba(39, 174, 96, 0.1)" }}
+          >
+            <FiCheckCircle style={{ color: "var(--success)" }} />
           </div>
           <div className="stat-content">
             <p className="stat-label">Model Accuracy</p>
             <h3 className="stat-value">
-              {processingStats.accuracy > 0 ? `${(processingStats.accuracy * 100).toFixed(1)}%` : 'N/A'}
+              {processingStats.accuracy > 0
+                ? `${(processingStats.accuracy * 100).toFixed(1)}%`
+                : "N/A"}
             </h3>
           </div>
         </div>
@@ -95,7 +135,9 @@ const Dashboard = ({ systemStatus, processingStats }) => {
         <div className="grid grid-4">
           {systemStatus.cameras.map((status, index) => (
             <div key={index} className="camera-status-item">
-              <div className={`camera-indicator ${status ? 'active' : 'inactive'}`}>
+              <div
+                className={`camera-indicator ${status ? "active" : "inactive"}`}
+              >
                 <FiActivity />
               </div>
               <div>
@@ -129,7 +171,9 @@ const Dashboard = ({ systemStatus, processingStats }) => {
               <tbody>
                 {recentResults.map((result) => (
                   <tr key={result.id}>
-                    <td><code>{result.id}</code></td>
+                    <td>
+                      <code>{result.id}</code>
+                    </td>
                     <td>
                       <span className={`type-badge type-${result.type}`}>
                         {result.type}
@@ -137,11 +181,13 @@ const Dashboard = ({ systemStatus, processingStats }) => {
                     </td>
                     <td>
                       <div className="confidence-bar">
-                        <div 
-                          className="confidence-fill" 
+                        <div
+                          className="confidence-fill"
                           style={{ width: `${result.confidence * 100}%` }}
                         />
-                        <span className="confidence-text">{(result.confidence * 100).toFixed(1)}%</span>
+                        <span className="confidence-text">
+                          {(result.confidence * 100).toFixed(1)}%
+                        </span>
                       </div>
                     </td>
                     <td className="timestamp">{result.timestamp}</td>

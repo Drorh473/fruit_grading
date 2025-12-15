@@ -206,7 +206,7 @@ class TestSuiteOrganizer:
         total_time = 0
         
         for suite_name, result in self.results.items():
-            status = "✓ PASS" if result['success'] else "✗ FAIL"
+            status = " PASS" if result['success'] else "✗ FAIL"
             
             print(f"\n{suite_name}:")
             print(f"  Status: {status}")
@@ -300,7 +300,7 @@ class TestSuiteOrganizer:
             print(f"\n{component}:")
             print(f"  Functions covered: {len(functions)}")
             for func in functions:
-                print(f"    ✓ {func}")
+                print(f"     {func}")
         
         print("\n" + "="*70 + "\n")
 

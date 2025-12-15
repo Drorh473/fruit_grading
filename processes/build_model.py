@@ -81,10 +81,10 @@ def setup_database():
     
     try:
         db_name, collection_name = process_dataset(ORIGINAL_DATASET_PATH, DB_NAME)
-        print(f"\n✓ Database setup complete: {db_name}/{collection_name}")
+        print(f"\n Database setup complete: {db_name}/{collection_name}")
         return True
     except Exception as e:
-        print(f"\n✗ Database setup failed: {e}")
+        print(f"\n Database setup failed: {e}")
         return False
 
 
@@ -241,11 +241,11 @@ def train_classifier(train_features, test_features,
             'label_mapping': label_mapping
         }
         
-        print(f"\n✓ Classifier training complete")
+        print(f"\n Classifier training complete")
         return params, results
         
     except Exception as e:
-        print(f"\n✗ Classifier training failed: {e}")
+        print(f"\n Classifier training failed: {e}")
         import traceback
         traceback.print_exc()
         return None, None
@@ -381,11 +381,11 @@ def train_classifier(train_features, test_features,
             'label_mapping': label_mapping
         }
         
-        print(f"\n✓ Classifier training complete")
+        print(f"\n Classifier training complete")
         return params, results
         
     except Exception as e:
-        print(f"\n✗ Classifier training failed: {e}")
+        print(f"\n Classifier training failed: {e}")
         import traceback
         traceback.print_exc()
         return None, None
@@ -408,25 +408,25 @@ def generate_confusion_matrix(results):
         report = generate_full_confusion_matrix_report(results, save_dir=MODEL_DIR)
         
         if report:
-            print(f"\n✓ Confusion matrix generation complete")
+            print(f"\n Confusion matrix generation complete")
             return report['cm']
         else:
             return None
         
     except Exception as e:
-        print(f"\n✗ Confusion matrix generation failed: {e}")
+        print(f"\n Confusion matrix generation failed: {e}")
         import traceback
         traceback.print_exc()
         return None
 
 
-def run_full_pipeline(skip_tests=True, 
+def run_full_pipeline(skip_tests=False, 
                      hidden_dim=256, epochs=100, learning_rate=0.001, lambda_reg = 0.01):
     # Step 0: Run tests (optional)
     if not skip_tests:
         test_success = run_tests()
         if not test_success:
-            print("\n⚠ Warning: Some tests failed. Continue anyway? (y/n)")
+            print("\n Warning: Some tests failed. Continue anyway? (y/n)")
             response = input().strip().lower()
             if response != 'y':
                 print("Pipeline aborted.")
@@ -441,10 +441,10 @@ def run_full_pipeline(skip_tests=True,
         print("\n" + "="*60)
         print("STEP 1: DATABASE SETUP - SKIPPED (Dataset folder exists)")
         print("="*60 + "\n")
-        print(f"✓ Using existing dataset at: {STORED_DATASET_PATH}")
+        print(f" Using existing dataset at: {STORED_DATASET_PATH}")
     else:
         if not setup_database():
-            print("\n✗ Pipeline failed at database setup")
+            print("\n Pipeline failed at database setup")
             return False
     
     # Step 2: Preprocessing (skip if processed folder exists)
@@ -452,24 +452,24 @@ def run_full_pipeline(skip_tests=True,
         print("\n" + "="*60)
         print("STEP 2: DATA PREPROCESSING - SKIPPED (Processed folder exists)")
         print("="*60 + "\n")
-        print(f"✓ Using existing preprocessed data at: {PROCESSED_DATASET_PATH}")
+        print(f" Using existing preprocessed data at: {PROCESSED_DATASET_PATH}")
         
         # Still need to load the data
         print("Loading preprocessed data...")
         train_gen, test_gen = preprocess_data()
         if not train_gen or not test_gen:
-            print("\n✗ Pipeline failed at loading preprocessed data")
+            print("\n Pipeline failed at loading preprocessed data")
             return False
     else:
         train_gen, test_gen = preprocess_data()
         if not train_gen or not test_gen:
-            print("\n✗ Pipeline failed at preprocessing")
+            print("\n Pipeline failed at preprocessing")
             return False
     
     # Step 3: Feature extraction
     train_features, test_features = extract_features(train_gen, test_gen)
     if not train_features or not test_features:
-        print("\n✗ Pipeline failed at feature extraction")
+        print("\n Pipeline failed at feature extraction")
         return False
     
     # Step 4: Train classifier
@@ -482,7 +482,7 @@ def run_full_pipeline(skip_tests=True,
     )
     
     if params is None:
-        print("\n✗ Pipeline failed at classifier training")
+        print("\n Pipeline failed at classifier training")
         return False
     label_mapping = results['label_mapping']    # Step 5: Generate confusion matrix
     cm = generate_confusion_matrix(results)
@@ -491,7 +491,7 @@ def run_full_pipeline(skip_tests=True,
     
     # Success
     print("\n" + "="*60)
-    print("✓ COMPLETE PIPELINE FINISHED SUCCESSFULLY")
+    print(" COMPLETE PIPELINE FINISHED SUCCESSFULLY")
     print("="*60)
     print(f"\nFinal Results:")
     print(f"  Classes: {len(label_mapping)}")
