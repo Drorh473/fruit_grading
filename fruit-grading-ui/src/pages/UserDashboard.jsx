@@ -1,7 +1,14 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { FiBarChart2, FiClock, FiCheckCircle } from "react-icons/fi";
+import {
+  FiBarChart2,
+  FiClock,
+  FiCheckCircle,
+  FiAlertCircle,
+  FiRefreshCw,
+} from "react-icons/fi";
 import { useAuth } from "../context/AuthContext";
+import { getUserDashboardStats, getRecentResults } from "../utils/api";
 import "./UserDashboard.css";
 
 const UserDashboard = () => {
@@ -10,63 +17,79 @@ const UserDashboard = () => {
     totalToday: 0,
     marketCount: 0,
     standardCount: 0,
-    premiumCount: 0,
+    rejectCount: 0,
   });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   const navigate = useNavigate();
   const { user } = useAuth();
 
+  // Fetch data on mount
   useEffect(() => {
-    fetchRecentResults();
-    fetchStats();
+    fetchData();
   }, []);
 
-  const fetchRecentResults = async () => {
-    // Mock data - replace with actual API call
-    const mockResults = [
-      {
-        id: "obj0014",
-        type: "market",
-        confidence: 0.95,
-        timestamp: "2025-12-12 14:30:22",
-      },
-      {
-        id: "obj0013",
-        type: "standard",
-        confidence: 0.88,
-        timestamp: "2025-12-12 14:28:15",
-      },
-      {
-        id: "obj0012",
-        type: "premium",
-        confidence: 0.92,
-        timestamp: "2025-12-12 14:25:08",
-      },
-      {
-        id: "obj0011",
-        type: "market",
-        confidence: 0.89,
-        timestamp: "2025-12-12 14:20:45",
-      },
-      {
-        id: "obj0010",
-        type: "standard",
-        confidence: 0.91,
-        timestamp: "2025-12-12 14:18:33",
-      },
-    ];
-    setRecentResults(mockResults);
+  // Fetch all dashboard data
+  const fetchData = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      // Fetch stats and recent results in parallel
+      const [statsData, resultsData] = await Promise.all([
+        getUserDashboardStats(), // Note: DashboardStats
+        getRecentResults(),
+      ]);
+
+      setStats(statsData);
+      setRecentResults(resultsData);
+    } catch (err) {
+      try {
+        const data = await getUserDashboardStats();
+        setStats(data);
+      } catch (err) {
+        console.error("Failed:", err);
+        setError("Failed to load dashboard data. Please try again.");
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const fetchStats = async () => {
-    // Mock stats - replace with actual API call
-    setStats({
-      totalToday: 47,
-      marketCount: 28,
-      standardCount: 13,
-      premiumCount: 6,
-    });
+  // Refresh data
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await fetchData();
+    setRefreshing(false);
   };
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="user-dashboard">
+        <div className="page-header">
+          <div>
+            <h1>Welcome, {user?.username}</h1>
+            <p className="page-subtitle">Loading dashboard data...</p>
+          </div>
+        </div>
+        <div className="card">
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              padding: "3rem",
+            }}
+          >
+            <div className="spinner"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="user-dashboard">
@@ -77,7 +100,30 @@ const UserDashboard = () => {
             Operator Dashboard - View Classification Results
           </p>
         </div>
+        <button
+          className="btn btn-secondary"
+          onClick={handleRefresh}
+          disabled={refreshing}
+        >
+          <FiRefreshCw className={refreshing ? "spinning" : ""} />
+          {refreshing ? "Refreshing..." : "Refresh"}
+        </button>
       </div>
+
+      {/* Error Alert */}
+      {error && (
+        <div className="alert alert-error">
+          <FiAlertCircle />
+          <span>{error}</span>
+          <button
+            className="btn btn-sm btn-secondary"
+            onClick={() => setError(null)}
+            style={{ marginLeft: "auto" }}
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {/* Summary Cards */}
       <div className="grid grid-4">
@@ -123,13 +169,13 @@ const UserDashboard = () => {
         <div className="summary-card">
           <div
             className="summary-icon"
-            style={{ background: "rgba(155, 89, 182, 0.1)" }}
+            style={{ background: "rgba(231, 76, 60, 0.1)" }}
           >
-            <FiCheckCircle style={{ color: "#9b59b6" }} />
+            <FiCheckCircle style={{ color: "var(--error)" }} />
           </div>
           <div className="summary-content">
-            <p className="summary-label">Premium Grade</p>
-            <h3 className="summary-value">{stats.premiumCount}</h3>
+            <p className="summary-label">Rejected</p>
+            <h3 className="summary-value">{stats.rejectCount}</h3>
           </div>
         </div>
       </div>
@@ -189,6 +235,15 @@ const UserDashboard = () => {
         ) : (
           <div className="empty-state">
             <p>No recent results available</p>
+            <p
+              style={{
+                fontSize: "0.875rem",
+                color: "var(--text-secondary)",
+                marginTop: "0.5rem",
+              }}
+            >
+              Results will appear here once fruits are processed
+            </p>
           </div>
         )}
       </div>
@@ -196,7 +251,7 @@ const UserDashboard = () => {
       {/* Info Box */}
       <div className="card info-card">
         <div className="card-header">
-          <h2 className="card-title">ðŸ“Š Classification Guide</h2>
+          <h2 className="card-title">📊 Classification Guide</h2>
         </div>
         <div className="classification-guide">
           <div className="guide-item">
@@ -208,8 +263,8 @@ const UserDashboard = () => {
             <p>Good quality fruits suitable for processing</p>
           </div>
           <div className="guide-item">
-            <span className="type-badge type-premium">Premium</span>
-            <p>Highest quality fruits with superior characteristics</p>
+            <span className="type-badge type-reject">Reject</span>
+            <p>Fruits that do not meet quality standards</p>
           </div>
         </div>
       </div>

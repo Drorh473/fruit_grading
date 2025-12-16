@@ -4,6 +4,15 @@
   margin: 0 auto;
 }
 
+/* Card Spacing */
+.user-dashboard .card {
+  margin-bottom: var(--spacing-xl);
+}
+
+.user-dashboard .grid {
+  margin-bottom: var(--spacing-xl);
+}
+
 /* Summary Cards */
 .summary-card {
   display: flex;
@@ -46,68 +55,6 @@
   font-size: 2rem;
   font-weight: 700;
   color: var(--text-primary);
-}
-
-/* Camera Status Items for User Dashboard */
-.camera-status-item-user {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-md);
-  padding: var(--spacing-md);
-  background: var(--bg-light);
-  border-radius: 6px;
-  border: 1px solid var(--border);
-  transition: all var(--transition-normal);
-}
-
-.camera-status-item-user:hover {
-  border-color: var(--accent-primary);
-}
-
-.camera-indicator-user {
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.5rem;
-  flex-shrink: 0;
-  transition: all var(--transition-normal);
-}
-
-.camera-indicator-user.active {
-  background: rgba(39, 174, 96, 0.1);
-  color: var(--success);
-  animation: pulse 2s ease-in-out infinite;
-}
-
-.camera-indicator-user.inactive {
-  background: rgba(231, 76, 60, 0.1);
-  color: var(--error);
-}
-
-.camera-label-user {
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin-bottom: var(--spacing-xs);
-}
-
-.camera-angle-user {
-  font-size: 0.75rem;
-  color: var(--text-secondary);
-  margin-bottom: var(--spacing-xs);
-}
-
-@keyframes pulse {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.5;
-  }
 }
 
 /* Confidence Bar Small */
@@ -228,11 +175,6 @@ code {
   }
 
   .guide-item {
-    flex-direction: column;
-    text-align: center;
-  }
-
-  .camera-status-item-user {
     flex-direction: column;
     text-align: center;
   }
