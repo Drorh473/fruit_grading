@@ -55,11 +55,27 @@ body {
 
 .main-content {
   flex: 1;
-  margin-left: 260px;
+  margin-left: 0;
   background-color: var(--bg-dark);
   min-height: 100vh;
+  transition: margin-left var(--transition-normal);
 }
 
+/* When sidebar is open, shift content to the right */
+body.sidebar-open .main-content {
+  margin-left: 260px;
+}
+
+/* Responsive adjustment */
+@media (max-width: 768px) {
+  .main-content {
+    margin-left: 0;
+  }
+
+  body.sidebar-open .main-content {
+    margin-left: 0;
+  }
+}
 /* Scrollbar Styling */
 ::-webkit-scrollbar {
   width: 8px;
@@ -318,19 +334,6 @@ tr:hover {
 
 .grid-4 {
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-}
-
-/* Responsive */
-@media (max-width: 768px) {
-  .main-content {
-    margin-left: 0;
-  }
-
-  .grid-2,
-  .grid-3,
-  .grid-4 {
-    grid-template-columns: 1fr;
-  }
 }
 
 /* Page Header Styles - No borders */
