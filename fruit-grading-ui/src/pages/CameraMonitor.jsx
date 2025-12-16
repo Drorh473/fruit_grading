@@ -1,15 +1,29 @@
 import React, { useState, useEffect } from "react";
-import { FiVideo, FiVideoOff, FiRefreshCw } from "react-icons/fi";
+import {
+  FiVideo,
+  FiVideoOff,
+  FiRefreshCw,
+  FiAlertCircle,
+  FiCheckCircle,
+} from "react-icons/fi";
 import "./CameraMonitor.css";
 
 const CameraMonitor = ({ systemStatus }) => {
   const [cameraFeeds, setCameraFeeds] = useState([]);
   const [selectedCamera, setSelectedCamera] = useState(0);
+  const [lastUpdate, setLastUpdate] = useState(new Date());
 
   useEffect(() => {
-    // Initialize camera feeds
     initializeCameras();
-  }, []);
+
+    // Simulate periodic updates every 5 seconds
+    const interval = setInterval(() => {
+      updateCameraMetrics();
+      setLastUpdate(new Date());
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [systemStatus]);
 
   const initializeCameras = () => {
     const feeds = Array.from({ length: 4 }, (_, i) => ({
@@ -17,21 +31,60 @@ const CameraMonitor = ({ systemStatus }) => {
       name: `Camera ${i}`,
       status: systemStatus.cameras[i],
       angle: ["Front View", "Right View", "Back View", "Left View"][i],
-      fps: 30,
+      fps: systemStatus.cameras[i] ? 30 : 0,
       resolution: "224x224",
-      lastFrame: null,
+      lastFrame: systemStatus.cameras[i] ? new Date().toISOString() : null,
+      captureSuccess: systemStatus.cameras[i] ? 99.8 - i * 0.5 : 96.2,
+      quality: systemStatus.cameras[i] ? 92 - (i === 1 ? 3 : 0) : 85,
+      lastError: systemStatus.cameras[i] ? null : "Connection timeout",
+      uptime: systemStatus.cameras[i] ? Math.floor(Math.random() * 24) + 12 : 0,
+      framesProcessed: systemStatus.cameras[i]
+        ? Math.floor(Math.random() * 10000) + 50000
+        : 0,
+      errorCount: systemStatus.cameras[i] ? Math.floor(Math.random() * 5) : 12,
     }));
     setCameraFeeds(feeds);
   };
 
+  const updateCameraMetrics = () => {
+    setCameraFeeds((prev) =>
+      prev.map((feed) => ({
+        ...feed,
+        framesProcessed: feed.status
+          ? feed.framesProcessed + Math.floor(Math.random() * 150) + 100
+          : feed.framesProcessed,
+        lastFrame: feed.status ? new Date().toISOString() : feed.lastFrame,
+        uptime: feed.status ? feed.uptime + 1 / 720 : feed.uptime, // Increment by 5 seconds
+      }))
+    );
+  };
+
   const handleRefresh = (cameraId) => {
-    // Refresh specific camera feed
-    console.log(`Refreshing camera ${cameraId}`);
+    setCameraFeeds((prev) =>
+      prev.map((feed) =>
+        feed.id === cameraId
+          ? { ...feed, lastFrame: new Date().toISOString() }
+          : feed
+      )
+    );
   };
 
   const handleRefreshAll = () => {
-    // Refresh all camera feeds
-    console.log("Refreshing all cameras");
+    initializeCameras();
+  };
+
+  const formatUptime = (hours) => {
+    if (hours < 1) return "< 1h";
+    if (hours >= 24)
+      return `${Math.floor(hours / 24)}d ${Math.floor(hours % 24)}h`;
+    return `${Math.floor(hours)}h`;
+  };
+
+  const getHealthStatus = (feed) => {
+    if (!feed.status) return "error";
+    if (feed.captureSuccess < 98) return "warning";
+    if (feed.quality < 90) return "warning";
+    return "good";
   };
 
   return (
@@ -42,11 +95,16 @@ const CameraMonitor = ({ systemStatus }) => {
           <p className="page-subtitle">
             Real-time camera feed visualization and system health
           </p>
+          <p className="last-update">
+            Last updated: {lastUpdate.toLocaleTimeString()}
+          </p>
         </div>
-        <button className="btn btn-primary" onClick={handleRefreshAll}>
-          <FiRefreshCw />
-          Refresh All
-        </button>
+        <div className="header-actions">
+          <button className="btn btn-primary" onClick={handleRefreshAll}>
+            <FiRefreshCw />
+            Refresh All
+          </button>
+        </div>
       </div>
 
       {/* Camera Grid View */}
@@ -127,65 +185,115 @@ const CameraMonitor = ({ systemStatus }) => {
         </div>
 
         <div className="camera-health-grid">
-          {cameraFeeds.map((feed) => (
-            <div key={feed.id} className="camera-health-card">
-              <div className="camera-health-header">
-                <div className="camera-health-title">
-                  <span className="camera-health-name">📹 {feed.name}</span>
-                  <span className="camera-health-angle">{feed.angle}</span>
+          {cameraFeeds.map((feed) => {
+            const healthStatus = getHealthStatus(feed);
+            return (
+              <div
+                key={feed.id}
+                className={`camera-health-card health-${healthStatus}`}
+              >
+                <div className="camera-health-header">
+                  <div className="camera-health-title">
+                    <span className="camera-health-name">
+                      {feed.status ? <FiCheckCircle /> : <FiAlertCircle />}
+                      {feed.name}
+                    </span>
+                    <span className="camera-health-angle">{feed.angle}</span>
+                  </div>
+                  <div className={`health-indicator health-${healthStatus}`}>
+                    {healthStatus === "good" && "●"}
+                    {healthStatus === "warning" && "◐"}
+                    {healthStatus === "error" && "○"}
+                  </div>
                 </div>
-                <div
-                  className={`health-indicator ${
-                    feed.status ? "health-good" : "health-error"
-                  }`}
-                ></div>
-              </div>
 
-              <div className="camera-health-metrics">
-                <div className="health-metric">
-                  <span className="health-metric-label">Frame Rate</span>
-                  <span className="health-metric-value">{feed.fps} FPS</span>
-                </div>
-                <div className="health-metric">
-                  <span className="health-metric-label">Capture Success</span>
-                  <span
-                    className={`health-metric-value ${
-                      feed.status ? "metric-success" : "metric-warning"
-                    }`}
-                  >
-                    {feed.status ? "99.8%" : "96.2%"}
-                  </span>
-                </div>
-                <div className="health-metric">
-                  <span className="health-metric-label">Avg Quality</span>
-                  <span className="health-metric-value">
-                    {feed.status
-                      ? feed.id === 1
-                        ? "89/100"
-                        : "92/100"
-                      : "85/100"}
-                  </span>
-                </div>
-                <div className="health-metric">
-                  <span className="health-metric-label">Last Error</span>
-                  <span
-                    className={`health-metric-value ${
-                      feed.status ? "metric-success" : "metric-warning"
-                    }`}
-                  >
-                    {feed.status ? "None" : "2 min ago"}
-                  </span>
-                </div>
-              </div>
+                <div className="camera-health-metrics">
+                  <div className="health-metric">
+                    <span className="health-metric-label">Capture Success</span>
+                    <span
+                      className={`health-metric-value ${
+                        feed.captureSuccess >= 99
+                          ? "metric-success"
+                          : feed.captureSuccess >= 97
+                          ? "metric-warning"
+                          : "metric-error"
+                      }`}
+                    >
+                      {feed.captureSuccess.toFixed(1)}%
+                    </span>
+                  </div>
 
-              <div className="camera-health-footer">
-                <button className="btn btn-secondary btn-sm">View Logs</button>
-                <button className="btn btn-secondary btn-sm">
-                  Diagnostics
-                </button>
+                  <div className="health-metric">
+                    <span className="health-metric-label">Avg Quality</span>
+                    <span
+                      className={`health-metric-value ${
+                        feed.quality >= 90 ? "metric-success" : "metric-warning"
+                      }`}
+                    >
+                      {feed.quality}/100
+                    </span>
+                  </div>
+
+                  <div className="health-metric">
+                    <span className="health-metric-label">Uptime</span>
+                    <span className="health-metric-value metric-info">
+                      {formatUptime(feed.uptime)}
+                    </span>
+                  </div>
+
+                  <div className="health-metric">
+                    <span className="health-metric-label">
+                      Frames Processed
+                    </span>
+                    <span className="health-metric-value metric-info">
+                      {feed.framesProcessed.toLocaleString()}
+                    </span>
+                  </div>
+
+                  <div className="health-metric">
+                    <span className="health-metric-label">Error Count</span>
+                    <span
+                      className={`health-metric-value ${
+                        feed.errorCount === 0
+                          ? "metric-success"
+                          : feed.errorCount < 5
+                          ? "metric-warning"
+                          : "metric-error"
+                      }`}
+                    >
+                      {feed.errorCount}
+                    </span>
+                  </div>
+
+                  <div className="health-metric">
+                    <span className="health-metric-label">Last Error</span>
+                    <span
+                      className={`health-metric-value ${
+                        !feed.lastError ? "metric-success" : "metric-warning"
+                      }`}
+                    >
+                      {feed.lastError || "None"}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="camera-health-footer">
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => console.log(`View logs for ${feed.name}`)}
+                  >
+                    View Logs
+                  </button>
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => handleRefresh(feed.id)}
+                  >
+                    Run Diagnostics
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>

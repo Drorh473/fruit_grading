@@ -3,12 +3,23 @@
   max-width: 1600px;
 }
 
-/* Page Header with Button Alignment */
-.camera-monitor .page-header {
+.page-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   margin-bottom: var(--spacing-xl);
+}
+
+.header-actions {
+  display: flex;
+  gap: var(--spacing-md);
+}
+
+.last-update {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin-top: var(--spacing-xs);
+  font-family: "Courier New", monospace;
 }
 
 .btn-icon {
@@ -155,6 +166,178 @@
   color: var(--text-primary);
 }
 
+/* Camera Health Grid */
+.camera-health-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: var(--spacing-lg);
+}
+
+.camera-health-card {
+  background: var(--bg-light);
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  padding: var(--spacing-lg);
+  transition: all var(--transition-normal);
+}
+
+.camera-health-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.camera-health-card.health-good {
+  border-color: rgba(39, 174, 96, 0.3);
+  background: linear-gradient(135deg, var(--bg-light), rgba(39, 174, 96, 0.05));
+}
+
+.camera-health-card.health-warning {
+  border-color: rgba(243, 156, 18, 0.3);
+  background: linear-gradient(
+    135deg,
+    var(--bg-light),
+    rgba(243, 156, 18, 0.05)
+  );
+}
+
+.camera-health-card.health-error {
+  border-color: rgba(231, 76, 60, 0.3);
+  background: linear-gradient(135deg, var(--bg-light), rgba(231, 76, 60, 0.05));
+}
+
+.camera-health-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: var(--spacing-lg);
+  padding-bottom: var(--spacing-md);
+  border-bottom: 1px solid var(--border);
+}
+
+.camera-health-title {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.camera-health-name {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.camera-health-name svg {
+  font-size: 1.25rem;
+}
+
+.health-good .camera-health-name svg {
+  color: var(--success);
+}
+
+.health-warning .camera-health-name svg {
+  color: var(--warning);
+}
+
+.health-error .camera-health-name svg {
+  color: var(--error);
+}
+
+.camera-health-angle {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.health-indicator {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.health-indicator.health-good {
+  background: rgba(39, 174, 96, 0.1);
+  color: var(--success);
+  border: 2px solid var(--success);
+}
+
+.health-indicator.health-warning {
+  background: rgba(243, 156, 18, 0.1);
+  color: var(--warning);
+  border: 2px solid var(--warning);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.health-indicator.health-error {
+  background: rgba(231, 76, 60, 0.1);
+  color: var(--error);
+  border: 2px solid var(--error);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+/* Camera Health Metrics */
+.camera-health-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-lg);
+}
+
+.health-metric {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-sm);
+  background: var(--bg-medium);
+  border-radius: 6px;
+}
+
+.health-metric-label {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.health-metric-value {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.metric-success {
+  color: var(--success) !important;
+}
+
+.metric-warning {
+  color: var(--warning) !important;
+}
+
+.metric-error {
+  color: var(--error) !important;
+}
+
+.metric-info {
+  color: var(--info) !important;
+}
+
+/* Camera Health Footer */
+.camera-health-footer {
+  display: flex;
+  gap: var(--spacing-sm);
+  justify-content: space-between;
+}
+
+.camera-health-footer .btn {
+  flex: 1;
+}
+
 /* Camera Details */
 .camera-details {
   padding: var(--spacing-md);
@@ -198,6 +381,11 @@
   padding: var(--spacing-md);
   background: var(--bg-light);
   border-radius: 6px;
+  transition: all var(--transition-fast);
+}
+
+.config-item:hover {
+  background: var(--bg-dark);
 }
 
 .config-icon {
@@ -223,4 +411,55 @@
   font-size: 0.75rem;
   color: var(--text-secondary);
   line-height: 1.5;
+}
+
+/* Animations */
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(0.95);
+  }
+}
+
+/* Responsive Design */
+@media (max-width: 1200px) {
+  .camera-health-metrics {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .camera-monitor {
+    padding: var(--spacing-md);
+  }
+
+  .page-header {
+    flex-direction: column;
+    gap: var(--spacing-md);
+  }
+
+  .header-actions {
+    width: 100%;
+  }
+
+  .header-actions .btn {
+    width: 100%;
+  }
+
+  .camera-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .camera-health-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .camera-health-footer {
+    flex-direction: column;
+  }
 }

@@ -8,7 +8,10 @@ import {
   FiRefreshCw,
 } from "react-icons/fi";
 import { useAuth } from "../context/AuthContext";
-import { getUserDashboardStats, getRecentResults } from "../utils/api";
+import {
+  getUserDashboardStats,
+  getRecentResults,
+} from "../utils/UserDashboardApi";
 import "./UserDashboard.css";
 
 const UserDashboard = () => {
@@ -39,20 +42,15 @@ const UserDashboard = () => {
     try {
       // Fetch stats and recent results in parallel
       const [statsData, resultsData] = await Promise.all([
-        getUserDashboardStats(), // Note: DashboardStats
+        getUserDashboardStats(),
         getRecentResults(),
       ]);
 
       setStats(statsData);
       setRecentResults(resultsData);
     } catch (err) {
-      try {
-        const data = await getUserDashboardStats();
-        setStats(data);
-      } catch (err) {
-        console.error("Failed:", err);
-        setError("Failed to load dashboard data. Please try again.");
-      }
+      console.error("Failed to load dashboard data:", err);
+      setError("Failed to load dashboard data. Please try again.");
     } finally {
       setLoading(false);
     }

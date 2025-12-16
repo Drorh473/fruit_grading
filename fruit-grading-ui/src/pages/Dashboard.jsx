@@ -1,55 +1,135 @@
 import React, { useState, useEffect } from "react";
-import { FiDatabase, FiCpu, FiActivity, FiCheckCircle } from "react-icons/fi";
+import {
+  FiDatabase,
+  FiCpu,
+  FiActivity,
+  FiCheckCircle,
+  FiRefreshCw,
+} from "react-icons/fi";
+import {
+  getSystemStatus,
+  getProcessingStats,
+  getRecentResults,
+  getDatasetInfo,
+  getModelPerformance,
+} from "../utils/AdminDashboardApi";
 import "./Dashboard.css";
 
-const Dashboard = ({ systemStatus, processingStats }) => {
+const Dashboard = () => {
+  const [systemStatus, setSystemStatus] = useState({
+    database: "loading",
+    model: "loading",
+    cameras: [false, false, false, false],
+  });
+  const [processingStats, setProcessingStats] = useState({
+    totalProcessed: 0,
+    accuracy: 0,
+    lastUpdate: null,
+  });
   const [recentResults, setRecentResults] = useState([]);
+  const [datasetInfo, setDatasetInfo] = useState(null);
+  const [modelPerformance, setModelPerformance] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    // Fetch recent results from API
-    fetchRecentResults();
+    loadDashboardData();
+
+    // Auto-refresh every 30 seconds
+    const interval = setInterval(loadDashboardData, 30000);
+    return () => clearInterval(interval);
   }, []);
 
-  const fetchRecentResults = async () => {
-    // Mock data - replace with actual API call
-    setRecentResults([
-      {
-        id: "obj0014",
-        type: "market",
-        confidence: 0.95,
-        timestamp: "2025-12-12 14:30:22",
-      },
-      {
-        id: "obj0013",
-        type: "standard",
-        confidence: 0.88,
-        timestamp: "2025-12-12 14:28:15",
-      },
-      {
-        id: "obj0012",
-        type: "premium",
-        confidence: 0.92,
-        timestamp: "2025-12-12 14:25:08",
-      },
-    ]);
+  const loadDashboardData = async () => {
+    try {
+      setError(null);
+
+      const [statusData, statsData, resultsData, datasetData, modelData] =
+        await Promise.all([
+          getSystemStatus(),
+          getProcessingStats(),
+          getRecentResults(3),
+          getDatasetInfo(),
+          getModelPerformance(),
+        ]);
+
+      setSystemStatus(statusData);
+      setProcessingStats(statsData);
+      setRecentResults(resultsData);
+      setDatasetInfo(datasetData);
+      setModelPerformance(modelData);
+    } catch (err) {
+      console.error("Failed to load dashboard data:", err);
+      setError("Failed to load dashboard data. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRefresh = () => {
+    setLoading(true);
+    loadDashboardData();
   };
 
   const getStatusColor = (status) => {
-    return status ? "status-success" : "status-error";
+    if (status === "connected" || status === "loaded") return "status-success";
+    if (status === "loading") return "status-info";
+    return "status-error";
   };
 
   const getStatusText = (status) => {
-    return status ? "Connected" : "Disconnected";
+    if (status === "connected" || status === "loaded") return status;
+    if (status === "loading") return "checking...";
+    return "disconnected";
   };
+
+  if (loading && !systemStatus.database) {
+    return (
+      <div className="dashboard">
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            height: "400px",
+          }}
+        >
+          <div className="spinner" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="dashboard">
       <div className="page-header">
-        <h1>System Dashboard</h1>
-        <p className="page-subtitle">
-          Monitor your fruit grading system status and performance
-        </p>
+        <div>
+          <h1>System Dashboard</h1>
+          <p className="page-subtitle">
+            Monitor your fruit grading system status and performance
+          </p>
+        </div>
+        <button
+          className="btn btn-secondary"
+          onClick={handleRefresh}
+          disabled={loading}
+        >
+          <FiRefreshCw className={loading ? "spinning" : ""} />
+          Refresh
+        </button>
       </div>
+
+      {error && (
+        <div
+          className="card"
+          style={{
+            background: "rgba(231, 76, 60, 0.1)",
+            border: "1px solid var(--error)",
+          }}
+        >
+          <p style={{ color: "var(--error)", margin: 0 }}>{error}</p>
+        </div>
+      )}
 
       {/* System Status Cards */}
       <div className="grid grid-4">
@@ -65,10 +145,10 @@ const Dashboard = ({ systemStatus, processingStats }) => {
             <h3 className="stat-value">
               <span
                 className={`status-badge ${getStatusColor(
-                  systemStatus.database === "connected"
+                  systemStatus.database
                 )}`}
               >
-                {systemStatus.database}
+                {getStatusText(systemStatus.database)}
               </span>
             </h3>
           </div>
@@ -85,11 +165,9 @@ const Dashboard = ({ systemStatus, processingStats }) => {
             <p className="stat-label">Model Status</p>
             <h3 className="stat-value">
               <span
-                className={`status-badge ${getStatusColor(
-                  systemStatus.model === "loaded"
-                )}`}
+                className={`status-badge ${getStatusColor(systemStatus.model)}`}
               >
-                {systemStatus.model}
+                {getStatusText(systemStatus.model)}
               </span>
             </h3>
           </div>
@@ -141,8 +219,12 @@ const Dashboard = ({ systemStatus, processingStats }) => {
               </div>
               <div>
                 <p className="camera-label">Camera {index}</p>
-                <span className={`status-badge ${getStatusColor(status)}`}>
-                  {getStatusText(status)}
+                <span
+                  className={`status-badge ${
+                    status ? "status-success" : "status-error"
+                  }`}
+                >
+                  {status ? "Active" : "Offline"}
                 </span>
               </div>
             </div>
@@ -163,7 +245,6 @@ const Dashboard = ({ systemStatus, processingStats }) => {
                 <tr>
                   <th>Object ID</th>
                   <th>Classification</th>
-                  <th>Confidence</th>
                   <th>Timestamp</th>
                 </tr>
               </thead>
@@ -177,17 +258,6 @@ const Dashboard = ({ systemStatus, processingStats }) => {
                       <span className={`type-badge type-${result.type}`}>
                         {result.type}
                       </span>
-                    </td>
-                    <td>
-                      <div className="confidence-bar">
-                        <div
-                          className="confidence-fill"
-                          style={{ width: `${result.confidence * 100}%` }}
-                        />
-                        <span className="confidence-text">
-                          {(result.confidence * 100).toFixed(1)}%
-                        </span>
-                      </div>
                     </td>
                     <td className="timestamp">{result.timestamp}</td>
                   </tr>
@@ -208,48 +278,76 @@ const Dashboard = ({ systemStatus, processingStats }) => {
           <div className="card-header">
             <h2 className="card-title">Dataset Information</h2>
           </div>
-          <div className="info-list">
-            <div className="info-item">
-              <span className="info-label">Training Samples</span>
-              <span className="info-value">9 objects</span>
+          {datasetInfo ? (
+            <div className="info-list">
+              <div className="info-item">
+                <span className="info-label">Training Samples</span>
+                <span className="info-value">
+                  {datasetInfo.trainingCount} objects
+                </span>
+              </div>
+              <div className="info-item">
+                <span className="info-label">Testing Samples</span>
+                <span className="info-value">
+                  {datasetInfo.testingCount} objects
+                </span>
+              </div>
+              <div className="info-item">
+                <span className="info-label">Total Images</span>
+                <span className="info-value">
+                  {datasetInfo.totalImages} images
+                </span>
+              </div>
+              <div className="info-item">
+                <span className="info-label">Feature Dimension</span>
+                <span className="info-value">
+                  {datasetInfo.featureDim.toLocaleString()}
+                </span>
+              </div>
             </div>
-            <div className="info-item">
-              <span className="info-label">Testing Samples</span>
-              <span className="info-value">5 objects</span>
+          ) : (
+            <div className="empty-state">
+              <p>Loading dataset info...</p>
             </div>
-            <div className="info-item">
-              <span className="info-label">Total Images</span>
-              <span className="info-value">165 images</span>
-            </div>
-            <div className="info-item">
-              <span className="info-label">Feature Dimension</span>
-              <span className="info-value">200,704</span>
-            </div>
-          </div>
+          )}
         </div>
 
         <div className="card">
           <div className="card-header">
             <h2 className="card-title">Model Performance</h2>
           </div>
-          <div className="info-list">
-            <div className="info-item">
-              <span className="info-label">Architecture</span>
-              <span className="info-value">ShuffleNetV2 + FC</span>
+          {modelPerformance ? (
+            <div className="info-list">
+              <div className="info-item">
+                <span className="info-label">Architecture</span>
+                <span className="info-value">
+                  {modelPerformance.architecture}
+                </span>
+              </div>
+              <div className="info-item">
+                <span className="info-label">Training Accuracy</span>
+                <span className="info-value">
+                  {(modelPerformance.trainAccuracy * 100).toFixed(2)}%
+                </span>
+              </div>
+              <div className="info-item">
+                <span className="info-label">Test Accuracy</span>
+                <span className="info-value">
+                  {(modelPerformance.testAccuracy * 100).toFixed(2)}%
+                </span>
+              </div>
+              <div className="info-item">
+                <span className="info-label">Classes</span>
+                <span className="info-value">
+                  {modelPerformance.classes} (market, standard, premium)
+                </span>
+              </div>
             </div>
-            <div className="info-item">
-              <span className="info-label">Training Accuracy</span>
-              <span className="info-value">100%</span>
+          ) : (
+            <div className="empty-state">
+              <p>Loading model performance...</p>
             </div>
-            <div className="info-item">
-              <span className="info-label">Test Accuracy</span>
-              <span className="info-value">36.36%</span>
-            </div>
-            <div className="info-item">
-              <span className="info-label">Classes</span>
-              <span className="info-value">3 (market, standard, premium)</span>
-            </div>
-          </div>
+          )}
         </div>
       </div>
     </div>

@@ -5,6 +5,7 @@ import {
   FiCheckCircle,
   FiAlertCircle,
 } from "react-icons/fi";
+import { validateFolder, processFruit } from "../utils/AddFruitApi";
 import "./AddFruit.css";
 
 const AddFruit = () => {
@@ -12,44 +13,58 @@ const AddFruit = () => {
   const [validation, setValidation] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [result, setResult] = useState(null);
+  const [error, setError] = useState(null);
+  const [validating, setValidating] = useState(false);
 
-  const validateFolder = async () => {
+  const handleValidate = async () => {
     if (!folderPath) {
-      setValidation({ valid: false, message: "Please enter a folder path" });
+      setError("Please enter a folder path");
       return;
     }
 
-    // Simulate validation API call
-    setTimeout(() => {
-      const mockValidation = {
-        valid: true,
-        message: "Folder structure is valid",
-        details: {
-          anglesFound: 4,
-          imagesPerAngle: [15, 15, 15, 15],
-          totalImages: 60,
-        },
-      };
-      setValidation(mockValidation);
-    }, 1000);
+    try {
+      setValidating(true);
+      setError(null);
+
+      const data = await validateFolder(folderPath);
+      setValidation(data);
+
+      if (!data.valid) {
+        setError(data.message);
+      }
+    } catch (err) {
+      console.error("Validation failed:", err);
+      setValidation({
+        valid: false,
+        message: "Validation failed. Please check the folder structure.",
+      });
+      setError("Validation failed: " + err.message);
+    } finally {
+      setValidating(false);
+    }
   };
 
-  const processFruit = async () => {
-    setIsProcessing(true);
-    setResult(null);
+  const handleProcess = async () => {
+    try {
+      setIsProcessing(true);
+      setResult(null);
+      setError(null);
 
-    // Simulate processing pipeline
-    setTimeout(() => {
-      const mockResult = {
-        objectId: "obj0015",
-        predictedType: "market",
-        confidence: 0.94,
-        imagesProcessed: 60,
-        processingTime: 45.3,
-      };
-      setResult(mockResult);
+      const data = await processFruit(folderPath, { runTests: false });
+      setResult(data);
+    } catch (err) {
+      console.error("Processing failed:", err);
+      setError("Processing failed: " + err.message);
+    } finally {
       setIsProcessing(false);
-    }, 5000);
+    }
+  };
+
+  const handleReset = () => {
+    setFolderPath("");
+    setValidation(null);
+    setResult(null);
+    setError(null);
   };
 
   return (
@@ -61,10 +76,34 @@ const AddFruit = () => {
         </div>
       </div>
 
+      {error && (
+        <div
+          className="card"
+          style={{
+            background: "rgba(231, 76, 60, 0.1)",
+            border: "1px solid var(--error)",
+            marginBottom: "var(--spacing-lg)",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "var(--spacing-md)",
+            }}
+          >
+            <FiAlertCircle
+              style={{ color: "var(--error)", fontSize: "1.5rem" }}
+            />
+            <p style={{ color: "var(--error)", margin: 0 }}>{error}</p>
+          </div>
+        </div>
+      )}
+
       {/* Instructions */}
       <div className="card instruction-card">
         <div className="card-header">
-          <h2 className="card-title"> Instructions</h2>
+          <h2 className="card-title">📋 Instructions</h2>
         </div>
         <div className="instructions">
           <div className="instruction-step">
@@ -116,14 +155,16 @@ const AddFruit = () => {
               onChange={(e) => {
                 setFolderPath(e.target.value);
                 setValidation(null);
+                setError(null);
               }}
+              disabled={isProcessing}
             />
             <button
               className="btn btn-secondary"
-              onClick={validateFolder}
-              disabled={!folderPath}
+              onClick={handleValidate}
+              disabled={!folderPath || validating || isProcessing}
             >
-              Validate
+              {validating ? "Validating..." : "Validate"}
             </button>
           </div>
 
@@ -157,7 +198,7 @@ const AddFruit = () => {
         <div className="process-section">
           <button
             className="btn btn-primary btn-large"
-            onClick={processFruit}
+            onClick={handleProcess}
             disabled={isProcessing}
           >
             {isProcessing ? (
@@ -192,27 +233,7 @@ const AddFruit = () => {
               <div className="step-indicator">
                 <div className="spinner-small" />
               </div>
-              <span>Validating folder structure...</span>
-            </div>
-            <div className="pipeline-step">
-              <div className="step-indicator" />
-              <span>Inserting into database...</span>
-            </div>
-            <div className="pipeline-step">
-              <div className="step-indicator" />
-              <span>Copying to stored dataset...</span>
-            </div>
-            <div className="pipeline-step">
-              <div className="step-indicator" />
-              <span>Preprocessing images...</span>
-            </div>
-            <div className="pipeline-step">
-              <div className="step-indicator" />
-              <span>Extracting features...</span>
-            </div>
-            <div className="pipeline-step">
-              <div className="step-indicator" />
-              <span>Running classification...</span>
+              <span>Processing in progress...</span>
             </div>
           </div>
         </div>
@@ -222,11 +243,11 @@ const AddFruit = () => {
       {result && (
         <div className="card result-card">
           <div className="card-header">
-            <h2 className="card-title">âœ“ Classification Complete</h2>
+            <h2 className="card-title">✅ Classification Complete</h2>
           </div>
           <div className="result-content">
             <div className="result-main">
-              <div className="result-icon">ðŸŽ¯</div>
+              <div className="result-icon">🎯</div>
               <div className="result-info">
                 <h3>
                   Object ID: <code>{result.objectId}</code>
@@ -261,7 +282,9 @@ const AddFruit = () => {
               </div>
               <div className="result-stat">
                 <span className="stat-label">Processing Time</span>
-                <span className="stat-value">{result.processingTime}s</span>
+                <span className="stat-value">
+                  {result.processingTime.toFixed(1)}s
+                </span>
               </div>
               <div className="result-stat">
                 <span className="stat-label">Status</span>
@@ -271,14 +294,7 @@ const AddFruit = () => {
 
             <div className="result-actions">
               <button className="btn btn-primary">View in Results</button>
-              <button
-                className="btn btn-secondary"
-                onClick={() => {
-                  setFolderPath("");
-                  setValidation(null);
-                  setResult(null);
-                }}
-              >
+              <button className="btn btn-secondary" onClick={handleReset}>
                 Add Another Fruit
               </button>
             </div>

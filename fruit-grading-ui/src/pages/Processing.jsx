@@ -1,13 +1,27 @@
-import React, { useState } from "react";
-import { FiPlay, FiSquare, FiCheckCircle, FiChevronDown } from "react-icons/fi";
+import React, { useState, useEffect } from "react";
+import {
+  FiPlay,
+  FiSquare,
+  FiAlertCircle,
+  FiRefreshCw,
+  FiChevronDown,
+} from "react-icons/fi";
+import {
+  startPipeline,
+  stopPipeline,
+  getPipelineStatus,
+  getPipelineLogs,
+  getPipelineConfig,
+} from "../utils/processingApi";
 import "./Processing.css";
 
 const Processing = ({ setProcessingStats }) => {
   const [isProcessing, setIsProcessing] = useState(false);
-  const [currentStep, setCurrentStep] = useState(0);
-  const [progress, setProgress] = useState(0);
+  const [status, setStatus] = useState(null);
   const [logs, setLogs] = useState([]);
   const [openDropdown, setOpenDropdown] = useState(null);
+  const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   // Training configuration state
   const [config, setConfig] = useState({
@@ -27,7 +41,7 @@ const Processing = ({ setProcessingStats }) => {
     batchSize: [8, 16, 32, 64, 128, 256],
   };
 
-  const processingSteps = [
+  const defaultSteps = [
     { id: 1, name: "Database Setup", status: "pending" },
     { id: 2, name: "Data Preprocessing", status: "pending" },
     { id: 3, name: "Feature Extraction", status: "pending" },
@@ -35,7 +49,104 @@ const Processing = ({ setProcessingStats }) => {
     { id: 5, name: "Evaluation", status: "pending" },
   ];
 
-  const [steps, setSteps] = useState(processingSteps);
+  const [steps, setSteps] = useState(defaultSteps);
+
+  useEffect(() => {
+    loadConfig();
+    checkStatus();
+  }, []);
+
+  useEffect(() => {
+    let interval;
+    if (isProcessing) {
+      // Poll for status updates every 2 seconds while processing
+      interval = setInterval(updateStatus, 2000);
+    }
+    return () => clearInterval(interval);
+  }, [isProcessing]);
+
+  const loadConfig = async () => {
+    try {
+      const data = await getPipelineConfig();
+      setConfig({
+        hiddenDim: data.hiddenDim || 256,
+        epochs: data.epochs || 100,
+        learningRate: data.learningRate || 0.001,
+        lambdaReg: data.lambdaReg || 0.01,
+        batchSize: data.batchSize || 32,
+      });
+    } catch (err) {
+      console.error("Failed to load config:", err);
+      setError("Failed to load configuration");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const checkStatus = async () => {
+    try {
+      const statusData = await getPipelineStatus();
+      if (statusData.running) {
+        setIsProcessing(true);
+        setStatus(statusData);
+        updateStepsFromStatus(statusData);
+      }
+    } catch (err) {
+      console.error("Failed to check status:", err);
+    }
+  };
+
+  const updateStatus = async () => {
+    try {
+      const [statusData, logsData] = await Promise.all([
+        getPipelineStatus(),
+        getPipelineLogs(50),
+      ]);
+
+      setStatus(statusData);
+      setLogs(logsData);
+
+      // Update steps based on status
+      updateStepsFromStatus(statusData);
+
+      // Check if pipeline completed or failed
+      if (statusData.status === "completed" || statusData.status === "failed") {
+        setIsProcessing(false);
+
+        if (statusData.status === "completed" && setProcessingStats) {
+          setProcessingStats({
+            totalProcessed: statusData.totalProcessed || 0,
+            accuracy: statusData.accuracy || 0,
+            lastUpdate: new Date().toISOString(),
+          });
+        }
+
+        if (statusData.status === "failed") {
+          setError("Pipeline failed. Check logs for details.");
+        }
+      }
+    } catch (err) {
+      console.error("Failed to update status:", err);
+      setError("Failed to update pipeline status");
+    }
+  };
+
+  const updateStepsFromStatus = (statusData) => {
+    if (statusData.steps) {
+      setSteps(statusData.steps);
+    } else if (statusData.currentStep) {
+      // Fallback if backend doesn't send full steps
+      const updatedSteps = defaultSteps.map((step, index) => {
+        if (index < statusData.currentStep - 1) {
+          return { ...step, status: "completed" };
+        } else if (index === statusData.currentStep - 1) {
+          return { ...step, status: "processing" };
+        }
+        return step;
+      });
+      setSteps(updatedSteps);
+    }
+  };
 
   const handleConfigChange = (field, value) => {
     setConfig((prev) => ({
@@ -50,107 +161,61 @@ const Processing = ({ setProcessingStats }) => {
     setOpenDropdown(openDropdown === field ? null : field);
   };
 
-  const addLog = (message, type = "info") => {
-    const timestamp = new Date().toLocaleTimeString();
-    setLogs((prev) => [...prev, { message, type, timestamp }]);
-  };
-
-  const updateStep = (stepId, status) => {
-    setSteps((prev) =>
-      prev.map((step) => (step.id === stepId ? { ...step, status } : step))
-    );
-  };
-
-  const runPipeline = async () => {
-    setIsProcessing(true);
-    setLogs([]);
-    setProgress(0);
-    setCurrentStep(0);
-    setOpenDropdown(null);
-
+  const handleStart = async () => {
     try {
-      // Step 1: Database Setup
-      setCurrentStep(1);
-      updateStep(1, "processing");
-      addLog("Starting database setup...", "info");
-      await simulateStep(20);
-      updateStep(1, "completed");
-      addLog("Database setup complete", "success");
+      setError(null);
+      setLogs([]);
+      setSteps(defaultSteps); // Reset steps
+      setOpenDropdown(null);
 
-      // Step 2: Preprocessing
-      setCurrentStep(2);
-      updateStep(2, "processing");
-      addLog("Processing images with Gaussian Blur and CLAHE...", "info");
-      await simulateStep(40);
-      updateStep(2, "completed");
-      addLog("165 images preprocessed successfully", "success");
-
-      // Step 3: Feature Extraction
-      setCurrentStep(3);
-      updateStep(3, "processing");
-      addLog("Extracting features using ShuffleNetV2...", "info");
-      await simulateStep(60);
-      addLog("Flattening features...", "info");
-      await simulateStep(70);
-      addLog("Temporal pooling across frames...", "info");
-      await simulateStep(80);
-      addLog("Multi-view fusion from 4 cameras...", "info");
-      await simulateStep(85);
-      updateStep(3, "completed");
-      addLog("Feature extraction complete (dim: 200,704)", "success");
-
-      // Step 4: Training
-      setCurrentStep(4);
-      updateStep(4, "processing");
-      addLog(
-        `Training with config: Hidden=${config.hiddenDim}, LR=${config.learningRate}, Lambda=${config.lambdaReg}`,
-        "info"
-      );
-      await simulateStep(95);
-      updateStep(4, "completed");
-      addLog(`Training complete (${config.epochs} epochs)`, "success");
-
-      // Step 5: Evaluation
-      setCurrentStep(5);
-      updateStep(5, "processing");
-      addLog("Evaluating model performance...", "info");
-      await simulateStep(100);
-      updateStep(5, "completed");
-      addLog("Evaluation complete", "success");
-      addLog("Training Accuracy: 100%", "success");
-      addLog("Test Accuracy: 36.36%", "warning");
-
-      setProcessingStats({
-        totalProcessed: 14,
-        accuracy: 0.3636,
-        lastUpdate: new Date().toISOString(),
+      // Start pipeline with current config
+      const response = await startPipeline({
+        skipTests: true,
+        hiddenDim: config.hiddenDim,
+        epochs: config.epochs,
+        learningRate: config.learningRate,
+        lambdaReg: config.lambdaReg,
+        batchSize: config.batchSize,
       });
-    } catch (error) {
-      addLog(`Error: ${error.message}`, "error");
-      updateStep(currentStep, "failed");
-    } finally {
-      setIsProcessing(false);
+
+      if (response.success) {
+        setIsProcessing(true);
+        // Status will be updated by the polling interval
+      } else {
+        setError(response.message || "Failed to start pipeline");
+      }
+    } catch (err) {
+      console.error("Failed to start pipeline:", err);
+      setError("Failed to start pipeline: " + err.message);
     }
   };
 
-  const simulateStep = (targetProgress) => {
-    return new Promise((resolve) => {
-      const interval = setInterval(() => {
-        setProgress((prev) => {
-          if (prev >= targetProgress) {
-            clearInterval(interval);
-            resolve();
-            return targetProgress;
-          }
-          return prev + 1;
-        });
-      }, 50);
-    });
+  const handleStop = async () => {
+    try {
+      await stopPipeline();
+      setIsProcessing(false);
+      setError(null);
+
+      // Add a log entry
+      setLogs((prev) => [
+        ...prev,
+        {
+          message: "Processing stopped by user",
+          type: "warning",
+          timestamp: new Date().toISOString(),
+        },
+      ]);
+    } catch (err) {
+      console.error("Failed to stop pipeline:", err);
+      setError("Failed to stop pipeline: " + err.message);
+    }
   };
 
-  const stopProcessing = () => {
-    setIsProcessing(false);
-    addLog("Processing stopped by user", "warning");
+  const handleRefresh = async () => {
+    setLoading(true);
+    setError(null);
+    await Promise.all([loadConfig(), checkStatus()]);
+    setLoading(false);
   };
 
   const getStepStatus = (step) => {
@@ -159,6 +224,23 @@ const Processing = ({ setProcessingStats }) => {
     if (step.status === "failed") return "step-failed";
     return "step-pending";
   };
+
+  if (loading) {
+    return (
+      <div className="processing">
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            height: "400px",
+          }}
+        >
+          <div className="spinner" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="processing">
@@ -170,13 +252,21 @@ const Processing = ({ setProcessingStats }) => {
           </p>
         </div>
         <div className="header-actions">
+          <button
+            className="btn btn-secondary"
+            onClick={handleRefresh}
+            disabled={isProcessing}
+          >
+            <FiRefreshCw />
+            Refresh
+          </button>
           {!isProcessing ? (
-            <button className="btn btn-primary" onClick={runPipeline}>
+            <button className="btn btn-primary" onClick={handleStart}>
               <FiPlay />
               Start Pipeline
             </button>
           ) : (
-            <button className="btn btn-danger" onClick={stopProcessing}>
+            <button className="btn btn-danger" onClick={handleStop}>
               <FiSquare />
               Stop
             </button>
@@ -184,18 +274,28 @@ const Processing = ({ setProcessingStats }) => {
         </div>
       </div>
 
+      {error && (
+        <div className="alert alert-error">
+          <FiAlertCircle />
+          <span>{error}</span>
+        </div>
+      )}
+
       {/* Progress Overview */}
       <div className="card">
         <div className="card-header">
           <h2 className="card-title">Pipeline Progress</h2>
-          <span className="progress-percent">{progress}%</span>
+          <span className="progress-percent">{status?.progress || 0}%</span>
         </div>
         <div className="progress-bar">
-          <div className="progress-fill" style={{ width: `${progress}%` }} />
+          <div
+            className="progress-fill"
+            style={{ width: `${status?.progress || 0}%` }}
+          />
         </div>
         {isProcessing && (
           <p className="processing-message">
-            Processing step {currentStep} of {steps.length}...
+            Processing step {status?.currentStep || 0} of {steps.length}...
           </p>
         )}
       </div>
@@ -206,7 +306,7 @@ const Processing = ({ setProcessingStats }) => {
           <h2 className="card-title">Pipeline Steps</h2>
         </div>
         <div className="steps-container">
-          {steps.map((step, index) => (
+          {steps.map((step) => (
             <div key={step.id} className={`step-item ${getStepStatus(step)}`}>
               <div className="step-content-full">
                 <h3 className="step-name">{step.name}</h3>
@@ -239,7 +339,9 @@ const Processing = ({ setProcessingStats }) => {
           ) : (
             logs.map((log, index) => (
               <div key={index} className={`log-entry log-${log.type}`}>
-                <span className="log-timestamp">{log.timestamp}</span>
+                <span className="log-timestamp">
+                  {new Date(log.timestamp).toLocaleTimeString()}
+                </span>
                 <span className="log-message">{log.message}</span>
               </div>
             ))

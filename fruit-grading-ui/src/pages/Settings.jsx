@@ -1,31 +1,131 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   FiSave,
   FiRefreshCw,
   FiDatabase,
   FiSettings as FiSettingsIcon,
+  FiCheckCircle,
+  FiXCircle,
+  FiAlertCircle,
+  FiDownload,
+  FiUpload,
+  FiLoader,
 } from "react-icons/fi";
 import "./Settings.css";
+import {
+  getSettings,
+  updateSettings,
+  resetSettings,
+  testDatabaseConnection,
+  testPath,
+  validateAllPaths,
+  getSystemStatus,
+  exportSettings,
+  importSettings,
+} from "../utils/SettingsApi";
 
-const Settings = ({ systemStatus, setSystemStatus }) => {
+const Settings = () => {
+  // Configuration state
   const [config, setConfig] = useState({
     // Database
-    dbName: "fruit_grading",
-    mongoConnection: "mongodb://localhost:27017",
+    dbName: "",
+    mongoConnection: "",
 
     // Paths
-    storedDataset: "C:\\GoogleDrive\\Datasets\\Dataset",
-    originalDataset: "C:\\GoogleDrive\\Datasets\\FruitsDataset\\data",
-    processedDataset: "C:\\GoogleDrive\\Datasets\\ProccesedDataset",
+    storedDataset: "",
+    originalDataset: "",
+    processedDataset: "",
 
     // Model
     batchSize: 128,
     modelVariant: "1.0x",
   });
 
+  // System status state
+  const [systemStatus, setSystemStatus] = useState({
+    database: "unknown",
+    model: "unknown",
+    cameras: [false, false, false, false],
+  });
+
+  // UI state
+  const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState(null);
+  const [hasChanges, setHasChanges] = useState(false);
+  const [originalConfig, setOriginalConfig] = useState(null);
 
+  // Testing states
+  const [testingConnection, setTestingConnection] = useState(false);
+  const [testingPaths, setTestingPaths] = useState({
+    stored: false,
+    original: false,
+    processed: false,
+  });
+  const [pathValidation, setPathValidation] = useState({
+    stored: null,
+    original: null,
+    processed: null,
+  });
+
+  // Fetch initial data
+  useEffect(() => {
+    fetchAllData();
+  }, []);
+
+  // Track changes
+  useEffect(() => {
+    if (originalConfig) {
+      const changed = JSON.stringify(config) !== JSON.stringify(originalConfig);
+      setHasChanges(changed);
+    }
+  }, [config, originalConfig]);
+
+  /**
+   * Fetch all settings and system status
+   */
+  const fetchAllData = async () => {
+    setLoading(true);
+    setSaveStatus(null);
+
+    try {
+      const [settingsData, statusData] = await Promise.all([
+        getSettings().catch((err) => {
+          console.error("Failed to fetch settings:", err);
+          return null;
+        }),
+        getSystemStatus().catch((err) => {
+          console.error("Failed to fetch system status:", err);
+          return {
+            database: "error",
+            model: "error",
+            cameras: [false, false, false, false],
+          };
+        }),
+      ]);
+
+      if (settingsData) {
+        setConfig(settingsData);
+        setOriginalConfig(settingsData);
+      }
+
+      if (statusData) {
+        setSystemStatus(statusData);
+      }
+    } catch (err) {
+      console.error("Error fetching data:", err);
+      setSaveStatus({
+        success: false,
+        message: "Failed to load settings. Please refresh the page.",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /**
+   * Handle field change
+   */
   const handleChange = (field, value) => {
     setConfig((prev) => ({
       ...prev,
@@ -34,32 +134,281 @@ const Settings = ({ systemStatus, setSystemStatus }) => {
     setSaveStatus(null);
   };
 
+  /**
+   * Save settings to backend
+   */
   const handleSave = async () => {
     setIsSaving(true);
     setSaveStatus(null);
 
-    // Simulate API call
-    setTimeout(() => {
-      setSaveStatus({ success: true, message: "Settings saved successfully" });
-      setIsSaving(false);
-    }, 1000);
-  };
+    try {
+      const updatedSettings = await updateSettings(config);
+      setConfig(updatedSettings);
+      setOriginalConfig(updatedSettings);
+      setHasChanges(false);
+      setSaveStatus({
+        success: true,
+        message: "Settings saved successfully",
+      });
 
-  const handleReset = () => {
-    if (
-      window.confirm("Are you sure you want to reset all settings to default?")
-    ) {
-      // Reset to defaults
-      setSaveStatus({ success: true, message: "Settings reset to defaults" });
+      // Refresh system status after save
+      const statusData = await getSystemStatus();
+      setSystemStatus(statusData);
+    } catch (err) {
+      console.error("Failed to save settings:", err);
+      setSaveStatus({
+        success: false,
+        message: err.message || "Failed to save settings. Please try again.",
+      });
+    } finally {
+      setIsSaving(false);
     }
   };
 
-  const testConnection = async (type) => {
-    setSaveStatus({
-      success: true,
-      message: `${type} connection test successful`,
-    });
+  /**
+   * Reset settings to defaults
+   */
+  const handleReset = async () => {
+    if (
+      !window.confirm("Are you sure you want to reset all settings to default?")
+    ) {
+      return;
+    }
+
+    setIsSaving(true);
+    setSaveStatus(null);
+
+    try {
+      const defaultSettings = await resetSettings();
+      setConfig(defaultSettings);
+      setOriginalConfig(defaultSettings);
+      setHasChanges(false);
+      setSaveStatus({
+        success: true,
+        message: "Settings reset to defaults",
+      });
+
+      // Clear path validations
+      setPathValidation({
+        stored: null,
+        original: null,
+        processed: null,
+      });
+    } catch (err) {
+      console.error("Failed to reset settings:", err);
+      setSaveStatus({
+        success: false,
+        message: err.message || "Failed to reset settings. Please try again.",
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
+
+  /**
+   * Test database connection
+   */
+  const testConnection = async () => {
+    setTestingConnection(true);
+    setSaveStatus(null);
+
+    try {
+      const result = await testDatabaseConnection(
+        config.mongoConnection,
+        config.dbName
+      );
+
+      setSaveStatus({
+        success: result.success,
+        message:
+          result.message ||
+          (result.success
+            ? "Database connection successful"
+            : "Database connection failed"),
+      });
+
+      // Update system status
+      if (result.success) {
+        setSystemStatus((prev) => ({
+          ...prev,
+          database: "connected",
+        }));
+      }
+    } catch (err) {
+      console.error("Database test failed:", err);
+      setSaveStatus({
+        success: false,
+        message: err.message || "Failed to test database connection",
+      });
+    } finally {
+      setTestingConnection(false);
+    }
+  };
+
+  /**
+   * Test individual path
+   */
+  const testSinglePath = async (pathType, pathValue) => {
+    setTestingPaths((prev) => ({ ...prev, [pathType]: true }));
+
+    try {
+      const result = await testPath(pathValue, pathType);
+
+      setPathValidation((prev) => ({
+        ...prev,
+        [pathType]: result,
+      }));
+
+      if (!result.success) {
+        setSaveStatus({
+          success: false,
+          message: result.message || `Path validation failed for ${pathType}`,
+        });
+      }
+    } catch (err) {
+      console.error(`Path test failed for ${pathType}:`, err);
+      setPathValidation((prev) => ({
+        ...prev,
+        [pathType]: {
+          success: false,
+          message: err.message || "Path test failed",
+        },
+      }));
+    } finally {
+      setTestingPaths((prev) => ({ ...prev, [pathType]: false }));
+    }
+  };
+
+  /**
+   * Validate all paths at once
+   */
+  const validatePaths = async () => {
+    setTestingPaths({
+      stored: true,
+      original: true,
+      processed: true,
+    });
+    setSaveStatus(null);
+
+    try {
+      const result = await validateAllPaths({
+        storedDataset: config.storedDataset,
+        originalDataset: config.originalDataset,
+        processedDataset: config.processedDataset,
+      });
+
+      setPathValidation(result);
+
+      const allValid = Object.values(result).every((r) => r.success);
+      setSaveStatus({
+        success: allValid,
+        message: allValid
+          ? "All paths validated successfully"
+          : "Some paths failed validation. Check details below.",
+      });
+    } catch (err) {
+      console.error("Path validation failed:", err);
+      setSaveStatus({
+        success: false,
+        message: err.message || "Failed to validate paths",
+      });
+    } finally {
+      setTestingPaths({
+        stored: false,
+        original: false,
+        processed: false,
+      });
+    }
+  };
+
+  /**
+   * Export settings configuration
+   */
+  const handleExport = async () => {
+    try {
+      const settings = await exportSettings();
+      const blob = new Blob([JSON.stringify(settings, null, 2)], {
+        type: "application/json",
+      });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `settings_${new Date().toISOString().split("T")[0]}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      setSaveStatus({
+        success: true,
+        message: "Settings exported successfully",
+      });
+    } catch (err) {
+      console.error("Export failed:", err);
+      setSaveStatus({
+        success: false,
+        message: "Failed to export settings",
+      });
+    }
+  };
+
+  /**
+   * Import settings configuration
+   */
+  const handleImport = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      const importedSettings = JSON.parse(text);
+
+      await importSettings(importedSettings);
+
+      // Refresh settings
+      await fetchAllData();
+
+      setSaveStatus({
+        success: true,
+        message: "Settings imported successfully",
+      });
+    } catch (err) {
+      console.error("Import failed:", err);
+      setSaveStatus({
+        success: false,
+        message: err.message || "Failed to import settings",
+      });
+    }
+  };
+
+  /**
+   * Get validation icon for path
+   */
+  const getValidationIcon = (pathType) => {
+    const validation = pathValidation[pathType];
+    const testing = testingPaths[pathType];
+
+    if (testing) {
+      return <FiLoader className="spinning" style={{ color: "var(--info)" }} />;
+    }
+    if (!validation) return null;
+    if (validation.success) {
+      return <FiCheckCircle style={{ color: "var(--success)" }} />;
+    }
+    return <FiXCircle style={{ color: "var(--error)" }} />;
+  };
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="settings">
+        <div className="loading-container">
+          <div className="spinner"></div>
+          <p>Loading settings...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="settings">
@@ -70,6 +419,25 @@ const Settings = ({ systemStatus, setSystemStatus }) => {
             Configure system parameters and connections
           </p>
         </div>
+        <div style={{ display: "flex", gap: "var(--spacing-sm)" }}>
+          <button className="btn btn-secondary btn-sm" onClick={handleExport}>
+            <FiDownload />
+            Export
+          </button>
+          <label
+            className="btn btn-secondary btn-sm"
+            style={{ cursor: "pointer" }}
+          >
+            <FiUpload />
+            Import
+            <input
+              type="file"
+              accept=".json"
+              onChange={handleImport}
+              style={{ display: "none" }}
+            />
+          </label>
+        </div>
       </div>
 
       {saveStatus && (
@@ -78,7 +446,15 @@ const Settings = ({ systemStatus, setSystemStatus }) => {
             saveStatus.success ? "alert-success" : "alert-error"
           }`}
         >
+          {saveStatus.success ? <FiCheckCircle /> : <FiAlertCircle />}
           {saveStatus.message}
+        </div>
+      )}
+
+      {hasChanges && (
+        <div className="alert alert-info">
+          <FiAlertCircle />
+          You have unsaved changes. Click "Save Settings" to apply them.
         </div>
       )}
 
@@ -98,6 +474,7 @@ const Settings = ({ systemStatus, setSystemStatus }) => {
               className="input-field"
               value={config.dbName}
               onChange={(e) => handleChange("dbName", e.target.value)}
+              placeholder="fruit_grading"
             />
           </div>
           <div className="setting-item">
@@ -110,12 +487,21 @@ const Settings = ({ systemStatus, setSystemStatus }) => {
                 onChange={(e) =>
                   handleChange("mongoConnection", e.target.value)
                 }
+                placeholder="mongodb://localhost:27017"
               />
               <button
                 className="btn btn-secondary btn-sm"
-                onClick={() => testConnection("Database")}
+                onClick={testConnection}
+                disabled={testingConnection}
               >
-                Test
+                {testingConnection ? (
+                  <>
+                    <FiLoader className="spinning" />
+                    Testing...
+                  </>
+                ) : (
+                  "Test"
+                )}
               </button>
             </div>
           </div>
@@ -129,41 +515,124 @@ const Settings = ({ systemStatus, setSystemStatus }) => {
             <FiSettingsIcon />
             <h2 className="card-title">Dataset Paths</h2>
           </div>
+          <button
+            className="btn btn-secondary btn-sm"
+            onClick={validatePaths}
+            disabled={Object.values(testingPaths).some((t) => t)}
+          >
+            Validate All Paths
+          </button>
         </div>
         <div className="settings-grid">
           <div className="setting-item full-width">
-            <label className="setting-label">Stored Dataset Path</label>
-            <input
-              type="text"
-              className="input-field"
-              value={config.storedDataset}
-              onChange={(e) => handleChange("storedDataset", e.target.value)}
-            />
+            <label className="setting-label">
+              Stored Dataset Path
+              {getValidationIcon("stored")}
+            </label>
+            <div className="input-with-action">
+              <input
+                type="text"
+                className="input-field"
+                value={config.storedDataset}
+                onChange={(e) => handleChange("storedDataset", e.target.value)}
+                placeholder="C:\GoogleDrive\Datasets\Dataset"
+              />
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={() => testSinglePath("stored", config.storedDataset)}
+                disabled={testingPaths.stored}
+              >
+                {testingPaths.stored ? (
+                  <FiLoader className="spinning" />
+                ) : (
+                  "Test"
+                )}
+              </button>
+            </div>
             <span className="setting-hint">
               Path where processed images are stored
             </span>
+            {pathValidation.stored && !pathValidation.stored.success && (
+              <span className="setting-error">
+                {pathValidation.stored.message}
+              </span>
+            )}
           </div>
+
           <div className="setting-item full-width">
-            <label className="setting-label">Original Dataset Path</label>
-            <input
-              type="text"
-              className="input-field"
-              value={config.originalDataset}
-              onChange={(e) => handleChange("originalDataset", e.target.value)}
-            />
+            <label className="setting-label">
+              Original Dataset Path
+              {getValidationIcon("original")}
+            </label>
+            <div className="input-with-action">
+              <input
+                type="text"
+                className="input-field"
+                value={config.originalDataset}
+                onChange={(e) =>
+                  handleChange("originalDataset", e.target.value)
+                }
+                placeholder="C:\GoogleDrive\Datasets\FruitsDataset\data"
+              />
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={() =>
+                  testSinglePath("original", config.originalDataset)
+                }
+                disabled={testingPaths.original}
+              >
+                {testingPaths.original ? (
+                  <FiLoader className="spinning" />
+                ) : (
+                  "Test"
+                )}
+              </button>
+            </div>
             <span className="setting-hint">Path to original raw images</span>
+            {pathValidation.original && !pathValidation.original.success && (
+              <span className="setting-error">
+                {pathValidation.original.message}
+              </span>
+            )}
           </div>
+
           <div className="setting-item full-width">
-            <label className="setting-label">Processed Dataset Path</label>
-            <input
-              type="text"
-              className="input-field"
-              value={config.processedDataset}
-              onChange={(e) => handleChange("processedDataset", e.target.value)}
-            />
+            <label className="setting-label">
+              Processed Dataset Path
+              {getValidationIcon("processed")}
+            </label>
+            <div className="input-with-action">
+              <input
+                type="text"
+                className="input-field"
+                value={config.processedDataset}
+                onChange={(e) =>
+                  handleChange("processedDataset", e.target.value)
+                }
+                placeholder="C:\GoogleDrive\Datasets\ProccesedDataset"
+              />
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={() =>
+                  testSinglePath("processed", config.processedDataset)
+                }
+                disabled={testingPaths.processed}
+              >
+                {testingPaths.processed ? (
+                  <FiLoader className="spinning" />
+                ) : (
+                  "Test"
+                )}
+              </button>
+            </div>
             <span className="setting-hint">
               Path for preprocessed images output
             </span>
+            {pathValidation.processed && !pathValidation.processed.success && (
+              <span className="setting-error">
+                {pathValidation.processed.message}
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -187,7 +656,7 @@ const Settings = ({ systemStatus, setSystemStatus }) => {
               max="512"
             />
             <span className="setting-hint">
-              Number of samples per training batch
+              Number of samples per training batch (1-512)
             </span>
           </div>
           <div className="setting-item">
@@ -197,10 +666,10 @@ const Settings = ({ systemStatus, setSystemStatus }) => {
               value={config.modelVariant}
               onChange={(e) => handleChange("modelVariant", e.target.value)}
             >
-              <option value="0.5x">0.5x (Faster)</option>
-              <option value="1.0x">1.0x (Default)</option>
-              <option value="1.5x">1.5x (Slower)</option>
-              <option value="2.0x">2.0x (Slowest)</option>
+              <option value="0.5x">0.5x (Faster, Less Accurate)</option>
+              <option value="1.0x">1.0x (Default, Balanced)</option>
+              <option value="1.5x">1.5x (Slower, More Accurate)</option>
+              <option value="2.0x">2.0x (Slowest, Most Accurate)</option>
             </select>
             <span className="setting-hint">
               Model complexity and speed trade-off
@@ -213,6 +682,10 @@ const Settings = ({ systemStatus, setSystemStatus }) => {
       <div className="card settings-card">
         <div className="card-header">
           <h2 className="card-title">System Status</h2>
+          <button className="btn btn-secondary btn-sm" onClick={fetchAllData}>
+            <FiRefreshCw />
+            Refresh
+          </button>
         </div>
         <div className="status-grid">
           <div className="status-item">
@@ -221,7 +694,9 @@ const Settings = ({ systemStatus, setSystemStatus }) => {
               className={`status-badge ${
                 systemStatus.database === "connected"
                   ? "status-success"
-                  : "status-error"
+                  : systemStatus.database === "disconnected"
+                  ? "status-error"
+                  : "status-warning"
               }`}
             >
               {systemStatus.database}
@@ -233,7 +708,9 @@ const Settings = ({ systemStatus, setSystemStatus }) => {
               className={`status-badge ${
                 systemStatus.model === "loaded"
                   ? "status-success"
-                  : "status-error"
+                  : systemStatus.model === "error"
+                  ? "status-error"
+                  : "status-warning"
               }`}
             >
               {systemStatus.model}
@@ -242,8 +719,8 @@ const Settings = ({ systemStatus, setSystemStatus }) => {
           <div className="status-item">
             <span className="status-label">Active Cameras</span>
             <span className="status-value">
-              {systemStatus.cameras.filter((c) => c).length} /{" "}
-              {systemStatus.cameras.length}
+              {systemStatus.cameras?.filter((c) => c).length || 0} /{" "}
+              {systemStatus.cameras?.length || 4}
             </span>
           </div>
         </div>
@@ -251,14 +728,18 @@ const Settings = ({ systemStatus, setSystemStatus }) => {
 
       {/* Action Buttons */}
       <div className="settings-actions">
-        <button className="btn btn-secondary" onClick={handleReset}>
+        <button
+          className="btn btn-secondary"
+          onClick={handleReset}
+          disabled={isSaving}
+        >
           <FiRefreshCw />
           Reset to Defaults
         </button>
         <button
           className="btn btn-primary"
           onClick={handleSave}
-          disabled={isSaving}
+          disabled={isSaving || !hasChanges}
         >
           {isSaving ? (
             <>
