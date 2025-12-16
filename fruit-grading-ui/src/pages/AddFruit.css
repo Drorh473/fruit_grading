@@ -3,6 +3,10 @@
   max-width: 1200px;
   margin: 0 auto;
 }
+/* Add spacing between cards */
+.add-fruit .card {
+  margin-bottom: var(--spacing-xl);
+}
 
 /* Instructions */
 .instruction-card {
@@ -361,7 +365,7 @@
 }
 
 .info-box li::before {
-  content: '•';
+  content: "â€¢";
   position: absolute;
   left: 0;
   color: var(--accent-primary);
@@ -374,11 +378,11 @@
     flex-direction: column;
     text-align: center;
   }
-  
+
   .confidence-bar-large {
     width: 100%;
   }
-  
+
   .result-actions {
     flex-direction: column;
   }

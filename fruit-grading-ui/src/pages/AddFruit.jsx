@@ -1,16 +1,21 @@
-import React, { useState } from 'react';
-import { FiUpload, FiFolder, FiCheckCircle, FiAlertCircle } from 'react-icons/fi';
-import './AddFruit.css';
+import React, { useState } from "react";
+import {
+  FiUpload,
+  FiFolder,
+  FiCheckCircle,
+  FiAlertCircle,
+} from "react-icons/fi";
+import "./AddFruit.css";
 
 const AddFruit = () => {
-  const [folderPath, setFolderPath] = useState('');
+  const [folderPath, setFolderPath] = useState("");
   const [validation, setValidation] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [result, setResult] = useState(null);
 
   const validateFolder = async () => {
     if (!folderPath) {
-      setValidation({ valid: false, message: 'Please enter a folder path' });
+      setValidation({ valid: false, message: "Please enter a folder path" });
       return;
     }
 
@@ -18,12 +23,12 @@ const AddFruit = () => {
     setTimeout(() => {
       const mockValidation = {
         valid: true,
-        message: 'Folder structure is valid',
+        message: "Folder structure is valid",
         details: {
           anglesFound: 4,
           imagesPerAngle: [15, 15, 15, 15],
-          totalImages: 60
-        }
+          totalImages: 60,
+        },
       };
       setValidation(mockValidation);
     }, 1000);
@@ -36,11 +41,11 @@ const AddFruit = () => {
     // Simulate processing pipeline
     setTimeout(() => {
       const mockResult = {
-        objectId: 'obj0015',
-        predictedType: 'market',
+        objectId: "obj0015",
+        predictedType: "market",
         confidence: 0.94,
         imagesProcessed: 60,
-        processingTime: 45.3
+        processingTime: 45.3,
       };
       setResult(mockResult);
       setIsProcessing(false);
@@ -59,28 +64,37 @@ const AddFruit = () => {
       {/* Instructions */}
       <div className="card instruction-card">
         <div className="card-header">
-          <h2 className="card-title">📋 Instructions</h2>
+          <h2 className="card-title"> Instructions</h2>
         </div>
         <div className="instructions">
           <div className="instruction-step">
             <div className="step-number">1</div>
             <div className="step-content">
               <h4>Prepare Your Images</h4>
-              <p>Organize images in a folder with subdirectories: <code>angle_0</code>, <code>angle_1</code>, <code>angle_2</code>, <code>angle_3</code></p>
+              <p>
+                Organize images in a folder with subdirectories:{" "}
+                <code>angle_0</code>, <code>angle_1</code>, <code>angle_2</code>
+                , <code>angle_3</code>
+              </p>
             </div>
           </div>
           <div className="instruction-step">
             <div className="step-number">2</div>
             <div className="step-content">
               <h4>Enter Folder Path</h4>
-              <p>Provide the path to the folder containing your angle directories</p>
+              <p>
+                Provide the path to the folder containing your angle directories
+              </p>
             </div>
           </div>
           <div className="instruction-step">
             <div className="step-number">3</div>
             <div className="step-content">
               <h4>Validate and Process</h4>
-              <p>System will validate structure, preprocess images, extract features, and classify</p>
+              <p>
+                System will validate structure, preprocess images, extract
+                features, and classify
+              </p>
             </div>
           </div>
         </div>
@@ -104,7 +118,7 @@ const AddFruit = () => {
                 setValidation(null);
               }}
             />
-            <button 
+            <button
               className="btn btn-secondary"
               onClick={validateFolder}
               disabled={!folderPath}
@@ -114,7 +128,11 @@ const AddFruit = () => {
           </div>
 
           {validation && (
-            <div className={`validation-result ${validation.valid ? 'valid' : 'invalid'}`}>
+            <div
+              className={`validation-result ${
+                validation.valid ? "valid" : "invalid"
+              }`}
+            >
               {validation.valid ? (
                 <FiCheckCircle className="validation-icon" />
               ) : (
@@ -137,7 +155,7 @@ const AddFruit = () => {
       {/* Process Button */}
       {validation?.valid && !result && (
         <div className="process-section">
-          <button 
+          <button
             className="btn btn-primary btn-large"
             onClick={processFruit}
             disabled={isProcessing}
@@ -156,7 +174,8 @@ const AddFruit = () => {
           </button>
           {isProcessing && (
             <p className="processing-note">
-              This may take a few minutes. The system will preprocess images, extract features, and classify the fruit.
+              This may take a few minutes. The system will preprocess images,
+              extract features, and classify the fruit.
             </p>
           )}
         </div>
@@ -203,24 +222,28 @@ const AddFruit = () => {
       {result && (
         <div className="card result-card">
           <div className="card-header">
-            <h2 className="card-title">✓ Classification Complete</h2>
+            <h2 className="card-title">âœ“ Classification Complete</h2>
           </div>
           <div className="result-content">
             <div className="result-main">
-              <div className="result-icon">🎯</div>
+              <div className="result-icon">ðŸŽ¯</div>
               <div className="result-info">
-                <h3>Object ID: <code>{result.objectId}</code></h3>
+                <h3>
+                  Object ID: <code>{result.objectId}</code>
+                </h3>
                 <div className="result-classification">
                   <span>Classification:</span>
-                  <span className={`type-badge-large type-${result.predictedType}`}>
+                  <span
+                    className={`type-badge-large type-${result.predictedType}`}
+                  >
                     {result.predictedType}
                   </span>
                 </div>
                 <div className="result-confidence">
                   <span>Confidence:</span>
                   <div className="confidence-bar-large">
-                    <div 
-                      className="confidence-fill" 
+                    <div
+                      className="confidence-fill"
                       style={{ width: `${result.confidence * 100}%` }}
                     />
                     <span className="confidence-text">
@@ -247,13 +270,11 @@ const AddFruit = () => {
             </div>
 
             <div className="result-actions">
-              <button className="btn btn-primary">
-                View in Results
-              </button>
-              <button 
+              <button className="btn btn-primary">View in Results</button>
+              <button
                 className="btn btn-secondary"
                 onClick={() => {
-                  setFolderPath('');
+                  setFolderPath("");
                   setValidation(null);
                   setResult(null);
                 }}
@@ -264,44 +285,6 @@ const AddFruit = () => {
           </div>
         </div>
       )}
-
-      {/* Info Card */}
-      <div className="card">
-        <div className="card-header">
-          <h2 className="card-title">Pipeline Information</h2>
-        </div>
-        <div className="info-grid">
-          <div className="info-box">
-            <h4>📸 Image Requirements</h4>
-            <ul>
-              <li>4 angle directories (angle_0 to angle_3)</li>
-              <li>JPG or PNG format</li>
-              <li>Images will be resized to 224x224</li>
-              <li>Recommended: 10-20 images per angle</li>
-            </ul>
-          </div>
-          <div className="info-box">
-            <h4>🔄 Processing Steps</h4>
-            <ul>
-              <li>Database insertion with auto object ID</li>
-              <li>Gaussian Blur + CLAHE preprocessing</li>
-              <li>ShuffleNetV2 feature extraction</li>
-              <li>Temporal pooling and multi-view fusion</li>
-              <li>Classification with trained model</li>
-            </ul>
-          </div>
-          <div className="info-box">
-            <h4>📊 Output</h4>
-            <ul>
-              <li>Object ID assigned automatically</li>
-              <li>Classification: market/standard/reject</li>
-              <li>Confidence score</li>
-              <li>All images stored in database</li>
-              <li>Results viewable in Results page</li>
-            </ul>
-          </div>
-        </div>
-      </div>
     </div>
   );
 };

@@ -5,13 +5,13 @@
   --primary-light: #34495e;
   --accent-primary: #16a085;
   --accent-secondary: #3498db;
-  
+
   /* Status Colors */
   --success: #27ae60;
   --warning: #f39c12;
   --error: #e74c3c;
   --info: #3498db;
-  
+
   /* Neutral Colors */
   --bg-dark: #0d1117;
   --bg-medium: #161b22;
@@ -19,14 +19,14 @@
   --text-primary: #e6edf3;
   --text-secondary: #8b949e;
   --border: #30363d;
-  
+
   /* Spacing */
   --spacing-xs: 0.25rem;
   --spacing-sm: 0.5rem;
   --spacing-md: 1rem;
   --spacing-lg: 1.5rem;
   --spacing-xl: 2rem;
-  
+
   /* Transitions */
   --transition-fast: 0.15s ease;
   --transition-normal: 0.3s ease;
@@ -39,8 +39,8 @@
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen",
+    "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue",
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -98,7 +98,6 @@ body {
   align-items: center;
   margin-bottom: var(--spacing-lg);
   padding-bottom: var(--spacing-md);
-  border-bottom: 1px solid var(--border);
 }
 
 .card-title {
@@ -206,8 +205,12 @@ body {
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 /* Progress Bar */
@@ -221,7 +224,11 @@ body {
 
 .progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+  background: linear-gradient(
+    90deg,
+    var(--accent-primary),
+    var(--accent-secondary)
+  );
   transition: width var(--transition-normal);
 }
 
@@ -318,10 +325,32 @@ tr:hover {
   .main-content {
     margin-left: 0;
   }
-  
+
   .grid-2,
   .grid-3,
   .grid-4 {
     grid-template-columns: 1fr;
   }
+}
+
+/* Page Header Styles - No borders */
+.page-header {
+  margin-bottom: var(--spacing-xl);
+  border: none;
+}
+
+.page-header h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: var(--spacing-sm);
+  border: none;
+}
+
+.page-subtitle {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  border: none;
+  padding-bottom: 0;
+  margin-bottom: 0;
 }

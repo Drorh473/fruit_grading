@@ -4,6 +4,21 @@
   margin: 0 auto;
 }
 
+/* Settings Card Spacing */
+.settings-card {
+  margin-bottom: var(--spacing-xl);
+}
+
+/* Settings Actions at Bottom */
+.settings-actions {
+  display: flex;
+  gap: var(--spacing-md);
+  justify-content: flex-end;
+  margin-top: var(--spacing-xl);
+  padding-top: var(--spacing-xl);
+  border-top: 2px solid var(--border);
+}
+
 .spinner-small {
   border: 2px solid rgba(255, 255, 255, 0.3);
   border-top: 2px solid white;
@@ -141,12 +156,12 @@ select.input-field {
   .settings-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .setting-item.full-width {
     grid-column: 1;
   }
-  
-  .header-actions {
+
+  .settings-actions {
     flex-direction: column;
   }
 }
