@@ -1,22 +1,16 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  FiBarChart2,
-  FiClock,
-  FiCheckCircle,
-  FiCamera,
-  FiAlertCircle,
-} from "react-icons/fi";
+import { FiBarChart2, FiClock, FiCheckCircle } from "react-icons/fi";
 import { useAuth } from "../context/AuthContext";
 import "./UserDashboard.css";
 
-const UserDashboard = ({ systemStatus }) => {
+const UserDashboard = () => {
   const [recentResults, setRecentResults] = useState([]);
   const [stats, setStats] = useState({
     totalToday: 0,
     marketCount: 0,
     standardCount: 0,
-    rejectCount: 0,
+    premiumCount: 0,
   });
 
   const navigate = useNavigate();
@@ -44,7 +38,7 @@ const UserDashboard = ({ systemStatus }) => {
       },
       {
         id: "obj0012",
-        type: "reject",
+        type: "premium",
         confidence: 0.92,
         timestamp: "2025-12-12 14:25:08",
       },
@@ -70,13 +64,9 @@ const UserDashboard = ({ systemStatus }) => {
       totalToday: 47,
       marketCount: 28,
       standardCount: 13,
-      rejectCount: 6,
+      premiumCount: 6,
     });
   };
-
-  const activeCamerasCount =
-    systemStatus?.cameras?.filter((c) => c).length || 0;
-  const allCamerasActive = activeCamerasCount === 4;
 
   return (
     <div className="user-dashboard">
@@ -88,46 +78,6 @@ const UserDashboard = ({ systemStatus }) => {
           </p>
         </div>
       </div>
-
-      {/* System Status Alert - Show warning if cameras offline */}
-      {!allCamerasActive && (
-        <div
-          className="card"
-          style={{
-            background: "rgba(243, 156, 18, 0.1)",
-            border: "1px solid var(--warning)",
-            marginBottom: "var(--spacing-lg)",
-          }}
-        >
-          <div
-            style={{
-              padding: "var(--spacing-md)",
-              display: "flex",
-              alignItems: "center",
-              gap: "var(--spacing-md)",
-            }}
-          >
-            <FiAlertCircle
-              style={{
-                fontSize: "1.5rem",
-                color: "var(--warning)",
-                flexShrink: 0,
-              }}
-            />
-            <div>
-              <strong style={{ color: "var(--warning)" }}>
-                System Notice:{" "}
-              </strong>
-              <span style={{ color: "var(--text-primary)" }}>
-                {4 - activeCamerasCount} camera
-                {4 - activeCamerasCount > 1 ? "s are" : " is"} currently
-                offline. Classification accuracy may be affected. Please contact
-                an administrator if this persists.
-              </span>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Summary Cards */}
       <div className="grid grid-4">
@@ -173,69 +123,14 @@ const UserDashboard = ({ systemStatus }) => {
         <div className="summary-card">
           <div
             className="summary-icon"
-            style={{ background: "rgba(231, 76, 60, 0.1)" }}
+            style={{ background: "rgba(155, 89, 182, 0.1)" }}
           >
-            <FiCheckCircle style={{ color: "var(--error)" }} />
+            <FiCheckCircle style={{ color: "#9b59b6" }} />
           </div>
           <div className="summary-content">
-            <p className="summary-label">Rejected</p>
-            <h3 className="summary-value">{stats.rejectCount}</h3>
+            <p className="summary-label">Premium Grade</p>
+            <h3 className="summary-value">{stats.premiumCount}</h3>
           </div>
-        </div>
-      </div>
-
-      {/* Camera System Status Card */}
-      <div className="card">
-        <div className="card-header">
-          <h2 className="card-title">
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "var(--spacing-sm)",
-              }}
-            >
-              <FiCamera />
-              Camera System Status
-            </div>
-          </h2>
-          <span
-            className={`status-badge ${
-              allCamerasActive ? "status-success" : "status-warning"
-            }`}
-          >
-            {activeCamerasCount} / 4 Active
-          </span>
-        </div>
-        <div className="grid grid-4">
-          {systemStatus?.cameras?.map((status, index) => (
-            <div key={index} className="camera-status-item-user">
-              <div
-                className={`camera-indicator-user ${
-                  status ? "active" : "inactive"
-                }`}
-              >
-                <FiCamera />
-              </div>
-              <div>
-                <p className="camera-label-user">Camera {index}</p>
-                <p className="camera-angle-user">
-                  {
-                    ["Front View", "Right View", "Back View", "Left View"][
-                      index
-                    ]
-                  }
-                </p>
-                <span
-                  className={`status-badge ${
-                    status ? "status-success" : "status-error"
-                  }`}
-                >
-                  {status ? "Active" : "Offline"}
-                </span>
-              </div>
-            </div>
-          ))}
         </div>
       </div>
 
@@ -301,7 +196,7 @@ const UserDashboard = ({ systemStatus }) => {
       {/* Info Box */}
       <div className="card info-card">
         <div className="card-header">
-          <h2 className="card-title">📊 Classification Guide</h2>
+          <h2 className="card-title">ðŸ“Š Classification Guide</h2>
         </div>
         <div className="classification-guide">
           <div className="guide-item">
@@ -313,8 +208,8 @@ const UserDashboard = ({ systemStatus }) => {
             <p>Good quality fruits suitable for processing</p>
           </div>
           <div className="guide-item">
-            <span className="type-badge type-reject">Reject</span>
-            <p>Fruits that do not meet quality standards</p>
+            <span className="type-badge type-premium">Premium</span>
+            <p>Highest quality fruits with superior characteristics</p>
           </div>
         </div>
       </div>

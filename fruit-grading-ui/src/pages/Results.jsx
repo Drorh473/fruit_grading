@@ -36,7 +36,7 @@ const Results = () => {
   const [qualityDist, setQualityDist] = useState({
     market: { count: 645, percentage: 52 },
     standard: { count: 524, percentage: 42 },
-    reject: { count: 78, percentage: 6 },
+    premium: { count: 78, percentage: 6 },
   });
 
   // Alerts
@@ -51,8 +51,8 @@ const Results = () => {
     {
       id: 2,
       type: "error",
-      title: "High Rejection Rate",
-      message: "Last hour: 15% rejection (3x normal)",
+      title: "High Premium Rate",
+      message: "Last hour: 15% premium (3x normal)",
       icon: "🔴",
     },
     {
@@ -94,7 +94,7 @@ const Results = () => {
       {
         id: "obj0245",
         batch: "#246",
-        type: "reject",
+        type: "premium",
         confidence: 0.924,
         processingTime: 4.2,
         timestamp: "2025-12-15 14:30:14",
@@ -134,7 +134,7 @@ const Results = () => {
       {
         id: "obj0240",
         batch: "#245",
-        type: "reject",
+        type: "premium",
         confidence: 0.903,
         processingTime: 4.3,
         timestamp: "2025-12-15 14:29:45",
@@ -221,15 +221,6 @@ const Results = () => {
         <div className="kpi-card">
           <div className="kpi-header">
             <span className="kpi-label">Total Processed</span>
-            <div
-              className="kpi-icon"
-              style={{
-                background: "rgba(22, 160, 133, 0.1)",
-                color: "var(--accent-primary)",
-              }}
-            >
-              🎯
-            </div>
           </div>
           <div className="kpi-value">
             {kpis.totalProcessed.toLocaleString()}
@@ -252,15 +243,6 @@ const Results = () => {
         <div className="kpi-card">
           <div className="kpi-header">
             <span className="kpi-label">Quality Rate</span>
-            <div
-              className="kpi-icon"
-              style={{
-                background: "rgba(39, 174, 96, 0.1)",
-                color: "var(--success)",
-              }}
-            >
-              ✓
-            </div>
           </div>
           <div className="kpi-value">
             {(kpis.qualityRate * 100).toFixed(1)}%
@@ -282,15 +264,6 @@ const Results = () => {
         <div className="kpi-card">
           <div className="kpi-header">
             <span className="kpi-label">Avg Confidence</span>
-            <div
-              className="kpi-icon"
-              style={{
-                background: "rgba(52, 152, 219, 0.1)",
-                color: "var(--info)",
-              }}
-            >
-              📈
-            </div>
           </div>
           <div className="kpi-value">
             {(kpis.avgConfidence * 100).toFixed(1)}%
@@ -312,15 +285,6 @@ const Results = () => {
         <div className="kpi-card">
           <div className="kpi-header">
             <span className="kpi-label">Processing Speed</span>
-            <div
-              className="kpi-icon"
-              style={{
-                background: "rgba(243, 156, 18, 0.1)",
-                color: "var(--warning)",
-              }}
-            >
-              ⚡
-            </div>
           </div>
           <div className="kpi-value">{kpis.processingSpeed.toFixed(1)}s</div>
           <div
@@ -338,180 +302,153 @@ const Results = () => {
         </div>
       </div>
 
-      {/* Charts Section */}
-      <div className="chart-grid">
-        {/* Time Series Chart */}
-        <div className="card">
-          <div className="card-header">
-            <div>
-              <h2 className="card-title">Hourly Processing Trend</h2>
-              <p className="card-subtitle">Last 24 hours</p>
-            </div>
-          </div>
-          <div className="chart-container">
-            <div className="chart-placeholder">
-              <p style={{ fontSize: "2rem", marginBottom: "8px" }}>📈</p>
-              <p
-                style={{ fontSize: "0.875rem", color: "var(--text-secondary)" }}
-              >
-                Line Chart
-              </p>
-              <p
-                style={{
-                  fontSize: "0.75rem",
-                  marginTop: "8px",
-                  color: "var(--text-secondary)",
-                }}
-              >
-                Shows fruits processed per hour
-                <br />
-                with quality rate overlay
-              </p>
-            </div>
+      {/* Charts Section - Full Width Hourly Trend */}
+      <div className="card">
+        <div className="card-header">
+          <div>
+            <h2 className="card-title">Hourly Processing Trend</h2>
+            <p className="card-subtitle">Last 24 hours</p>
           </div>
         </div>
-
-        {/* Quality Distribution */}
-        <div className="card">
-          <div className="card-header">
-            <div>
-              <h2 className="card-title">Quality Distribution</h2>
-              <p className="card-subtitle">Today's breakdown</p>
-            </div>
-          </div>
-          <div className="quality-bars">
-            <div className="quality-item type-market">
-              <div className="quality-header">
-                <span className="quality-label">Market Grade</span>
-                <span
-                  className="quality-value"
-                  style={{ color: "var(--success)" }}
-                >
-                  {qualityDist.market.count}
-                </span>
-              </div>
-              <div className="quality-bar">
-                <div
-                  className="quality-fill"
-                  style={{
-                    width: `${qualityDist.market.percentage}%`,
-                    background: "var(--success)",
-                  }}
-                ></div>
-              </div>
-              <span
-                style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}
-              >
-                {qualityDist.market.percentage}% of total
-              </span>
-            </div>
-
-            <div className="quality-item type-standard">
-              <div className="quality-header">
-                <span className="quality-label">Standard Grade</span>
-                <span
-                  className="quality-value"
-                  style={{ color: "var(--info)" }}
-                >
-                  {qualityDist.standard.count}
-                </span>
-              </div>
-              <div className="quality-bar">
-                <div
-                  className="quality-fill"
-                  style={{
-                    width: `${qualityDist.standard.percentage}%`,
-                    background: "var(--info)",
-                  }}
-                ></div>
-              </div>
-              <span
-                style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}
-              >
-                {qualityDist.standard.percentage}% of total
-              </span>
-            </div>
-
-            <div className="quality-item type-reject">
-              <div className="quality-header">
-                <span className="quality-label">Rejected</span>
-                <span
-                  className="quality-value"
-                  style={{ color: "var(--error)" }}
-                >
-                  {qualityDist.reject.count}
-                </span>
-              </div>
-              <div className="quality-bar">
-                <div
-                  className="quality-fill"
-                  style={{
-                    width: `${qualityDist.reject.percentage}%`,
-                    background: "var(--error)",
-                  }}
-                ></div>
-              </div>
-              <span
-                style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}
-              >
-                {qualityDist.reject.percentage}% of total
-              </span>
-            </div>
+        <div className="chart-container">
+          <div className="chart-placeholder">
+            <p style={{ fontSize: "2rem", marginBottom: "8px" }}>📈</p>
+            <p style={{ fontSize: "0.875rem", color: "var(--text-secondary)" }}>
+              Line Chart
+            </p>
+            <p
+              style={{
+                fontSize: "0.75rem",
+                marginTop: "8px",
+                color: "var(--text-secondary)",
+              }}
+            >
+              Shows fruits processed per hour
+              <br />
+              with quality rate overlay
+            </p>
           </div>
         </div>
       </div>
 
-      {/* Confidence Analysis & Alerts */}
-      <div className="chart-grid">
-        {/* Confidence Distribution */}
-        <div className="card">
-          <div className="card-header">
-            <div>
-              <h2 className="card-title">Confidence Score Distribution</h2>
-              <p className="card-subtitle">Classification reliability</p>
+      {/* Quality Distribution (Full Width) and Alerts (Sidebar) Grid */}
+      <div className="charts-alerts-grid">
+        {/* Left Column - Quality Distribution Full Width */}
+        <div className="charts-column">
+          <div className="card">
+            <div className="card-header">
+              <div>
+                <h2 className="card-title">Quality Distribution</h2>
+                <p className="card-subtitle">Today's breakdown</p>
+              </div>
             </div>
-          </div>
-          <div className="chart-container">
-            <div className="chart-placeholder">
-              <p style={{ fontSize: "2rem", marginBottom: "8px" }}>📊</p>
-              <p
-                style={{ fontSize: "0.875rem", color: "var(--text-secondary)" }}
-              >
-                Histogram Chart
-              </p>
-              <p
-                style={{
-                  fontSize: "0.75rem",
-                  marginTop: "8px",
-                  color: "var(--text-secondary)",
-                }}
-              >
-                Shows distribution of confidence scores
-                <br />
-                0-100% with bucket sizes
-              </p>
+            <div className="pie-chart-container">
+              <svg viewBox="0 0 200 200" className="pie-chart">
+                {/* Circumference = 2 * PI * 80 = 502.65 */}
+                {/* Market - 52% = 261.38 of 502.65 */}
+                <circle
+                  cx="100"
+                  cy="100"
+                  r="80"
+                  fill="none"
+                  stroke="var(--success)"
+                  strokeWidth="60"
+                  strokeDasharray="261.38 502.65"
+                  transform="rotate(-90 100 100)"
+                />
+                {/* Standard - 42% = 211.11 of 502.65 */}
+                <circle
+                  cx="100"
+                  cy="100"
+                  r="80"
+                  fill="none"
+                  stroke="var(--info)"
+                  strokeWidth="60"
+                  strokeDasharray="211.11 502.65"
+                  transform="rotate(97.2 100 100)"
+                />
+                {/* Premium - 6% = 30.16 of 502.65 */}
+                <circle
+                  cx="100"
+                  cy="100"
+                  r="80"
+                  fill="none"
+                  stroke="#9b59b6"
+                  strokeWidth="60"
+                  strokeDasharray="30.16 502.65"
+                  transform="rotate(248.4 100 100)"
+                />
+                {/* Center circle for donut effect */}
+                <circle cx="100" cy="100" r="50" fill="var(--bg-medium)" />
+              </svg>
+
+              <div className="pie-chart-legend">
+                <div className="legend-item">
+                  <div
+                    className="legend-color"
+                    style={{ background: "var(--success)" }}
+                  ></div>
+                  <div className="legend-info">
+                    <span className="legend-label">Market Grade</span>
+                    <span className="legend-value">
+                      {qualityDist.market.count} (
+                      {qualityDist.market.percentage}%)
+                    </span>
+                  </div>
+                </div>
+                <div className="legend-item">
+                  <div
+                    className="legend-color"
+                    style={{ background: "var(--info)" }}
+                  ></div>
+                  <div className="legend-info">
+                    <span className="legend-label">Standard Grade</span>
+                    <span className="legend-value">
+                      {qualityDist.standard.count} (
+                      {qualityDist.standard.percentage}%)
+                    </span>
+                  </div>
+                </div>
+                <div className="legend-item">
+                  <div
+                    className="legend-color"
+                    style={{ background: "#9b59b6" }}
+                  ></div>
+                  <div className="legend-info">
+                    <span className="legend-label">Premium Grade</span>
+                    <span className="legend-value">
+                      {qualityDist.premium.count} (
+                      {qualityDist.premium.percentage}%)
+                    </span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Quality Alerts */}
-        <div className="card">
-          <div className="card-header">
-            <div>
-              <h2 className="card-title">Quality Alerts</h2>
-              <p className="card-subtitle">Requires attention</p>
-            </div>
-          </div>
-          <div className="alert-list">
-            {alerts.map((alert) => (
-              <div key={alert.id} className={`alert-item alert-${alert.type}`}>
-                <span className="alert-icon">{alert.icon}</span>
-                <div className="alert-content">
-                  <div className="alert-title">{alert.title}</div>
-                  <div className="alert-message">{alert.message}</div>
-                </div>
+        {/* Right Column - Quality Alerts Sidebar */}
+        <div className="alerts-sidebar">
+          <div className="card">
+            <div className="card-header">
+              <div>
+                <h2 className="card-title">Quality Alerts</h2>
+                <p className="card-subtitle">Requires attention</p>
               </div>
-            ))}
+            </div>
+            <div className="alert-list">
+              {alerts.map((alert) => (
+                <div
+                  key={alert.id}
+                  className={`alert-item alert-${alert.type}`}
+                >
+                  <div className="alert-content">
+                    <div className="alert-title">{alert.title}</div>
+                    <div className="alert-message">{alert.message}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -578,7 +515,7 @@ const Results = () => {
               <option value="all">All Types</option>
               <option value="market">Market</option>
               <option value="standard">Standard</option>
-              <option value="reject">Reject</option>
+              <option value="premium">Premium</option>
             </select>
           </div>
           <select
@@ -658,17 +595,15 @@ const Results = () => {
       {/* Export Options */}
       <div className="card">
         <div className="card-header">
-          <h2 className="card-title">📤 Export & Reporting Options</h2>
+          <h2 className="card-title">Export & Reporting Options</h2>
         </div>
         <div className="export-options">
-          <button className="btn btn-secondary">📄 Export PDF Report</button>
+          <button className="btn btn-secondary">Export PDF Report</button>
           <button className="btn btn-secondary">
-            📊 Export Excel with Charts
+            Export Excel with Charts
           </button>
-          <button className="btn btn-secondary">
-            📧 Schedule Email Report
-          </button>
-          <button className="btn btn-secondary">📋 Export CSV Data</button>
+          <button className="btn btn-secondary">Schedule Email Report</button>
+          <button className="btn btn-secondary">Export CSV Data</button>
         </div>
       </div>
     </div>

@@ -144,8 +144,8 @@
   background: var(--info);
 }
 
-.type-reject .quality-fill {
-  background: var(--error);
+.type-premium .quality-fill {
+  background: #9b59b6;
 }
 
 /* Alerts */
@@ -299,10 +299,10 @@ tr:hover {
   border: 1px solid var(--info);
 }
 
-.type-badge.type-reject {
-  background: rgba(231, 76, 60, 0.1);
-  color: var(--error);
-  border: 1px solid var(--error);
+.type-badge.type-premium {
+  background: rgba(155, 89, 182, 0.1);
+  color: #9b59b6;
+  border: 1px solid #9b59b6;
 }
 
 code {
@@ -353,5 +353,179 @@ code {
 /* Override card-header border for Results page */
 .results .card-header {
   border-bottom: none;
-  padding-bottom: 0;
+  padding-bottom: var(--spacing-lg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--spacing-xs);
+  margin-bottom: var(--spacing-xl);
+}
+
+.results .card-header > div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  width: 100%;
+}
+
+.results .card-title {
+  margin-bottom: var(--spacing-xs);
+}
+
+.results .card-subtitle {
+  margin-top: 0;
+}
+
+/* Pie Chart */
+/* NUCLEAR OPTION: Complete card override for Quality Distribution card */
+.results .charts-alerts-grid .charts-column .card {
+  background: var(--bg-medium) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 0 !important; /* Remove border radius completely */
+  padding: 0 !important; /* Remove padding to prevent clipping */
+  transition: all var(--transition-normal) !important;
+  overflow: visible !important; /* Allow content to overflow */
+  box-shadow: none !important;
+  clip-path: none !important;
+  contain: none !important;
+}
+
+/* Restore padding to header only */
+.results .charts-alerts-grid .charts-column .card .card-header {
+  padding: var(--spacing-lg) var(--spacing-lg) var(--spacing-md)
+    var(--spacing-lg) !important;
+  margin-bottom: 0 !important;
+}
+
+/* Container for pie chart with generous space */
+.pie-chart-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: calc(var(--spacing-xl) * 2);
+  padding: var(--spacing-xl) calc(var(--spacing-xl) * 3);
+  min-height: 500px;
+  overflow: visible !important;
+  background: transparent;
+  width: 100%;
+}
+
+/* Pie chart sizing */
+.pie-chart {
+  width: 320px;
+  height: 320px;
+  flex-shrink: 0;
+  overflow: visible !important;
+}
+
+.pie-chart svg {
+  overflow: visible !important;
+}
+
+.pie-chart circle {
+  transition: all var(--transition-normal);
+}
+
+.pie-chart-legend {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+  min-width: 220px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.legend-color {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.legend-info {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.legend-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.legend-value {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+/* Charts and Alerts Grid Layout */
+.charts-alerts-grid {
+  display: grid;
+  grid-template-columns: 1fr 350px;
+  gap: var(--spacing-xl);
+  margin-bottom: var(--spacing-xl);
+  margin-top: var(--spacing-xl);
+}
+
+.charts-column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+  min-width: 0; /* Allow content to shrink */
+}
+
+.alerts-sidebar {
+  display: flex;
+  flex-direction: column;
+}
+
+.alerts-sidebar .card {
+  height: 100%;
+}
+
+.alerts-sidebar .alert-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+/* Remove alert icons */
+.alert-item {
+  display: flex;
+  padding: var(--spacing-md);
+  border-radius: 6px;
+}
+
+.alert-content {
+  flex: 1;
+}
+
+/* Remove KPI icons */
+.kpi-header {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: var(--spacing-md);
+}
+
+.kpi-icon {
+  display: none;
+}
+
+/* Responsive */
+@media (max-width: 1200px) {
+  .charts-alerts-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .alerts-sidebar {
+    order: -1;
+  }
 }

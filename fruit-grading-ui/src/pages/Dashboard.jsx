@@ -27,7 +27,7 @@ const Dashboard = ({ systemStatus, processingStats }) => {
       },
       {
         id: "obj0012",
-        type: "reject",
+        type: "premium",
         confidence: 0.92,
         timestamp: "2025-12-12 14:25:08",
       },
@@ -46,10 +46,9 @@ const Dashboard = ({ systemStatus, processingStats }) => {
     <div className="dashboard">
       <div className="page-header">
         <h1>System Dashboard</h1>
-      </div>
-
-      <div className="page-description">
-        <p>Monitor your fruit grading system status and performance</p>
+        <p className="page-subtitle">
+          Monitor your fruit grading system status and performance
+        </p>
       </div>
 
       {/* System Status Cards */}
@@ -248,7 +247,7 @@ const Dashboard = ({ systemStatus, processingStats }) => {
             </div>
             <div className="info-item">
               <span className="info-label">Classes</span>
-              <span className="info-value">3 (market, standard, reject)</span>
+              <span className="info-value">3 (market, standard, premium)</span>
             </div>
           </div>
         </div>
