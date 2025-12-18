@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { NavLink } from "react-router-dom";
 import {
   FiHome,
@@ -17,6 +17,17 @@ import "./Sidebar.css";
 const Sidebar = () => {
   const { user, logout, isAdmin } = useAuth();
   const [isHovered, setIsHovered] = useState(false);
+
+  // **FIX: Ensure sidebar-open class is removed on mount and unmount**
+  useEffect(() => {
+    // Remove class immediately when component mounts
+    document.body.classList.remove("sidebar-open");
+
+    // Cleanup: remove class when component unmounts
+    return () => {
+      document.body.classList.remove("sidebar-open");
+    };
+  }, []);
 
   // Get icon component by name
   const getIcon = (iconName) => {
