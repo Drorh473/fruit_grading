@@ -2,9 +2,19 @@
 Add Fruit Routes
 Endpoints for adding and processing new fruit objects
 """
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, current_app
 import os
+import sys
 from pathlib import Path
+
+# Add project root to path
+PROJECT_ROOT = Path(__file__).parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+# Import validation and processing functions
+from preprocessing.preprocessing_insertion import validate_folder_structure
+from processes.data_insertion import process_new_fruit_folder
 
 add_fruit_bp = Blueprint('add_fruit', __name__)
 
@@ -28,20 +38,37 @@ def validate_folder():
                 'message': 'Folder does not exist'
             }), 200
         
-        # In production, implement actual folder validation
-        # Check for:
-        # - 4 camera angles (Front, Right, Back, Left)
-        # - Multiple frames per angle
-        # - Valid image formats
+        # Use actual validation from preprocessing module
+        is_valid, error_msg = validate_folder_structure(folder_path)
         
-        # Mock validation for now
+        if not is_valid:
+            return jsonify({
+                'valid': False,
+                'message': error_msg
+            }), 200
+        
+        # Count images in angle directories
+        angle_dirs = ['angle_0', 'angle_1', 'angle_2', 'angle_3']
+        total_images = 0
+        angles_found = 0
+        
+        for angle_dir in angle_dirs:
+            angle_path = os.path.join(folder_path, angle_dir)
+            if os.path.isdir(angle_path):
+                angles_found += 1
+                # Count image files
+                image_files = [f for f in os.listdir(angle_path) 
+                             if f.lower().endswith(('.jpg', '.jpeg', '.png'))]
+                total_images += len(image_files)
+        
         return jsonify({
             'valid': True,
             'message': 'Folder structure is valid',
             'details': {
-                'anglesFound': 4,
-                'totalImages': 60,
-                'cameraAngles': ['Front View', 'Right View', 'Back View', 'Left View']
+                'anglesFound': angles_found,
+                'totalImages': total_images,
+                'cameraAngles': ['angle_0 (Front)', 'angle_1 (Right)', 
+                               'angle_2 (Back)', 'angle_3 (Left)']
             }
         }), 200
         
@@ -49,53 +76,65 @@ def validate_folder():
         print(f"Error in validate_folder: {e}")
         return jsonify({
             'valid': False,
-            'message': str(e)
+            'message': f'Validation error: {str(e)}'
         }), 500
 
 
 @add_fruit_bp.route('/process', methods=['POST'])
 def process_fruit():
-    """Process new fruit object"""
+    """Process new fruit object through complete pipeline"""
     try:
         data = request.get_json()
         folder_path = data.get('folderPath')
-        fruit_type = data.get('fruitType')
-        object_id = data.get('objectId')
+        run_tests = data.get('runTests', False)
         
-        if not folder_path or not fruit_type:
+        if not folder_path:
             return jsonify({
                 'success': False,
-                'error': 'Folder path and fruit type are required'
+                'error': 'Folder path is required'
             }), 400
         
-        # In production, implement actual processing pipeline:
-        # 1. Load images from folder
-        # 2. Preprocess images (Gaussian blur, CLAHE)
-        # 3. Extract features using CNN
-        # 4. Store in database
-        # 5. Classify using trained model
-        # 6. Return prediction
+        # Validate folder exists
+        if not os.path.exists(folder_path):
+            return jsonify({
+                'success': False,
+                'error': 'Folder does not exist'
+            }), 400
         
-        # Mock response for now
+        # Get database name from config
+        db_name = current_app.config.get('DB_NAME', 'fruit_grading')
+        
+        # Run complete processing pipeline
+        result = process_new_fruit_folder(
+            folder_path=folder_path,
+            db_name=db_name,
+            collection_name='images',
+            run_tests=run_tests
+        )
+        
+        if result is None:
+            return jsonify({
+                'success': False,
+                'error': 'Processing pipeline failed. Check server logs for details.'
+            }), 500
+        
+        # Return successful result
         return jsonify({
             'success': True,
-            'objectId': object_id or 'obj0015',
-            'predictedType': fruit_type,
-            'confidence': 0.94,
-            'imagesProcessed': 60,
-            'processingTime': 45.3,
-            'details': {
-                'preprocessed': 60,
-                'featuresExtracted': 60,
-                'storedInDb': 60
-            }
+            'objectId': result['object_id'],
+            'predictedType': result['predicted_type'],
+            'confidence': result['confidence'],
+            'imagesProcessed': result['images_count'],
+            'processingTime': result['processing_time']
         }), 200
         
     except Exception as e:
         print(f"Error in process_fruit: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({
             'success': False,
-            'error': str(e)
+            'error': f'Processing error: {str(e)}'
         }), 500
 
 
