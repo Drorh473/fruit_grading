@@ -43,10 +43,11 @@ export async function getSystemStatus() {
 
 /**
  * Get processing statistics
- * @returns {Promise<Object>} { totalProcessed, accuracy, lastUpdate }
+ * @returns {Promise<Object>} { totalProcessed, accuracy, marketCount, standardCount, premiumCount, rejectCount, totalImages, totalObjects }
  */
 export async function getProcessingStats() {
-  return apiFetch("/admin/processing-stats");
+  // FIXED: Changed from /admin/processing-stats to /admin/dashboard-stats
+  return apiFetch("/admin/dashboard-stats");
 }
 
 /**
