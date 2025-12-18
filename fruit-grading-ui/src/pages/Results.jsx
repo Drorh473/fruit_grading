@@ -35,7 +35,6 @@ const Results = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState("all");
   const [filterBatch, setFilterBatch] = useState("all");
-  const [filterConfidence, setFilterConfidence] = useState("all");
 
   // UI states
   const [loading, setLoading] = useState(true);
@@ -50,7 +49,7 @@ const Results = () => {
   // Re-fetch results when filters change
   useEffect(() => {
     fetchResults();
-  }, [searchTerm, filterType, filterBatch, filterConfidence]);
+  }, [searchTerm, filterType, filterBatch]);
 
   /**
    * Fetch all initial data
@@ -105,7 +104,6 @@ const Results = () => {
         search: searchTerm || undefined,
         type: filterType,
         batch: filterBatch,
-        confidence: filterConfidence,
         limit: 100,
       };
 
@@ -130,7 +128,6 @@ const Results = () => {
         search: searchTerm || undefined,
         type: filterType !== "all" ? filterType : undefined,
         batch: filterBatch !== "all" ? filterBatch : undefined,
-        confidence: filterConfidence !== "all" ? filterConfidence : undefined,
       };
 
       const csvContent = await exportResultsCSV(filters);
@@ -226,7 +223,10 @@ const Results = () => {
 
       {/* KPI Cards */}
       {kpis && (
-        <div className="kpi-grid">
+        <div
+          className="kpi-grid"
+          style={{ gridTemplateColumns: "repeat(3, 1fr)" }}
+        >
           <div className="kpi-card">
             <div className="kpi-header">
               <span className="kpi-label">Total Processed</span>
@@ -234,186 +234,167 @@ const Results = () => {
             <div className="kpi-value">
               {kpis.totalProcessed?.toLocaleString() || 0}
             </div>
-            <div
-              className={`kpi-trend ${
-                kpis.trends?.totalProcessed > 0 ? "trend-up" : "trend-down"
-              }`}
-            >
-              {kpis.trends?.totalProcessed > 0 ? (
-                <FiTrendingUp />
-              ) : (
-                <FiTrendingDown />
-              )}
-              {Math.abs((kpis.trends?.totalProcessed || 0) * 100).toFixed(1)}%
-              vs yesterday
-            </div>
+            {kpis.trends?.totalProcessed && (
+              <div
+                className={`kpi-trend ${
+                  kpis.trends.totalProcessed.startsWith("+")
+                    ? "trend-up"
+                    : "trend-down"
+                }`}
+              >
+                {kpis.trends.totalProcessed.startsWith("+") ? (
+                  <FiTrendingUp />
+                ) : (
+                  <FiTrendingDown />
+                )}
+                {kpis.trends.totalProcessed} vs yesterday
+              </div>
+            )}
           </div>
 
           <div className="kpi-card">
             <div className="kpi-header">
               <span className="kpi-label">Quality Rate</span>
             </div>
-            <div className="kpi-value">
-              {((kpis.qualityRate || 0) * 100).toFixed(1)}%
-            </div>
-            <div
-              className={`kpi-trend ${
-                kpis.trends?.qualityRate > 0 ? "trend-up" : "trend-down"
-              }`}
-            >
-              {kpis.trends?.qualityRate > 0 ? (
-                <FiTrendingUp />
-              ) : (
-                <FiTrendingDown />
-              )}
-              {Math.abs((kpis.trends?.qualityRate || 0) * 100).toFixed(1)}% vs
-              yesterday
-            </div>
-          </div>
-
-          <div className="kpi-card">
-            <div className="kpi-header">
-              <span className="kpi-label">Avg Confidence</span>
-            </div>
-            <div className="kpi-value">
-              {((kpis.avgConfidence || 0) * 100).toFixed(1)}%
-            </div>
-            <div
-              className={`kpi-trend ${
-                kpis.trends?.avgConfidence > 0 ? "trend-up" : "trend-down"
-              }`}
-            >
-              {kpis.trends?.avgConfidence > 0 ? (
-                <FiTrendingUp />
-              ) : (
-                <FiTrendingDown />
-              )}
-              {Math.abs((kpis.trends?.avgConfidence || 0) * 100).toFixed(1)}% vs
-              yesterday
-            </div>
+            <div className="kpi-value">{kpis.qualityRate || 0}%</div>
+            {kpis.trends?.qualityRate && (
+              <div
+                className={`kpi-trend ${
+                  kpis.trends.qualityRate.startsWith("+")
+                    ? "trend-up"
+                    : "trend-down"
+                }`}
+              >
+                {kpis.trends.qualityRate.startsWith("+") ? (
+                  <FiTrendingUp />
+                ) : (
+                  <FiTrendingDown />
+                )}
+                {kpis.trends.qualityRate} vs yesterday
+              </div>
+            )}
           </div>
 
           <div className="kpi-card">
             <div className="kpi-header">
               <span className="kpi-label">Processing Speed</span>
             </div>
-            <div className="kpi-value">
-              {(kpis.processingSpeed || 0).toFixed(1)}s
-            </div>
-            <div
-              className={`kpi-trend ${
-                kpis.trends?.processingSpeed > 0 ? "trend-down" : "trend-up"
-              }`}
-            >
-              {kpis.trends?.processingSpeed > 0 ? (
-                <FiTrendingUp />
-              ) : (
-                <FiTrendingDown />
-              )}
-              {Math.abs(kpis.trends?.processingSpeed || 0).toFixed(1)}s vs
-              yesterday
-            </div>
+            <div className="kpi-value">{kpis.processingSpeed || 0} obj/hr</div>
+            {kpis.trends?.processingSpeed && (
+              <div
+                className={`kpi-trend ${
+                  kpis.trends.processingSpeed.startsWith("+")
+                    ? "trend-up"
+                    : "trend-down"
+                }`}
+              >
+                {kpis.trends.processingSpeed.startsWith("+") ? (
+                  <FiTrendingUp />
+                ) : (
+                  <FiTrendingDown />
+                )}
+                {kpis.trends.processingSpeed} vs yesterday
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      {/* Charts Section - Full Width Hourly Trend */}
-      <div className="card">
-        <div className="card-header">
-          <div>
-            <h2 className="card-title">Hourly Processing Trend</h2>
-            <p className="card-subtitle">Last 24 hours</p>
-          </div>
-        </div>
-        <div className="chart-container">
-          <div className="chart-placeholder">
-            <p style={{ fontSize: "2rem", marginBottom: "8px" }}>📈</p>
-            <p style={{ fontSize: "0.875rem", color: "var(--text-secondary)" }}>
-              Line Chart
-            </p>
-            <p
-              style={{
-                fontSize: "0.75rem",
-                marginTop: "8px",
-                color: "var(--text-secondary)",
-              }}
-            >
-              Shows fruits processed per hour
-              <br />
-              with quality rate overlay
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Quality Distribution (Full Width) and Alerts (Sidebar) Grid */}
+      {/* Quality Analytics Grid */}
       <div className="charts-alerts-grid">
-        {/* Left Column - Quality Distribution Full Width */}
+        {/* Left Column - Quality Distribution */}
         <div className="charts-column">
           {qualityDist && (
             <div className="card">
               <div className="card-header">
                 <div>
                   <h2 className="card-title">Quality Distribution</h2>
-                  <p className="card-subtitle">Today's breakdown</p>
+                  <p className="card-subtitle">
+                    Current batch classification breakdown
+                  </p>
                 </div>
               </div>
               <div className="pie-chart-container">
                 <svg viewBox="0 0 200 200" className="pie-chart">
-                  {/* Calculate stroke dasharray based on percentages */}
                   {(() => {
                     const circumference = 502.65;
-                    const marketArc =
-                      ((qualityDist.market?.percentage || 0) * circumference) /
-                      100;
-                    const standardArc =
-                      ((qualityDist.standard?.percentage || 0) *
-                        circumference) /
-                      100;
-                    const premiumArc =
-                      ((qualityDist.premium?.percentage || 0) * circumference) /
-                      100;
+                    const marketPct = qualityDist.market?.percentage || 0;
+                    const standardPct = qualityDist.standard?.percentage || 0;
+                    const premiumPct = qualityDist.premium?.percentage || 0;
+                    const rejectPct = qualityDist.reject?.percentage || 0;
+
+                    const marketArc = (marketPct * circumference) / 100;
+                    const standardArc = (standardPct * circumference) / 100;
+                    const premiumArc = (premiumPct * circumference) / 100;
+                    const rejectArc = (rejectPct * circumference) / 100;
+
+                    let currentRotation = -90;
 
                     return (
                       <>
                         {/* Market */}
-                        <circle
-                          cx="100"
-                          cy="100"
-                          r="80"
-                          fill="none"
-                          stroke="var(--success)"
-                          strokeWidth="60"
-                          strokeDasharray={`${marketArc} ${circumference}`}
-                          transform="rotate(-90 100 100)"
-                        />
+                        {marketPct > 0 && (
+                          <circle
+                            cx="100"
+                            cy="100"
+                            r="80"
+                            fill="none"
+                            stroke="var(--success)"
+                            strokeWidth="60"
+                            strokeDasharray={`${marketArc} ${circumference}`}
+                            transform={`rotate(${currentRotation} 100 100)`}
+                          />
+                        )}
                         {/* Standard */}
-                        <circle
-                          cx="100"
-                          cy="100"
-                          r="80"
-                          fill="none"
-                          stroke="var(--info)"
-                          strokeWidth="60"
-                          strokeDasharray={`${standardArc} ${circumference}`}
-                          transform={`rotate(${
-                            -90 + (marketArc / circumference) * 360
-                          } 100 100)`}
-                        />
+                        {standardPct > 0 && (
+                          <circle
+                            cx="100"
+                            cy="100"
+                            r="80"
+                            fill="none"
+                            stroke="var(--info)"
+                            strokeWidth="60"
+                            strokeDasharray={`${standardArc} ${circumference}`}
+                            transform={`rotate(${
+                              currentRotation +
+                              (marketArc / circumference) * 360
+                            } 100 100)`}
+                          />
+                        )}
                         {/* Premium */}
-                        <circle
-                          cx="100"
-                          cy="100"
-                          r="80"
-                          fill="none"
-                          stroke="#9b59b6"
-                          strokeWidth="60"
-                          strokeDasharray={`${premiumArc} ${circumference}`}
-                          transform={`rotate(${
-                            -90 +
-                            ((marketArc + standardArc) / circumference) * 360
-                          } 100 100)`}
-                        />
+                        {premiumPct > 0 && (
+                          <circle
+                            cx="100"
+                            cy="100"
+                            r="80"
+                            fill="none"
+                            stroke="#9b59b6"
+                            strokeWidth="60"
+                            strokeDasharray={`${premiumArc} ${circumference}`}
+                            transform={`rotate(${
+                              currentRotation +
+                              ((marketArc + standardArc) / circumference) * 360
+                            } 100 100)`}
+                          />
+                        )}
+                        {/* Reject */}
+                        {rejectPct > 0 && (
+                          <circle
+                            cx="100"
+                            cy="100"
+                            r="80"
+                            fill="none"
+                            stroke="var(--error)"
+                            strokeWidth="60"
+                            strokeDasharray={`${rejectArc} ${circumference}`}
+                            transform={`rotate(${
+                              currentRotation +
+                              ((marketArc + standardArc + premiumArc) /
+                                circumference) *
+                                360
+                            } 100 100)`}
+                          />
+                        )}
                         {/* Center circle for donut effect */}
                         <circle
                           cx="100"
@@ -463,6 +444,19 @@ const Results = () => {
                       <span className="legend-value">
                         {qualityDist.premium?.count || 0} (
                         {qualityDist.premium?.percentage || 0}%)
+                      </span>
+                    </div>
+                  </div>
+                  <div className="legend-item">
+                    <div
+                      className="legend-color"
+                      style={{ background: "var(--error)" }}
+                    ></div>
+                    <div className="legend-info">
+                      <span className="legend-label">Reject</span>
+                      <span className="legend-value">
+                        {qualityDist.reject?.count || 0} (
+                        {qualityDist.reject?.percentage || 0}%)
                       </span>
                     </div>
                   </div>
@@ -534,7 +528,7 @@ const Results = () => {
             >
               Compare key metrics:
               <br />
-              Processing speed, Quality rate, Confidence, Throughput
+              Processing speed, Quality rate, Throughput
             </p>
           </div>
         </div>
@@ -589,16 +583,6 @@ const Results = () => {
               </option>
             ))}
           </select>
-          <select
-            value={filterConfidence}
-            onChange={(e) => setFilterConfidence(e.target.value)}
-            className="filter-select"
-          >
-            <option value="all">All Confidence</option>
-            <option value="high">High (&gt;90%)</option>
-            <option value="medium">Medium (70-90%)</option>
-            <option value="low">Low (&lt;70%)</option>
-          </select>
         </div>
 
         {results.length > 0 ? (
@@ -609,10 +593,8 @@ const Results = () => {
                   <th>Object ID</th>
                   <th>Batch</th>
                   <th>Classification</th>
-                  <th>Confidence</th>
-                  <th>Processing Time</th>
+                  <th>Image Count</th>
                   <th>Timestamp</th>
-                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -627,20 +609,8 @@ const Results = () => {
                         {result.type}
                       </span>
                     </td>
-                    <td>{((result.confidence || 0) * 100).toFixed(1)}%</td>
-                    <td>{(result.processingTime || 0).toFixed(1)}s</td>
+                    <td>{result.imageCount || 0}</td>
                     <td className="timestamp">{result.timestamp || "N/A"}</td>
-                    <td>
-                      {result.confidence < 0.7 ? (
-                        <a href="#" style={{ color: "var(--warning)" }}>
-                          ⚠️ Review
-                        </a>
-                      ) : (
-                        <a href="#" style={{ color: "var(--accent-primary)" }}>
-                          View
-                        </a>
-                      )}
-                    </td>
                   </tr>
                 ))}
               </tbody>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   FiDatabase,
   FiCpu,
@@ -32,18 +32,31 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // Track last known model timestamp to detect changes
+  const lastModelTimestamp = useRef(null);
+  const autoRefreshInterval = useRef(null);
+
   useEffect(() => {
     loadDashboardData();
 
-    // Auto-refresh every 30 seconds
-    const interval = setInterval(loadDashboardData, 30000);
-    return () => clearInterval(interval);
+    // Smart auto-refresh: only refresh system status and processing stats
+    // Model data doesn't change unless pipeline runs
+    autoRefreshInterval.current = setInterval(() => {
+      refreshLiveData();
+    }, 30000); // 30 seconds
+
+    return () => {
+      if (autoRefreshInterval.current) {
+        clearInterval(autoRefreshInterval.current);
+      }
+    };
   }, []);
 
   const loadDashboardData = async () => {
     try {
       setError(null);
 
+      // Load all data (full refresh)
       const [statusData, statsData, resultsData, datasetData, modelData] =
         await Promise.all([
           getSystemStatus(),
@@ -53,16 +66,62 @@ const Dashboard = () => {
           getModelPerformance(),
         ]);
 
+      console.log("Dashboard data loaded successfully");
+
       setSystemStatus(statusData);
       setProcessingStats(statsData);
       setRecentResults(resultsData);
       setDatasetInfo(datasetData);
       setModelPerformance(modelData);
+
+      // Track model timestamp
+      if (statsData.lastUpdate) {
+        lastModelTimestamp.current = statsData.lastUpdate;
+      }
     } catch (err) {
       console.error("Failed to load dashboard data:", err);
-      setError("Failed to load dashboard data. Please try again.");
+      setError(
+        `Failed to load dashboard data: ${err.message || "Please try again."}`
+      );
     } finally {
       setLoading(false);
+    }
+  };
+
+  const refreshLiveData = async () => {
+    // Only refresh dynamic data (system status, processing stats, recent results)
+    // Skip model performance and dataset info unless model changed
+    try {
+      const [statusData, statsData, resultsData] = await Promise.all([
+        getSystemStatus(),
+        getProcessingStats(),
+        getRecentResults(3),
+      ]);
+
+      setSystemStatus(statusData);
+      setProcessingStats(statsData);
+      setRecentResults(resultsData);
+
+      // Check if model was retrained (timestamp changed)
+      if (
+        statsData.lastUpdate &&
+        statsData.lastUpdate !== lastModelTimestamp.current
+      ) {
+        console.log("Model update detected - refreshing model data");
+        lastModelTimestamp.current = statsData.lastUpdate;
+
+        // Reload model-specific data only when model changes
+        const [datasetData, modelData] = await Promise.all([
+          getDatasetInfo(),
+          getModelPerformance(),
+        ]);
+
+        setDatasetInfo(datasetData);
+        setModelPerformance(modelData);
+      }
+    } catch (err) {
+      console.error("Auto-refresh error:", err);
+      // Don't show error for auto-refresh failures
     }
   };
 
@@ -83,7 +142,7 @@ const Dashboard = () => {
     return "disconnected";
   };
 
-  if (loading && !systemStatus.database) {
+  if (loading && systemStatus.database === "loading") {
     return (
       <div className="dashboard">
         <div

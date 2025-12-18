@@ -47,7 +47,7 @@ export async function getSystemStatus() {
  */
 export async function getProcessingStats() {
   // FIXED: Changed from /admin/processing-stats to /admin/dashboard-stats
-  return apiFetch("/admin/dashboard-stats");
+  return apiFetch("/admin/processing-stats");
 }
 
 /**

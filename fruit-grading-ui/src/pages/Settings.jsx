@@ -706,7 +706,8 @@ const Settings = () => {
             <span className="status-label">Model Status</span>
             <span
               className={`status-badge ${
-                systemStatus.model === "loaded"
+                systemStatus.model === "loaded" ||
+                systemStatus.model === "trained"
                   ? "status-success"
                   : systemStatus.model === "error"
                   ? "status-error"
@@ -719,8 +720,15 @@ const Settings = () => {
           <div className="status-item">
             <span className="status-label">Active Cameras</span>
             <span className="status-value">
-              {systemStatus.cameras?.filter((c) => c).length || 0} /{" "}
-              {systemStatus.cameras?.length || 4}
+              {(() => {
+                // Handle both array and object formats for cameras
+                if (!systemStatus.cameras) return "0 / 4";
+                const camerasArray = Array.isArray(systemStatus.cameras)
+                  ? systemStatus.cameras
+                  : Object.values(systemStatus.cameras);
+                const activeCount = camerasArray.filter((c) => c).length;
+                return `${activeCount} / ${camerasArray.length}`;
+              })()}
             </span>
           </div>
         </div>
