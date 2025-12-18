@@ -24,6 +24,10 @@ from visuals.confusion_matrix import generate_full_confusion_matrix_report
 #import for the testing suit
 import subprocess
 
+# Import model metadata management
+sys.path.insert(0, '/home/claude')
+from model_metadata import save_dashboard_metadata
+
 
 # Get configuration
 ORIGINAL_DATASET_PATH = os.getenv('ORIGINAL_DATASET_PATH')
@@ -62,10 +66,10 @@ def run_tests():
         return result.returncode == 0
         
     except subprocess.TimeoutExpired:
-        print("\nâœ— Tests timed out after 2 minutes")
+        print("\nÃ¢Å“â€” Tests timed out after 2 minutes")
         return False
     except Exception as e:
-        print(f"\nâœ— Error running tests: {e}")
+        print(f"\nÃ¢Å“â€” Error running tests: {e}")
         return False
 
 def setup_database():
@@ -321,7 +325,7 @@ def train_classifier(train_features, test_features,
         print(f"  Testing samples: {len(X_test)}")
         print(f"  Feature dimension: {input_dim:,}")
         print(f"  Number of classes: {num_classes}")
-        print(f"  L2 Regularization: λ = {lambda_reg}")
+        print(f"  L2 Regularization: Î» = {lambda_reg}")
         
         # Check label distribution
         print(f"\nTraining label distribution:")
@@ -488,6 +492,23 @@ def run_full_pipeline(skip_tests=False,
     cm = generate_confusion_matrix(results)
     if cm is not None:
         results['confusion_matrix'] = cm
+    
+    # Step 6: Save comprehensive metadata for dashboards
+    print("" + "="*60)
+    print("STEP 6: SAVING MODEL METADATA")
+    print("="*60 + "")
+    
+    dataset_stats = {
+        'training_samples': len(train_features),
+        'testing_samples': len(test_features),
+        'feature_dimension': train_features[list(train_features.keys())[0]]['features'].shape[0],
+        'total_images': len(train_features) + len(test_features)
+    }
+    
+    metadata_path = save_dashboard_metadata(results, MODEL_DIR, dataset_stats)
+    if metadata_path:
+        print(f"  ✓ Metadata saved successfully")
+        print(f"  ✓ Dashboards can now display this model's results")
     
     # Success
     print("\n" + "="*60)

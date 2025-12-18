@@ -34,29 +34,35 @@ except ImportError as e:
 
 
 def run_pipeline_background(config):
-    """Run the complete ML pipeline in background thread"""
+    """Background task for running pipeline"""
     try:
-        pipeline_state.add_log("Starting ML pipeline...", 'info')
-        pipeline_state.update_state(status='running', running=True)
+        pipeline_state.update_state(status='running', progress=0, running=True)
+        pipeline_state.add_log("Pipeline started", 'info')
         
         # Extract config
-        skip_tests = config.get('skipTests', True)
+        skip_tests = config.get('skipTests', False)
+        setup_database_con = config.get('setupDatabase', True)
+        preprocess_data_flag = config.get('preprocessData', True) 
+        extract_features_flag = config.get('extractFeatures', True)
+        train_classifier_flag = config.get('trainClassifier', True)
+        generate_confusion_matrix_flag = config.get('generateConfusionMatrix', True)
+        
+        # Training hyperparameters
         hidden_dim = config.get('hiddenDim', 16)
         epochs = config.get('epochs', 100)
         learning_rate = config.get('learningRate', 0.0005)
         lambda_reg = config.get('lambdaReg', 0.001)
         
-        # Store config
-        pipeline_state.update_config(
-            hiddenDim=hidden_dim,
-            epochs=epochs,
-            learningRate=learning_rate,
-            lambdaReg=lambda_reg,
-            batchSize=config.get('batchSize', 32)
-        )
+        # Initialize variables that might be used later
+        train_gen = None
+        test_gen = None
+        train_features = None
+        test_features = None
+        params = None
+        results = None  # Initialize results to None
         
-        # Step 0: Run tests (optional)
-        if not skip_tests and run_tests:
+        # Step 0: Tests (optional)
+        if not skip_tests:
             pipeline_state.add_log("Running test suite...", 'info')
             test_success = run_tests()
             if not test_success:
@@ -65,11 +71,12 @@ def run_pipeline_background(config):
                 return
         
         # Step 1: Database Setup
-        if setup_database:
+        if setup_database_con:
             pipeline_state.update_step(1, 'processing')
             pipeline_state.add_log("Step 1/5: Setting up database...", 'info')
             
-            if not setup_database():
+            success = setup_database()  # Call the actual function
+            if not success:
                 pipeline_state.add_log("Database setup failed!", 'error')
                 pipeline_state.update_step(1, 'failed')
                 pipeline_state.update_state(status='failed', running=False)
@@ -79,7 +86,7 @@ def run_pipeline_background(config):
             pipeline_state.add_log("Database setup complete", 'success')
         
         # Step 2: Preprocessing
-        if preprocess_data:
+        if preprocess_data_flag:
             pipeline_state.update_step(2, 'processing')
             pipeline_state.add_log("Step 2/5: Preprocessing data...", 'info')
             
@@ -94,7 +101,7 @@ def run_pipeline_background(config):
             pipeline_state.add_log(f"Preprocessing complete", 'success')
         
         # Step 3: Feature Extraction
-        if extract_features:
+        if extract_features_flag:
             pipeline_state.update_step(3, 'processing')
             pipeline_state.add_log("Step 3/5: Extracting features...", 'info')
             
@@ -109,7 +116,7 @@ def run_pipeline_background(config):
             pipeline_state.add_log(f"Feature extraction complete", 'success')
         
         # Step 4: Model Training
-        if train_classifier:
+        if train_classifier_flag:
             pipeline_state.update_step(4, 'processing')
             pipeline_state.add_log(f"Step 4/5: Training classifier...", 'info')
             
@@ -121,7 +128,7 @@ def run_pipeline_background(config):
                 lambda_reg=lambda_reg
             )
             
-            if params is None:
+            if params is None or results is None:
                 pipeline_state.add_log("Classifier training failed!", 'error')
                 pipeline_state.update_step(4, 'failed')
                 pipeline_state.update_state(status='failed', running=False)
@@ -131,7 +138,7 @@ def run_pipeline_background(config):
             pipeline_state.add_log(f"Training complete - Accuracy: {results['test_accuracy']*100:.2f}%", 'success')
         
         # Step 5: Evaluation
-        if generate_confusion_matrix:
+        if generate_confusion_matrix_flag and results is not None:
             pipeline_state.update_step(5, 'processing')
             pipeline_state.add_log("Step 5/5: Generating evaluation metrics...", 'info')
             
@@ -142,15 +149,45 @@ def run_pipeline_background(config):
             pipeline_state.update_step(5, 'completed')
             pipeline_state.add_log("Evaluation complete", 'success')
         
-        # Store results
-        pipeline_state.set_results({
-            'train_accuracy': float(results['train_accuracy']),
-            'test_accuracy': float(results['test_accuracy']),
-            'train_loss': float(results['train_loss']),
-            'test_loss': float(results['test_loss']),
-            'totalProcessed': len(train_features) + len(test_features),
-            'timestamp': datetime.now().isoformat()
-        })
+        # Step 6: Save dashboard metadata (NEW)
+        if results is not None and train_features is not None and test_features is not None:
+            pipeline_state.add_log("Step 6/6: Saving dashboard metadata...", 'info')
+            try:
+                from model_metadata import save_dashboard_metadata
+                
+                # Get label mapping
+                label_mapping = results.get('label_mapping', {
+                    'market': 0,
+                    'standard': 1,
+                    'premium': 2
+                })
+                
+                # Get confusion matrix
+                cm = results.get('confusion_matrix', None)
+                
+                save_dashboard_metadata(
+                    results=results,
+                    train_features=train_features,
+                    test_features=test_features,
+                    params=params,
+                    label_mapping=label_mapping,
+                    confusion_matrix=cm
+                )
+                
+                pipeline_state.add_log("Dashboard metadata saved successfully", 'success')
+            except Exception as e:
+                pipeline_state.add_log(f"Warning: Could not save dashboard metadata: {str(e)}", 'warning')
+        
+        # Store results in pipeline_state (only if results exist)
+        if results is not None:
+            pipeline_state.set_results({
+                'train_accuracy': float(results['train_accuracy']),
+                'test_accuracy': float(results['test_accuracy']),
+                'train_loss': float(results['train_loss']),
+                'test_loss': float(results['test_loss']),
+                'totalProcessed': len(train_features) + len(test_features) if train_features and test_features else 0,
+                'timestamp': datetime.now().isoformat()
+            })
         
         # Complete
         pipeline_state.update_state(status='completed', progress=100, running=False)
@@ -165,7 +202,6 @@ def run_pipeline_background(config):
         state = pipeline_state.get_state()
         if state['currentStep'] > 0:
             pipeline_state.update_step(state['currentStep'], 'failed')
-
 
 @processing_bp.route('/start', methods=['POST'])
 def start_pipeline():

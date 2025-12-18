@@ -1,12 +1,15 @@
 """
-Shared Pipeline State
-Manages ML pipeline state across all routes
+Shared Pipeline State with Smart Caching
+Manages ML pipeline state across all routes with efficient caching
 """
 from datetime import datetime
 from threading import Lock
+import json
+import os
+from pathlib import Path
 
 class PipelineState:
-    """Thread-safe pipeline state manager"""
+    """Thread-safe pipeline state manager with smart caching"""
     
     def __init__(self):
         self._lock = Lock()
@@ -33,6 +36,34 @@ class PipelineState:
             'results': None,
             'pipeline_thread': None
         }
+        
+        # Caching system
+        self._results_cache = None
+        self._cache_timestamp = None
+        self._metadata_path = Path(os.getenv('MODEL_DIR', 'saved_models')) / 'dashboard_metadata.json'
+        
+        # Load initial results from disk (once on startup)
+        self._load_results_from_disk()
+    
+    def _load_results_from_disk(self):
+        """Load results from disk file - called only on startup or when explicitly triggered"""
+        try:
+            if self._metadata_path.exists():
+                with open(self._metadata_path, 'r') as f:
+                    data = json.load(f)
+                    self._results_cache = data
+                    self._cache_timestamp = datetime.now()
+                    print(f"✓ Dashboard metadata loaded from {self._metadata_path} (startup)")
+            else:
+                print(f"ℹ No metadata file found at {self._metadata_path}")
+        except Exception as e:
+            print(f"⚠ Error loading dashboard metadata: {e}")
+            self._results_cache = None
+    
+    def invalidate_cache(self):
+        """Force reload of results from disk (call after pipeline completion)"""
+        print("♻ Invalidating results cache - reloading from disk")
+        self._load_results_from_disk()
     
     def get_state(self):
         """Get current state"""
@@ -72,7 +103,7 @@ class PipelineState:
             self._state['currentStep'] = 0
             self._state['progress'] = 0
             self._state['logs'] = []
-            self._state['results'] = None
+            # Don't reset results - they're cached until new model is trained
             for step in self._state['steps']:
                 step['status'] = 'pending'
     
@@ -87,14 +118,30 @@ class PipelineState:
             self._state['config'].update(kwargs)
     
     def get_results(self):
-        """Get pipeline results"""
-        with self._lock:
-            return self._state['results']
+        """
+        Get pipeline results from cache (no disk I/O)
+        Returns cached results loaded at startup or after pipeline completion
+        """
+        return self._results_cache
     
     def set_results(self, results):
-        """Set pipeline results"""
+        """
+        Set pipeline results (called after training completes)
+        Updates both memory cache and triggers disk save
+        """
         with self._lock:
             self._state['results'] = results
+            self._results_cache = results
+            self._cache_timestamp = datetime.now()
+        
+        # Save to disk
+        try:
+            self._metadata_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(self._metadata_path, 'w') as f:
+                json.dump(results, f, indent=2)
+            print(f"✓ Dashboard metadata saved to {self._metadata_path}")
+        except Exception as e:
+            print(f"⚠ Error saving dashboard metadata: {e}")
     
     def is_running(self):
         """Check if pipeline is running"""
@@ -105,6 +152,14 @@ class PipelineState:
         """Get recent logs"""
         with self._lock:
             return self._state['logs'][-limit:]
+    
+    def get_cache_info(self):
+        """Get cache metadata for debugging"""
+        return {
+            'cached': self._results_cache is not None,
+            'timestamp': self._cache_timestamp.isoformat() if self._cache_timestamp else None,
+            'file_exists': self._metadata_path.exists()
+        }
 
 # Global pipeline state instance
 pipeline_state = PipelineState()
