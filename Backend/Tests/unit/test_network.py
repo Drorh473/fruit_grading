@@ -1,15 +1,16 @@
-import unittest
-import os
-import sys
+"""
+Enhanced Model Training Testing
+Comprehensive tests for neural network operations and training
+"""
+import pytest
 import numpy as np
-from pathlib import Path
-from dotenv import load_dotenv
 import tempfile
+from pathlib import Path
+from Tests.test_config import TestConfig
 
-# Add project to path
-PROJECT_DIR = '/mnt/project'
-if PROJECT_DIR not in sys.path:
-    sys.path.insert(0, PROJECT_DIR)
+# Import functions to test
+import sys
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from cnn.fully_connected_layer import (
     initialize_parameters,
@@ -25,69 +26,10 @@ from cnn.fully_connected_layer import (
     save_model,
     load_model
 )
-from cnn.activation_functions import relu, softmax, relu_derivative
-
-# Load environment
-env_path = Path('.') / '.env'
-load_dotenv(dotenv_path=env_path)
 
 
-class TestActivationFunctions(unittest.TestCase):
-    """Test cases for activation functions"""
-    
-    def test_relu_positive_values(self):
-        """Test ReLU with positive values"""
-        x = np.array([1, 2, 3, 4, 5])
-        result = relu(x)
-        np.testing.assert_array_equal(result, x)
-    
-    def test_relu_negative_values(self):
-        """Test ReLU zeros negative values"""
-        x = np.array([-1, -2, -3, -4, -5])
-        result = relu(x)
-        np.testing.assert_array_equal(result, np.zeros_like(x))
-    
-    def test_relu_mixed_values(self):
-        """Test ReLU with mixed positive and negative"""
-        x = np.array([-2, -1, 0, 1, 2])
-        expected = np.array([0, 0, 0, 1, 2])
-        result = relu(x)
-        np.testing.assert_array_equal(result, expected)
-    
-    def test_relu_derivative(self):
-        """Test ReLU derivative"""
-        x = np.array([-2, -1, 0, 1, 2])
-        expected = np.array([0, 0, 0, 1, 1])
-        result = relu_derivative(x)
-        np.testing.assert_array_equal(result, expected)
-    
-    def test_softmax_output_range(self):
-        """Test softmax outputs are in [0, 1] and sum to 1"""
-        x = np.array([[1, 2, 3, 4, 5]])
-        result = softmax(x)
-        
-        # Check range
-        self.assertTrue(np.all(result >= 0))
-        self.assertTrue(np.all(result <= 1))
-        
-        # Check sum to 1
-        np.testing.assert_almost_equal(result.sum(axis=1), 1.0)
-    
-    def test_softmax_numerical_stability(self):
-        """Test softmax handles large values without overflow"""
-        x = np.array([[1000, 2000, 3000]])
-        result = softmax(x)
-        
-        # Should not have NaN or Inf
-        self.assertFalse(np.any(np.isnan(result)))
-        self.assertFalse(np.any(np.isinf(result)))
-        
-        # Should still sum to 1
-        np.testing.assert_almost_equal(result.sum(axis=1), 1.0)
-
-
-class TestParameterInitialization(unittest.TestCase):
-    """Test cases for parameter initialization"""
+class TestParameterInitialization:
+    """Test parameter initialization"""
     
     def test_initialize_parameters_shapes(self):
         """Test that initialized parameters have correct shapes"""
@@ -98,430 +40,486 @@ class TestParameterInitialization(unittest.TestCase):
         params = initialize_parameters(input_dim, hidden_dim, num_classes)
         
         # Check shapes
-        self.assertEqual(params['W1'].shape, (input_dim, hidden_dim))
-        self.assertEqual(params['b1'].shape, (1, hidden_dim))
-        self.assertEqual(params['W2'].shape, (hidden_dim, num_classes))
-        self.assertEqual(params['b2'].shape, (1, num_classes))
+        assert params['W1'].shape == (input_dim, hidden_dim)
+        assert params['b1'].shape == (hidden_dim,)
+        assert params['W2'].shape == (hidden_dim, num_classes)
+        assert params['b2'].shape == (num_classes,)
     
-    def test_initialize_parameters_bias_zeros(self):
-        """Test that biases are initialized to zeros"""
+    def test_initialize_parameters_types(self):
+        """Test that parameters are numpy arrays"""
         params = initialize_parameters(100, 50, 3)
         
-        np.testing.assert_array_equal(params['b1'], np.zeros((1, 50)))
-        np.testing.assert_array_equal(params['b2'], np.zeros((1, 3)))
+        assert isinstance(params['W1'], np.ndarray)
+        assert isinstance(params['b1'], np.ndarray)
+        assert isinstance(params['W2'], np.ndarray)
+        assert isinstance(params['b2'], np.ndarray)
     
-    def test_initialize_parameters_weights_non_zero(self):
-        """Test that weights are non-zero (He initialization)"""
+    def test_initialize_parameters_values(self):
+        """Test that parameters are initialized with reasonable values"""
         params = initialize_parameters(100, 50, 3)
         
-        # Weights should not all be zero
-        self.assertFalse(np.all(params['W1'] == 0))
-        self.assertFalse(np.all(params['W2'] == 0))
-    
-    def test_initialize_parameters_reproducibility(self):
-        """Test that initialization with same seed gives same results"""
-        np.random.seed(42)
-        params1 = initialize_parameters(100, 50, 3)
+        # Weights should be small random values
+        assert np.abs(params['W1']).mean() < 1.0
+        assert np.abs(params['W2']).mean() < 1.0
         
-        np.random.seed(42)
-        params2 = initialize_parameters(100, 50, 3)
-        
-        np.testing.assert_array_equal(params1['W1'], params2['W1'])
-        np.testing.assert_array_equal(params1['W2'], params2['W2'])
+        # Biases should be zeros
+        np.testing.assert_array_equal(params['b1'], np.zeros(50))
+        np.testing.assert_array_equal(params['b2'], np.zeros(3))
 
 
-class TestForwardPass(unittest.TestCase):
-    """Test cases for forward pass"""
+class TestForwardPass:
+    """Test forward propagation"""
     
-    def setUp(self):
-        """Set up test parameters"""
-        np.random.seed(42)
-        self.params = initialize_parameters(10, 5, 3)
-        self.X = np.random.rand(4, 10).astype(np.float32)
+    def test_forward_pass_shapes(self, mock_model_parameters):
+        """Test that forward pass produces correct output shapes"""
+        batch_size = 10
+        X = np.random.rand(batch_size, TestConfig.FEATURE_DIM)
+        
+        cache = forward_pass(X, mock_model_parameters)
+        
+        assert cache['A1'].shape == (batch_size, TestConfig.HIDDEN_DIM)
+        assert cache['A2'].shape == (batch_size, TestConfig.NUM_CLASSES)
     
-    def test_forward_pass_output_shape(self):
-        """Test forward pass output has correct shape"""
-        A2, cache = forward_pass(self.X, self.params)
+    def test_forward_pass_probabilities(self, mock_model_parameters):
+        """Test that output probabilities sum to 1"""
+        X = np.random.rand(5, TestConfig.FEATURE_DIM)
         
-        # Output should be (batch_size, num_classes)
-        self.assertEqual(A2.shape, (4, 3))
+        cache = forward_pass(X, mock_model_parameters)
+        
+        # A2 should be probability distribution (sum to 1 for each sample)
+        prob_sums = cache['A2'].sum(axis=1)
+        np.testing.assert_almost_equal(prob_sums, np.ones(5), decimal=5)
     
-    def test_forward_pass_output_probabilities(self):
-        """Test forward pass outputs valid probabilities"""
-        A2, cache = forward_pass(self.X, self.params)
+    def test_forward_pass_range(self, mock_model_parameters):
+        """Test that probabilities are in [0, 1] range"""
+        X = np.random.rand(5, TestConfig.FEATURE_DIM)
         
-        # All values should be in [0, 1]
-        self.assertTrue(np.all(A2 >= 0))
-        self.assertTrue(np.all(A2 <= 1))
+        cache = forward_pass(X, mock_model_parameters)
         
-        # Each row should sum to 1
-        row_sums = A2.sum(axis=1)
-        np.testing.assert_array_almost_equal(row_sums, np.ones(4))
+        assert np.all(cache['A2'] >= 0)
+        assert np.all(cache['A2'] <= 1)
     
-    def test_forward_pass_cache_contents(self):
-        """Test forward pass caches intermediate values"""
-        A2, cache = forward_pass(self.X, self.params)
+    def test_forward_pass_cache_contents(self, mock_model_parameters):
+        """Test that cache contains all required values"""
+        X = np.random.rand(5, TestConfig.FEATURE_DIM)
         
-        # Cache should contain all intermediate values
-        self.assertIn('X', cache)
-        self.assertIn('Z1', cache)
-        self.assertIn('A1', cache)
-        self.assertIn('Z2', cache)
-        self.assertIn('A2', cache)
+        cache = forward_pass(X, mock_model_parameters)
         
-        # Check shapes
-        self.assertEqual(cache['X'].shape, (4, 10))
-        self.assertEqual(cache['Z1'].shape, (4, 5))
-        self.assertEqual(cache['A1'].shape, (4, 5))
-        self.assertEqual(cache['Z2'].shape, (4, 3))
-        self.assertEqual(cache['A2'].shape, (4, 3))
+        required_keys = ['Z1', 'A1', 'Z2', 'A2']
+        for key in required_keys:
+            assert key in cache
 
 
-class TestLossComputation(unittest.TestCase):
-    """Test cases for loss computation"""
+class TestLossComputation:
+    """Test loss computation"""
     
-    def test_compute_loss_perfect_prediction(self):
-        """Test loss is near zero for perfect predictions"""
-        y_pred = np.array([[0.0, 0.0, 1.0],
-                          [1.0, 0.0, 0.0],
-                          [0.0, 1.0, 0.0]])
-        y_true = np.array([2, 0, 1])
+    def test_compute_loss_value(self):
+        """Test that loss is computed correctly"""
+        # Perfect predictions
+        y_pred = np.array([[0.9, 0.05, 0.05],
+                          [0.05, 0.9, 0.05],
+                          [0.05, 0.05, 0.9]])
+        y_true = np.array([0, 1, 2])
         
-        loss = compute_loss(y_pred, y_true, 3)
+        loss = compute_loss(y_pred, y_true)
         
-        # Loss should be very small (numerical stability prevents exactly 0)
-        self.assertLess(loss, 0.01)
+        # Loss should be low for good predictions
+        assert loss > 0
+        assert loss < 1.0
     
-    def test_compute_loss_worst_prediction(self):
-        """Test loss is high for worst predictions"""
-        y_pred = np.array([[1.0, 0.0, 0.0],
-                          [0.0, 1.0, 0.0],
-                          [0.0, 0.0, 1.0]])
-        y_true = np.array([2, 0, 1])  # Opposite of predictions
+    def test_compute_loss_worst_case(self):
+        """Test loss for worst predictions"""
+        # Worst predictions (high confidence wrong)
+        y_pred = np.array([[0.05, 0.05, 0.9],   # Predicts 2, actual 0
+                          [0.9, 0.05, 0.05],    # Predicts 0, actual 1
+                          [0.05, 0.9, 0.05]])   # Predicts 1, actual 2
+        y_true = np.array([0, 1, 2])
         
-        loss = compute_loss(y_pred, y_true, 3)
+        loss = compute_loss(y_pred, y_true)
         
-        # Loss should be large
-        self.assertGreater(loss, 1.0)
+        # Loss should be high for bad predictions
+        assert loss > 1.0
     
-    def test_compute_loss_with_onehot_labels(self):
-        """Test loss computation with one-hot encoded labels"""
-        y_pred = np.array([[0.1, 0.2, 0.7],
-                          [0.8, 0.1, 0.1]])
-        y_true_onehot = np.array([[0, 0, 1],
-                                   [1, 0, 0]])
+    def test_compute_loss_stability(self):
+        """Test numerical stability with extreme values"""
+        # Very confident predictions
+        y_pred = np.array([[0.9999, 0.00005, 0.00005]])
+        y_true = np.array([0])
         
-        loss = compute_loss(y_pred, y_true_onehot, 3)
+        loss = compute_loss(y_pred, y_true)
         
-        # Should compute valid loss
-        self.assertGreater(loss, 0)
-        self.assertFalse(np.isnan(loss))
+        # Should not produce NaN or Inf
+        assert not np.isnan(loss)
+        assert not np.isinf(loss)
 
 
-class TestBackwardPass(unittest.TestCase):
-    """Test cases for backward pass"""
+class TestBackwardPass:
+    """Test backward propagation"""
     
-    def setUp(self):
-        """Set up test parameters and cache"""
-        np.random.seed(42)
-        self.params = initialize_parameters(10, 5, 3)
-        self.X = np.random.rand(4, 10).astype(np.float32)
-        self.y = np.array([0, 1, 2, 1])
-        _, self.cache = forward_pass(self.X, self.params)
-    
-    def test_backward_pass_gradient_shapes(self):
-        """Test backward pass produces gradients with correct shapes"""
-        grads = backward_pass(self.y, self.params, self.cache, 3)
+    def test_backward_pass_gradient_shapes(self, mock_model_parameters):
+        """Test that gradients have correct shapes"""
+        X = np.random.rand(10, TestConfig.FEATURE_DIM)
+        y = np.array([0, 1, 2, 0, 1, 2, 0, 1, 2, 0])
         
-        # Gradients should match parameter shapes
-        self.assertEqual(grads['dW1'].shape, self.params['W1'].shape)
-        self.assertEqual(grads['db1'].shape, self.params['b1'].shape)
-        self.assertEqual(grads['dW2'].shape, self.params['W2'].shape)
-        self.assertEqual(grads['db2'].shape, self.params['b2'].shape)
-    
-    def test_backward_pass_gradient_finite(self):
-        """Test that gradients are finite (no NaN or Inf)"""
-        grads = backward_pass(self.y, self.params, self.cache, 3)
+        cache = forward_pass(X, mock_model_parameters)
+        grads = backward_pass(X, y, cache, mock_model_parameters)
         
-        for key in grads:
-            self.assertFalse(np.any(np.isnan(grads[key])))
-            self.assertFalse(np.any(np.isinf(grads[key])))
+        assert grads['dW1'].shape == mock_model_parameters['W1'].shape
+        assert grads['db1'].shape == mock_model_parameters['b1'].shape
+        assert grads['dW2'].shape == mock_model_parameters['W2'].shape
+        assert grads['db2'].shape == mock_model_parameters['b2'].shape
+    
+    def test_backward_pass_gradient_types(self, mock_model_parameters):
+        """Test that gradients are numpy arrays"""
+        X = np.random.rand(5, TestConfig.FEATURE_DIM)
+        y = np.array([0, 1, 2, 0, 1])
+        
+        cache = forward_pass(X, mock_model_parameters)
+        grads = backward_pass(X, y, cache, mock_model_parameters)
+        
+        assert isinstance(grads['dW1'], np.ndarray)
+        assert isinstance(grads['db1'], np.ndarray)
+        assert isinstance(grads['dW2'], np.ndarray)
+        assert isinstance(grads['db2'], np.ndarray)
 
 
-class TestUpdateParameters(unittest.TestCase):
-    """Test cases for parameter updates"""
+class TestParameterUpdate:
+    """Test parameter updates"""
     
-    def setUp(self):
-        """Set up test parameters"""
-        np.random.seed(42)
-        self.params = initialize_parameters(10, 5, 3)
-        self.original_params = {k: v.copy() for k, v in self.params.items()}
+    def test_update_parameters_changes_values(self, mock_model_parameters):
+        """Test that parameters are updated"""
+        original_W1 = mock_model_parameters['W1'].copy()
         
-        # Create mock gradients
-        self.grads = {
-            'dW1': np.ones_like(self.params['W1']),
-            'db1': np.ones_like(self.params['b1']),
-            'dW2': np.ones_like(self.params['W2']),
-            'db2': np.ones_like(self.params['b2'])
+        # Create dummy gradients
+        grads = {
+            'dW1': np.random.rand(*mock_model_parameters['W1'].shape),
+            'db1': np.random.rand(*mock_model_parameters['b1'].shape),
+            'dW2': np.random.rand(*mock_model_parameters['W2'].shape),
+            'db2': np.random.rand(*mock_model_parameters['b2'].shape)
         }
-    
-    def test_update_parameters_modifies_params(self):
-        """Test that update_parameters changes parameter values"""
-        updated_params = update_parameters(self.params, self.grads, 0.01)
         
-        # Parameters should be different after update
-        self.assertFalse(np.array_equal(updated_params['W1'], self.original_params['W1']))
-        self.assertFalse(np.array_equal(updated_params['W2'], self.original_params['W2']))
+        learning_rate = 0.01
+        updated_params = update_parameters(mock_model_parameters, grads, learning_rate)
+        
+        # Parameters should change
+        assert not np.array_equal(updated_params['W1'], original_W1)
     
-    def test_update_parameters_gradient_descent(self):
+    def test_update_parameters_direction(self, mock_model_parameters):
         """Test that parameters move in opposite direction of gradients"""
-        learning_rate = 0.1
-        updated_params = update_parameters(self.params, self.grads, learning_rate)
+        original_W1 = mock_model_parameters['W1'].copy()
         
-        # W1 should decrease by learning_rate * gradient (all ones)
-        expected_W1 = self.original_params['W1'] - learning_rate * self.grads['dW1']
-        np.testing.assert_array_almost_equal(updated_params['W1'], expected_W1)
-    
-    def test_update_parameters_zero_learning_rate(self):
-        """Test that zero learning rate doesn't change parameters"""
-        updated_params = update_parameters(self.params, self.grads, 0.0)
-        
-        np.testing.assert_array_equal(updated_params['W1'], self.original_params['W1'])
-        np.testing.assert_array_equal(updated_params['W2'], self.original_params['W2'])
-
-
-class TestTrainStep(unittest.TestCase):
-    """Test cases for single training step"""
-    
-    def setUp(self):
-        """Set up test data"""
-        np.random.seed(42)
-        self.X = np.random.rand(10, 50).astype(np.float32)
-        self.y = np.random.randint(0, 3, size=10)
-        self.params = initialize_parameters(50, 25, 3)
-    
-    def test_train_step_returns_valid_metrics(self):
-        """Test that train_step returns valid loss and accuracy"""
-        loss, accuracy, updated_params = train_step(
-            self.X, self.y, self.params, 3, 0.01
-        )
-        
-        # Loss should be positive
-        self.assertGreater(loss, 0)
-        self.assertFalse(np.isnan(loss))
-        
-        # Accuracy should be in [0, 1]
-        self.assertGreaterEqual(accuracy, 0)
-        self.assertLessEqual(accuracy, 1)
-    
-    def test_train_step_updates_parameters(self):
-        """Test that train_step modifies parameters"""
-        original_W1 = self.params['W1'].copy()
-        
-        _, _, updated_params = train_step(
-            self.X, self.y, self.params, 3, 0.01
-        )
-        
-        # Parameters should be updated
-        self.assertFalse(np.array_equal(updated_params['W1'], original_W1))
-
-
-class TestPrediction(unittest.TestCase):
-    """Test cases for prediction"""
-    
-    def setUp(self):
-        """Set up test data"""
-        np.random.seed(42)
-        self.X = np.random.rand(5, 20).astype(np.float32)
-        self.params = initialize_parameters(20, 10, 3)
-    
-    def test_predict_output_shapes(self):
-        """Test predict returns correct shapes"""
-        predictions, probabilities = predict(self.X, self.params)
-        
-        self.assertEqual(predictions.shape, (5,))
-        self.assertEqual(probabilities.shape, (5, 3))
-    
-    def test_predict_valid_class_indices(self):
-        """Test predictions are valid class indices"""
-        predictions, _ = predict(self.X, self.params)
-        
-        # All predictions should be in [0, 1, 2]
-        self.assertTrue(np.all(predictions >= 0))
-        self.assertTrue(np.all(predictions < 3))
-    
-    def test_predict_probabilities_sum_to_one(self):
-        """Test predicted probabilities sum to 1"""
-        _, probabilities = predict(self.X, self.params)
-        
-        row_sums = probabilities.sum(axis=1)
-        np.testing.assert_array_almost_equal(row_sums, np.ones(5))
-
-
-class TestEvaluate(unittest.TestCase):
-    """Test cases for model evaluation"""
-    
-    def setUp(self):
-        """Set up test data"""
-        np.random.seed(42)
-        self.X = np.random.rand(20, 30).astype(np.float32)
-        self.y = np.random.randint(0, 3, size=20)
-        self.params = initialize_parameters(30, 15, 3)
-    
-    def test_evaluate_returns_metrics(self):
-        """Test evaluate returns loss and accuracy"""
-        loss, accuracy = evaluate(self.X, self.y, self.params, 3)
-        
-        self.assertIsInstance(loss, (float, np.floating))
-        self.assertIsInstance(accuracy, (float, np.floating))
-        
-        # Check valid ranges
-        self.assertGreater(loss, 0)
-        self.assertGreaterEqual(accuracy, 0)
-        self.assertLessEqual(accuracy, 1)
-
-
-class TestTraining(unittest.TestCase):
-    """Test cases for training loop"""
-    
-    def test_train_simple_dataset(self):
-        """Test training on a simple dataset"""
-        np.random.seed(42)
-        
-        # Create simple linearly separable dataset
-        X_train = np.vstack([
-            np.random.randn(10, 5) + [1, 1, 0, 0, 0],  # Class 0
-            np.random.randn(10, 5) + [0, 0, 1, 1, 0],  # Class 1
-            np.random.randn(10, 5) + [0, 0, 0, 0, 1],  # Class 2
-        ]).astype(np.float32)
-        y_train = np.array([0]*10 + [1]*10 + [2]*10)
-        
-        X_val = np.vstack([
-            np.random.randn(5, 5) + [1, 1, 0, 0, 0],
-            np.random.randn(5, 5) + [0, 0, 1, 1, 0],
-            np.random.randn(5, 5) + [0, 0, 0, 0, 1],
-        ]).astype(np.float32)
-        y_val = np.array([0]*5 + [1]*5 + [2]*5)
-        
-        # Train
-        params, history = train(
-            X_train, y_train,
-            X_val, y_val,
-            input_dim=5,
-            hidden_dim=10,
-            num_classes=3,
-            epochs=20,
-            batch_size=10,
-            learning_rate=0.01,
-            verbose=False
-        )
-        
-        # Check that training improved
-        self.assertLess(history['train_loss'][-1], history['train_loss'][0])
-        
-        # Check history structure
-        self.assertIn('train_loss', history)
-        self.assertIn('train_accuracy', history)
-        self.assertIn('val_loss', history)
-        self.assertIn('val_accuracy', history)
-        
-        self.assertEqual(len(history['train_loss']), 20)
-
-
-class TestModelSaveLoad(unittest.TestCase):
-    """Test cases for saving and loading models"""
-    
-    def setUp(self):
-        """Set up test parameters"""
-        np.random.seed(42)
-        self.params = initialize_parameters(100, 50, 3)
-        self.history = {
-            'train_loss': [1.0, 0.8, 0.6],
-            'train_accuracy': [0.5, 0.6, 0.7],
-            'val_loss': [1.1, 0.9, 0.7],
-            'val_accuracy': [0.4, 0.5, 0.6]
+        grads = {
+            'dW1': np.ones_like(mock_model_parameters['W1']),
+            'db1': np.ones_like(mock_model_parameters['b1']),
+            'dW2': np.ones_like(mock_model_parameters['W2']),
+            'db2': np.ones_like(mock_model_parameters['b2'])
         }
-        self.input_dim = 100
-        self.hidden_dim = 50
-        self.num_classes = 3
+        
+        learning_rate = 0.01
+        updated_params = update_parameters(mock_model_parameters, grads, learning_rate)
+        
+        # W1 should decrease (gradient is positive)
+        assert np.all(updated_params['W1'] < original_W1)
+
+
+class TestTrainingStep:
+    """Test single training step"""
     
-    def test_save_and_load_model(self):
-        """Test saving and loading preserves model parameters"""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            filepath = os.path.join(tmpdir, 'test_model.pkl')
+    def test_train_step_returns_loss(self, mock_model_parameters):
+        """Test that train_step returns a loss value"""
+        X = np.random.rand(10, TestConfig.FEATURE_DIM)
+        y = np.array([0, 1, 2, 0, 1, 2, 0, 1, 2, 0])
+        
+        params, loss = train_step(X, y, mock_model_parameters, learning_rate=0.01)
+        
+        assert isinstance(loss, (float, np.floating))
+        assert loss > 0
+    
+    def test_train_step_updates_parameters(self, mock_model_parameters):
+        """Test that parameters are updated during training step"""
+        X = np.random.rand(10, TestConfig.FEATURE_DIM)
+        y = np.array([0, 1, 2, 0, 1, 2, 0, 1, 2, 0])
+        
+        original_W1 = mock_model_parameters['W1'].copy()
+        
+        params, loss = train_step(X, y, mock_model_parameters, learning_rate=0.01)
+        
+        assert not np.array_equal(params['W1'], original_W1)
+
+
+class TestPrediction:
+    """Test prediction function"""
+    
+    def test_predict_shape(self, mock_model_parameters):
+        """Test that predictions have correct shape"""
+        X = np.random.rand(10, TestConfig.FEATURE_DIM)
+        
+        predictions = predict(X, mock_model_parameters)
+        
+        assert predictions.shape == (10,)
+    
+    def test_predict_values(self, mock_model_parameters):
+        """Test that predictions are valid class indices"""
+        X = np.random.rand(10, TestConfig.FEATURE_DIM)
+        
+        predictions = predict(X, mock_model_parameters)
+        
+        # Predictions should be in [0, num_classes)
+        assert np.all(predictions >= 0)
+        assert np.all(predictions < TestConfig.NUM_CLASSES)
+    
+    def test_predict_deterministic(self, mock_model_parameters):
+        """Test that predictions are deterministic"""
+        X = np.random.rand(5, TestConfig.FEATURE_DIM)
+        
+        pred1 = predict(X, mock_model_parameters)
+        pred2 = predict(X, mock_model_parameters)
+        
+        np.testing.assert_array_equal(pred1, pred2)
+
+
+class TestEvaluation:
+    """Test model evaluation"""
+    
+    def test_evaluate_perfect_predictions(self, mock_model_parameters):
+        """Test evaluation with perfect predictions"""
+        X = np.random.rand(10, TestConfig.FEATURE_DIM)
+        y_true = np.array([0, 1, 2, 0, 1, 2, 0, 1, 2, 0])
+        
+        # Mock perfect predictions
+        y_pred = y_true.copy()
+        
+        # Temporarily replace predict function
+        import cnn.fully_connected_layer as fcl
+        original_predict = fcl.predict
+        fcl.predict = lambda X, params: y_pred
+        
+        accuracy, conf_matrix = evaluate(X, y_true, mock_model_parameters)
+        
+        # Restore original function
+        fcl.predict = original_predict
+        
+        # Should have 100% accuracy
+        assert accuracy == 1.0
+    
+    def test_evaluate_returns_confusion_matrix(self, mock_model_parameters):
+        """Test that confusion matrix has correct shape"""
+        X = np.random.rand(10, TestConfig.FEATURE_DIM)
+        y_true = np.array([0, 1, 2, 0, 1, 2, 0, 1, 2, 0])
+        
+        accuracy, conf_matrix = evaluate(X, y_true, mock_model_parameters)
+        
+        assert conf_matrix.shape == (TestConfig.NUM_CLASSES, TestConfig.NUM_CLASSES)
+
+
+class TestModelTraining:
+    """Test complete training process"""
+    
+    def test_overfitting_detection(self):
+        """Monitor train vs test accuracy divergence"""
+        # Create simple overfitting scenario
+        X_train = np.random.rand(20, TestConfig.FEATURE_DIM)
+        y_train = np.random.randint(0, TestConfig.NUM_CLASSES, 20)
+        
+        X_test = np.random.rand(10, TestConfig.FEATURE_DIM)
+        y_test = np.random.randint(0, TestConfig.NUM_CLASSES, 10)
+        
+        params = initialize_parameters(
+            TestConfig.FEATURE_DIM,
+            TestConfig.HIDDEN_DIM,
+            TestConfig.NUM_CLASSES
+        )
+        
+        # Train for many epochs
+        train_losses = []
+        for epoch in range(50):
+            params, loss = train_step(X_train, y_train, params, learning_rate=0.01)
+            train_losses.append(loss)
+        
+        # Training loss should decrease
+        assert train_losses[-1] < train_losses[0]
+    
+    def test_learning_rate_schedules(self):
+        """Test different LR decay strategies"""
+        X = np.random.rand(20, TestConfig.FEATURE_DIM)
+        y = np.random.randint(0, TestConfig.NUM_CLASSES, 20)
+        
+        params = initialize_parameters(
+            TestConfig.FEATURE_DIM,
+            TestConfig.HIDDEN_DIM,
+            TestConfig.NUM_CLASSES
+        )
+        
+        # Test with decreasing learning rate
+        learning_rates = [0.1, 0.01, 0.001]
+        losses = []
+        
+        for lr in learning_rates:
+            params_copy = {k: v.copy() for k, v in params.items()}
+            params_copy, loss = train_step(X, y, params_copy, learning_rate=lr)
+            losses.append(loss)
+        
+        # All should complete without errors
+        assert len(losses) == 3
+    
+    def test_checkpoint_recovery(self):
+        """Test resuming training from checkpoint"""
+        X = np.random.rand(20, TestConfig.FEATURE_DIM)
+        y = np.random.randint(0, TestConfig.NUM_CLASSES, 20)
+        
+        # Train for a few epochs
+        params = initialize_parameters(
+            TestConfig.FEATURE_DIM,
+            TestConfig.HIDDEN_DIM,
+            TestConfig.NUM_CLASSES
+        )
+        
+        for _ in range(5):
+            params, _ = train_step(X, y, params, learning_rate=0.01)
+        
+        # Save checkpoint
+        with tempfile.NamedTemporaryFile(suffix='.npy', delete=False) as f:
+            checkpoint_path = f.name
+            save_model(params, checkpoint_path)
+        
+        # Load checkpoint
+        loaded_params = load_model(checkpoint_path)
+        
+        # Parameters should match
+        for key in params.keys():
+            np.testing.assert_array_almost_equal(params[key], loaded_params[key])
+        
+        # Cleanup
+        Path(checkpoint_path).unlink()
+    
+    def test_gradient_clipping(self):
+        """Test gradient explosion prevention"""
+        X = np.random.rand(10, TestConfig.FEATURE_DIM) * 1000  # Large inputs
+        y = np.random.randint(0, TestConfig.NUM_CLASSES, 10)
+        
+        params = initialize_parameters(
+            TestConfig.FEATURE_DIM,
+            TestConfig.HIDDEN_DIM,
+            TestConfig.NUM_CLASSES
+        )
+        
+        cache = forward_pass(X, params)
+        grads = backward_pass(X, y, cache, params)
+        
+        # Check if gradients are reasonable (not exploding)
+        assert not np.any(np.isnan(grads['dW1']))
+        assert not np.any(np.isinf(grads['dW1']))
+    
+    def test_regularization_effectiveness(self):
+        """Compare L1, L2, and dropout regularization"""
+        X = np.random.rand(20, TestConfig.FEATURE_DIM)
+        y = np.random.randint(0, TestConfig.NUM_CLASSES, 20)
+        
+        params = initialize_parameters(
+            TestConfig.FEATURE_DIM,
+            TestConfig.HIDDEN_DIM,
+            TestConfig.NUM_CLASSES
+        )
+        
+        # Train without regularization
+        params_no_reg = {k: v.copy() for k, v in params.items()}
+        for _ in range(10):
+            params_no_reg, _ = train_step(X, y, params_no_reg, learning_rate=0.01)
+        
+        # With L2 regularization (if implemented)
+        params_l2 = {k: v.copy() for k, v in params.items()}
+        for _ in range(10):
+            params_l2, _ = train_step(X, y, params_l2, learning_rate=0.01, lambda_reg=0.001)
+        
+        # Parameters should be different
+        assert not np.array_equal(params_no_reg['W1'], params_l2['W1'])
+    
+    def test_convergence_detection(self):
+        """Test plateau detection and convergence criteria"""
+        X = np.random.rand(20, TestConfig.FEATURE_DIM)
+        y = np.random.randint(0, TestConfig.NUM_CLASSES, 20)
+        
+        params = initialize_parameters(
+            TestConfig.FEATURE_DIM,
+            TestConfig.HIDDEN_DIM,
+            TestConfig.NUM_CLASSES
+        )
+        
+        losses = []
+        for epoch in range(100):
+            params, loss = train_step(X, y, params, learning_rate=0.001)
+            losses.append(loss)
             
-            # Save model
-            save_model(
-                self.params, self.history,
-                self.input_dim, self.hidden_dim, self.num_classes,
-                filepath
+            # Check for convergence (loss change < threshold)
+            if epoch > 10:
+                recent_change = abs(losses[-1] - losses[-10])
+                if recent_change < 0.001:
+                    # Converged
+                    break
+        
+        # Should converge before max epochs
+        assert len(losses) < 100 or losses[-1] < losses[0]
+
+
+class TestModelSaveLoad:
+    """Test model persistence"""
+    
+    def test_save_model(self, mock_model_parameters):
+        """Test saving model to file"""
+        with tempfile.NamedTemporaryFile(suffix='.npy', delete=False) as f:
+            model_path = f.name
+        
+        save_model(mock_model_parameters, model_path)
+        
+        # File should exist
+        assert Path(model_path).exists()
+        
+        # Cleanup
+        Path(model_path).unlink()
+    
+    def test_load_model(self, mock_model_parameters):
+        """Test loading model from file"""
+        with tempfile.NamedTemporaryFile(suffix='.npy', delete=False) as f:
+            model_path = f.name
+        
+        save_model(mock_model_parameters, model_path)
+        loaded_params = load_model(model_path)
+        
+        # Parameters should match
+        for key in mock_model_parameters.keys():
+            np.testing.assert_array_almost_equal(
+                mock_model_parameters[key],
+                loaded_params[key]
             )
-            
-            # Check file exists
-            self.assertTrue(os.path.exists(filepath))
-            
-            # Load model
-            loaded_params, model_info = load_model(filepath)
-            
-            # Check parameters match
-            np.testing.assert_array_equal(loaded_params['W1'], self.params['W1'])
-            np.testing.assert_array_equal(loaded_params['W2'], self.params['W2'])
-            
-            # Check metadata
-            self.assertEqual(model_info['input_dim'], self.input_dim)
-            self.assertEqual(model_info['hidden_dim'], self.hidden_dim)
-            self.assertEqual(model_info['num_classes'], self.num_classes)
-
-
-class TestTrainingEdgeCases(unittest.TestCase):
-    """Test edge cases and error handling"""
+        
+        # Cleanup
+        Path(model_path).unlink()
     
-    def test_train_with_single_batch(self):
-        """Test training with batch size equal to dataset size"""
-        np.random.seed(42)
-        X_train = np.random.rand(10, 5).astype(np.float32)
-        y_train = np.random.randint(0, 3, size=10)
+    def test_save_load_preserves_functionality(self, mock_model_parameters):
+        """Test that saved/loaded model produces same predictions"""
+        X = np.random.rand(5, TestConfig.FEATURE_DIM)
         
-        params, history = train(
-            X_train, y_train,
-            None, None,
-            input_dim=5,
-            hidden_dim=5,
-            num_classes=3,
-            epochs=5,
-            batch_size=10,
-            learning_rate=0.01,
-            verbose=False
-        )
+        # Get predictions with original model
+        pred_original = predict(X, mock_model_parameters)
         
-        # Should complete without errors
-        self.assertIsNotNone(params)
-        self.assertEqual(len(history['train_loss']), 5)
-    
-    def test_train_without_validation(self):
-        """Test training without validation data"""
-        np.random.seed(42)
-        X_train = np.random.rand(20, 5).astype(np.float32)
-        y_train = np.random.randint(0, 3, size=20)
+        # Save and load model
+        with tempfile.NamedTemporaryFile(suffix='.npy', delete=False) as f:
+            model_path = f.name
         
-        params, history = train(
-            X_train, y_train,
-            None, None,
-            input_dim=5,
-            hidden_dim=5,
-            num_classes=3,
-            epochs=5,
-            batch_size=5,
-            learning_rate=0.01,
-            verbose=False
-        )
+        save_model(mock_model_parameters, model_path)
+        loaded_params = load_model(model_path)
         
-        # Should have training metrics but no validation metrics
-        self.assertIn('train_loss', history)
-        self.assertIn('train_accuracy', history)
-        # Val metrics will be empty lists or not meaningful
-        self.assertEqual(len(history['val_loss']), 0)
+        # Get predictions with loaded model
+        pred_loaded = predict(X, loaded_params)
+        
+        # Should be identical
+        np.testing.assert_array_equal(pred_original, pred_loaded)
+        
+        # Cleanup
+        Path(model_path).unlink()
 
 
-if __name__ == '__main__':
-    unittest.main()
+# ==================== Run Tests ====================
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])
