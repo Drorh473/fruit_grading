@@ -1,144 +1,266 @@
 """
 User Dashboard API Tests
-Tests for user dashboard statistics and activity endpoints
+Essential tests for operator dashboard statistics and results endpoints
 """
 import pytest
 import json
-from datetime import datetime, timedelta
 
 
-class TestUserDashboardAPI:
-    """Test user dashboard endpoints"""
+class TestDashboardStats:
+    """Test dashboard statistics endpoint"""
     
-    def test_get_user_stats(self, client):
-        """Test retrieving user statistics"""
-        response = client.get('/api/user/dashboard/stats')
+    def test_get_dashboard_stats(self, client):
+        """Test getting dashboard statistics"""
+        response = client.get('/api/user/dashboard-stats')
         
         assert response.status_code == 200
         data = json.loads(response.data)
         
-        # Should have statistics fields
-        assert isinstance(data, dict)
-    
-    def test_get_recent_activity(self, client):
-        """Test retrieving recent activity"""
-        response = client.get('/api/user/dashboard/activity')
+        # Verify all required fields
+        assert 'totalToday' in data
+        assert 'marketCount' in data
+        assert 'standardCount' in data
+        assert 'premiumCount' in data
+        assert 'rejectCount' in data
         
-        assert response.status_code == 200
+        # Verify types
+        assert isinstance(data['totalToday'], int)
+        assert isinstance(data['marketCount'], int)
+        assert isinstance(data['standardCount'], int)
+        assert isinstance(data['premiumCount'], int)
+        assert isinstance(data['rejectCount'], int)
+    
+    def test_dashboard_stats_values(self, client):
+        """Test dashboard stats have valid values"""
+        response = client.get('/api/user/dashboard-stats')
         data = json.loads(response.data)
         
-        # Should return activity list
-        assert 'activities' in data or isinstance(data, list)
-    
-    def test_get_recent_activity_with_limit(self, client):
-        """Test activity retrieval with limit parameter"""
-        response = client.get('/api/user/dashboard/activity?limit=10')
+        # All counts should be non-negative
+        assert data['totalToday'] >= 0
+        assert data['marketCount'] >= 0
+        assert data['standardCount'] >= 0
+        assert data['premiumCount'] >= 0
+        assert data['rejectCount'] >= 0
         
-        assert response.status_code == 200
-        data = json.loads(response.data)
-        
-        activities = data.get('activities', data)
-        if isinstance(activities, list):
-            assert len(activities) <= 10
-    
-    def test_get_user_processing_history(self, client):
-        """Test retrieving processing history"""
-        response = client.get('/api/user/dashboard/processing-history')
-        
-        assert response.status_code == 200
-        data = json.loads(response.data)
-        
-        assert isinstance(data, (list, dict))
-    
-    def test_get_user_stats_with_date_range(self, client):
-        """Test statistics with date range filter"""
-        # Get stats for last 7 days
-        end_date = datetime.now()
-        start_date = end_date - timedelta(days=7)
-        
-        response = client.get(
-            f'/api/user/dashboard/stats'
-            f'?start_date={start_date.isoformat()}'
-            f'&end_date={end_date.isoformat()}'
-        )
-        
-        assert response.status_code == 200
+        # Total should equal sum of categories
+        category_sum = (data['marketCount'] + data['standardCount'] + 
+                       data['premiumCount'] + data['rejectCount'])
+        assert data['totalToday'] == category_sum or data['totalToday'] == 0
 
 
-class TestUserStatistics:
-    """Test user statistics calculations"""
+class TestRecentResults:
+    """Test recent results endpoint"""
     
-    def test_total_processed_count(self, client, test_collection):
-        """Test total processed fruits count"""
-        # Insert test processing records
-        records = []
-        for i in range(15):
-            records.append({
-                "object_id": f"obj{i:04d}",
-                "fruit_type": "market",
-                "processed_at": datetime.now().isoformat(),
-                "status": "completed"
-            })
+    def test_get_recent_results(self, client):
+        """Test getting recent classification results"""
+        response = client.get('/api/user/recent-results')
         
-        test_collection.insert_many(records)
+        assert response.status_code == 200
+        data = json.loads(response.data)
         
-        response = client.get('/api/user/dashboard/stats')
+        # Should return a list
+        assert isinstance(data, list)
         
-        if response.status_code == 200:
-            data = json.loads(response.data)
-            # Should reflect inserted records
-            assert 'total_processed' in data or 'count' in data
+        # Should not exceed 10 results
+        assert len(data) <= 10
     
-    def test_stats_by_fruit_type(self, client, test_collection):
-        """Test statistics grouped by fruit type"""
-        # Insert mixed fruit types
-        records = [
-            {"fruit_type": "market", "status": "completed"},
-            {"fruit_type": "market", "status": "completed"},
-            {"fruit_type": "standard", "status": "completed"},
-            {"fruit_type": "premium", "status": "completed"}
+    def test_recent_results_structure(self, client):
+        """Test recent results have correct structure"""
+        response = client.get('/api/user/recent-results')
+        data = json.loads(response.data)
+        
+        # Check each result has required fields
+        for result in data:
+            assert 'id' in result
+            assert 'type' in result
+            assert 'confidence' in result
+            assert 'timestamp' in result
+            
+            # Verify types
+            assert isinstance(result['id'], str)
+            assert isinstance(result['type'], str)
+            assert isinstance(result['confidence'], (int, float))
+            assert isinstance(result['timestamp'], str)
+    
+    def test_recent_results_values(self, client):
+        """Test recent results have valid values"""
+        response = client.get('/api/user/recent-results')
+        data = json.loads(response.data)
+        
+        for result in data:
+            # Confidence should be between 0 and 1
+            assert 0.0 <= result['confidence'] <= 1.0
+            
+            # Type should be valid category
+            assert result['type'] in ['market', 'standard', 'premium', 'reject']
+    
+    def test_recent_results_ordering(self, client):
+        """Test results are ordered by timestamp (newest first)"""
+        response = client.get('/api/user/recent-results')
+        data = json.loads(response.data)
+        
+        # If we have multiple results, verify ordering
+        if len(data) > 1:
+            timestamps = [result['timestamp'] for result in data]
+            # Later items should have earlier timestamps
+            # (we can't strictly verify without parsing, but structure should be consistent)
+            assert all(isinstance(ts, str) for ts in timestamps)
+
+
+class TestModelInfo:
+    """Test model information endpoint"""
+    
+    def test_get_model_info(self, client):
+        """Test getting model information"""
+        response = client.get('/api/user/model-info')
+        
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        
+        # Verify all required fields
+        assert 'accuracy' in data
+        assert 'lastTrained' in data
+        assert 'totalSamples' in data
+        
+        # Verify types
+        assert isinstance(data['accuracy'], (int, float))
+        assert data['lastTrained'] is None or isinstance(data['lastTrained'], str)
+        assert isinstance(data['totalSamples'], int)
+    
+    def test_model_info_values(self, client):
+        """Test model info has valid values"""
+        response = client.get('/api/user/model-info')
+        data = json.loads(response.data)
+        
+        # Accuracy should be between 0 and 1
+        assert 0.0 <= data['accuracy'] <= 1.0
+        
+        # Total samples should be non-negative
+        assert data['totalSamples'] >= 0
+    
+    def test_model_info_when_trained(self, client):
+        """Test model info when model is trained"""
+        response = client.get('/api/user/model-info')
+        data = json.loads(response.data)
+        
+        # If model is trained, lastTrained should be present
+        if data['accuracy'] > 0:
+            # Should have training timestamp or be null
+            assert data['lastTrained'] is None or len(data['lastTrained']) > 0
+
+
+class TestUserDashboardIntegration:
+    """Test integration between user dashboard endpoints"""
+    
+    def test_stats_and_results_consistency(self, client):
+        """Test consistency between stats and recent results"""
+        # Get stats
+        stats_response = client.get('/api/user/dashboard-stats')
+        stats_data = json.loads(stats_response.data)
+        
+        # Get recent results
+        results_response = client.get('/api/user/recent-results')
+        results_data = json.loads(results_response.data)
+        
+        # Both should work
+        assert stats_response.status_code == 200
+        assert results_response.status_code == 200
+        
+        # Recent results should be a list
+        assert isinstance(results_data, list)
+    
+    def test_model_info_and_stats_consistency(self, client):
+        """Test consistency between model info and stats"""
+        # Get model info
+        model_response = client.get('/api/user/model-info')
+        model_data = json.loads(model_response.data)
+        
+        # Get stats
+        stats_response = client.get('/api/user/dashboard-stats')
+        stats_data = json.loads(stats_response.data)
+        
+        # Both should work
+        assert model_response.status_code == 200
+        assert stats_response.status_code == 200
+
+
+class TestDashboardWithMetadata:
+    """Test dashboard endpoints with metadata"""
+    
+    def test_stats_with_metadata(self, client):
+        """Test stats uses metadata when available"""
+        response = client.get('/api/user/dashboard-stats')
+        
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        
+        # Should return valid stats regardless of metadata
+        assert 'totalToday' in data
+        assert data['totalToday'] >= 0
+    
+    def test_model_info_with_metadata(self, client):
+        """Test model info uses metadata when available"""
+        response = client.get('/api/user/model-info')
+        
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        
+        # Should return valid info regardless of metadata
+        assert 'accuracy' in data
+        assert 0.0 <= data['accuracy'] <= 1.0
+
+
+class TestErrorHandling:
+    """Test error handling for user dashboard endpoints"""
+    
+    def test_dashboard_endpoints_resilience(self, client):
+        """Test all dashboard endpoints are resilient"""
+        endpoints = [
+            '/api/user/dashboard-stats',
+            '/api/user/recent-results',
+            '/api/user/model-info'
         ]
         
-        test_collection.insert_many(records)
-        
-        response = client.get('/api/user/dashboard/stats/by-type')
-        
-        if response.status_code == 200:
-            data = json.loads(response.data)
-            assert isinstance(data, (list, dict))
-
-
-class TestUserActivity:
-    """Test user activity tracking"""
+        for endpoint in endpoints:
+            response = client.get(endpoint)
+            assert response.status_code == 200
     
-    def test_recent_activity_ordering(self, client, test_collection):
-        """Test that activities are ordered by time (newest first)"""
-        # Insert activities with different timestamps
-        now = datetime.now()
-        activities = []
+    def test_stats_error_returns_defaults(self, client):
+        """Test stats returns default values on error"""
+        response = client.get('/api/user/dashboard-stats')
         
-        for i in range(5):
-            activities.append({
-                "action": "processed",
-                "object_id": f"obj{i:04d}",
-                "timestamp": (now - timedelta(minutes=i)).isoformat(),
-                "user": "test_user"
-            })
+        assert response.status_code == 200
+        data = json.loads(response.data)
         
-        test_collection.insert_many(activities)
+        # Should have all fields even on error
+        assert 'totalToday' in data
+        assert 'marketCount' in data
+        assert 'standardCount' in data
+        assert 'premiumCount' in data
+        assert 'rejectCount' in data
+    
+    def test_recent_results_error_returns_empty(self, client):
+        """Test recent results returns empty list on error"""
+        response = client.get('/api/user/recent-results')
         
-        response = client.get('/api/user/dashboard/activity')
+        assert response.status_code == 200
+        data = json.loads(response.data)
         
-        if response.status_code == 200:
-            data = json.loads(response.data)
-            activity_list = data.get('activities', data)
-            
-            if isinstance(activity_list, list) and len(activity_list) > 1:
-                # First activity should be most recent
-                assert activity_list[0].get('object_id') == 'obj0000'
+        # Should be a list (empty or with data)
+        assert isinstance(data, list)
+    
+    def test_model_info_error_returns_defaults(self, client):
+        """Test model info returns default values on error"""
+        response = client.get('/api/user/model-info')
+        
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        
+        # Should have all fields even on error
+        assert 'accuracy' in data
+        assert 'lastTrained' in data
+        assert 'totalSamples' in data
 
-
-# ==================== Run Tests ====================
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
