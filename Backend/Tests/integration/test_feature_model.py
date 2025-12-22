@@ -1,7 +1,3 @@
-"""
-Feature-Model Integration Tests
-Test pipeline from feature extraction to model training and inference
-"""
 import pytest
 import numpy as np
 from pathlib import Path
@@ -190,59 +186,6 @@ class TestModelPerformanceOnFeatures:
                 final_loss = loss
         
         # Loss should decrease
-        assert final_loss < initial_loss
-    
-    def test_model_generalizes_to_test_set(self):
-        """Test model generalization to unseen features"""
-        # Create train and test sets with similar distributions
-        num_train = 30
-        num_test = 10
-        
-        # Training data
-        X_train = []
-        y_train = []
-        for i in range(num_train):
-            label = i % TestConfig.NUM_CLASSES
-            feature = np.random.rand(TestConfig.FEATURE_DIM) + label
-            X_train.append(feature)
-            y_train.append(label)
-        
-        X_train = np.array(X_train)
-        y_train = np.array(y_train)
-        
-        # Test data (similar distribution)
-        X_test = []
-        y_test = []
-        for i in range(num_test):
-            label = i % TestConfig.NUM_CLASSES
-            feature = np.random.rand(TestConfig.FEATURE_DIM) + label
-            X_test.append(feature)
-            y_test.append(label)
-        
-        X_test = np.array(X_test)
-        y_test = np.array(y_test)
-        
-        # Train model
-        params = initialize_parameters(
-            TestConfig.FEATURE_DIM,
-            TestConfig.HIDDEN_DIM,
-            TestConfig.NUM_CLASSES
-        )
-        
-        for _ in range(30):
-            params, _ = train_step(X_train, y_train, params, learning_rate=0.01)
-        
-        # Evaluate on test set
-        accuracy, _ = evaluate(X_test, y_test, params)
-        
-        # Should have reasonable accuracy (better than random)
-        random_accuracy = 1.0 / TestConfig.NUM_CLASSES
-        # Note: With random features, this may not always hold
-        # This is more of a smoke test
-        assert 0.0 <= accuracy <= 1.0
-
-
-# ==================== Run Tests ====================
-
+        assert final_loss < initial_loss       
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

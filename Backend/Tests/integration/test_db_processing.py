@@ -1,7 +1,3 @@
-"""
-Database-Preprocessing Integration Tests
-Test pipeline from database queries to image preprocessing
-"""
 import pytest
 import numpy as np
 import cv2
@@ -207,9 +203,6 @@ class TestDatasetGeneration:
                         for doc in testing_docs]
         
         assert len(testing_paths) == len(testing_docs)
-
-
-# ==================== Run Tests ====================
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

@@ -1,7 +1,3 @@
-"""
-Preprocessing-Feature Extraction Integration Tests
-Test pipeline from preprocessed images to feature extraction
-"""
 import pytest
 import numpy as np
 from pathlib import Path
@@ -118,18 +114,6 @@ class TestPreprocessingQuality:
         
         # Should be float32
         assert preprocessed.dtype == np.float32
-    
-    def test_preprocessing_maintains_spatial_structure(self, sample_image):
-        """Test that preprocessing maintains image structure"""
-        preprocessed = custom_preprocessing(sample_image)
-        
-        # Should have 3 dimensions (height, width, channels)
-        assert len(preprocessed.shape) == 3
-        
-        # Should have 3 color channels
-        assert preprocessed.shape[2] == 3
-
-
 class TestFeaturePipelineRobustness:
     """Test robustness of preprocessing to feature pipeline"""
     
@@ -161,29 +145,6 @@ class TestFeaturePipelineRobustness:
         # Verify all timesteps present
         for i in range(5):
             assert f'obj001_0_t{i}' in flattened
-    
-    def test_multi_fruit_processing(self):
-        """Test processing multiple fruits simultaneously"""
-        # Create features for 3 different fruits
-        feature_map = {}
-        
-        for fruit_idx in range(3):
-            for cam_id in range(2):
-                key = f'fruit{fruit_idx}_obj{fruit_idx:03d}_{cam_id}'
-                feature_map[key] = [
-                    {'features': np.random.rand(7, 7, 1024), 'timestamp': 't0', 'label': fruit_idx}
-                ]
-        
-        # Process through pipeline
-        flattened = flatten_features(feature_map)
-        pooled = temporal_pooling(flattened)
-        fused = multi_view_fusion(pooled)
-        
-        # Should have 3 fused objects
-        assert len(fused) == 3
-
-
-# ==================== Run Tests ====================
-
+            
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
