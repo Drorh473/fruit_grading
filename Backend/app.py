@@ -1,29 +1,60 @@
 """
-Main Flask Application Entry Point
-Fruit Grading System Backend
+Flask App with Integrated Testing
+Uses comprehensive pre-pipeline test validation
 """
 from flask import Flask, g
 from flask_cors import CORS
 import pymongo
 import os
 import sys
+import argparse
 from pathlib import Path
 from dotenv import load_dotenv
 
-# Load environment
 env_path = Path('.') / '.env'
 load_dotenv(dotenv_path=env_path)
 
-# Add project root to path for imports
 PROJECT_ROOT = Path(__file__).parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+from Tests.run_tests import TestOrchestrator
+
+
+def run_tests(mode='full', verbose=True):
+    """
+    Run test suite before server startup
+    
+    Args:
+        mode: 'full', 'critical', or phase number (1-5)
+        verbose: Output verbosity
+    
+    Returns:
+        bool: True if tests passed
+    """
+    orchestrator = TestOrchestrator()
+    
+    if mode == 'critical':
+        print("\nRunning critical tests only...")
+        return orchestrator.run_critical_only(verbose=verbose)
+    elif mode == 'full':
+        print("\nRunning full test suite...")
+        return orchestrator.run_all(verbose=verbose, stop_on_failure=True)
+    elif isinstance(mode, int) and 1 <= mode <= 5:
+        print(f"\nRunning Phase {mode} only...")
+        success = orchestrator.run_phase(mode, verbose=verbose)
+        orchestrator._print_summary(success, mode=f"phase-{mode}")
+        return success
+    else:
+        print(f"Invalid mode: {mode}")
+        return False
+
+
 def create_app():
-    """Application factory pattern"""
+    """Create Flask app"""
     app = Flask(__name__)
     
-    # Configuration
+    # Config
     app.config['MONGO_CONNECTION_STRING'] = os.getenv('MONGO_CONNECTION_STRING', 'mongodb://localhost:27017/')
     app.config['DB_NAME'] = os.getenv('DB_NAME', 'fruit_grading')
     app.config['STORED_DATASET_PATH'] = os.getenv('STORED_DATASET_PATH')
@@ -33,22 +64,21 @@ def create_app():
     app.config['CAMERA_FPS'] = int(os.getenv('CAMERA_FPS', 30))
     app.config['BATCH_SIZE'] = int(os.getenv('BATCH_SIZE', 128))
     
-    # Enable CORS
     CORS(app)
     
-    # Initialize database connection
+    # MongoDB
     try:
         app.mongo_client = pymongo.MongoClient(
             app.config['MONGO_CONNECTION_STRING'],
             serverSelectionTimeoutMS=5000
         )
         app.mongo_client.server_info()
-        print(f" Connected to MongoDB: {app.config['DB_NAME']}")
+        print(f"MongoDB connected: {app.config['DB_NAME']}")
     except Exception as e:
-        print(f" Failed to connect to MongoDB: {e}")
+        print(f"MongoDB failed: {e}")
         app.mongo_client = None
     
-    # Register blueprints
+    # Register routes
     from routes.user_dashboard import user_dashboard_bp
     from routes.admin_dashboard import admin_dashboard_bp
     from routes.camera_monitor import cameras_bp
@@ -56,7 +86,6 @@ def create_app():
     from routes.results import results_bp
     from routes.settings import settings_bp
     from routes.add_fruit import add_fruit_bp
-    from routes.health import health_bp
     
     app.register_blueprint(user_dashboard_bp, url_prefix='/api/user')
     app.register_blueprint(admin_dashboard_bp, url_prefix='/api/admin')
@@ -65,15 +94,60 @@ def create_app():
     app.register_blueprint(results_bp, url_prefix='/api/results')
     app.register_blueprint(settings_bp, url_prefix='/api/settings')
     app.register_blueprint(add_fruit_bp, url_prefix='/api/fruit')
-    app.register_blueprint(health_bp, url_prefix='/api')
     
     @app.teardown_appcontext
     def close_db(error):
-        """Close database connection"""
         g.pop('db', None)
     
     return app
 
-if __name__ == '__main__':
+
+def main():
+    """Main entry point"""
+    parser = argparse.ArgumentParser(description='Start Flask Backend with Testing')
+    parser.add_argument('--skip-tests', action='store_true', help='Skip all tests')
+    parser.add_argument('--critical-test', action='store_true', help='Run critical tests only')
+    parser.add_argument('--continue-on-test-failure', action='store_true', help='Start even if tests fail')
+    parser.add_argument('--port', type=int, default=5000, help='Port (default: 5000)')
+    parser.add_argument('--host', default='0.0.0.0', help='Host (default: 0.0.0.0)')
+    parser.add_argument('--no-debug', action='store_true', help='Disable debug mode')
+    
+    args = parser.parse_args()
+    
+    # Run tests
+    if not args.skip_tests:
+        print("\n" + "="*70)
+        print("PRE-STARTUP VALIDATION")
+        print("="*70)
+        
+        if args.critical_test:
+            test_mode = 'critical'
+        else:
+            test_mode = 'full'
+        
+        tests_passed = run_tests(mode=test_mode, verbose=True)
+        
+        if not tests_passed:
+            print("\nTests failed!")
+            if not args.continue_on_test_failure:
+                print("Server will NOT start")
+                sys.exit(1)
+        else:
+            print("\nAll tests passed")
+    
+    # Start server
+    print("\n" + "="*70)
+    print("STARTING FLASK SERVER")
+    print("="*70)
+    
     app = create_app()
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    
+    print(f"\nServer: {args.host}:{args.port}")
+    print(f"Debug: {not args.no_debug}")
+    print(f"URL: http://localhost:{args.port}\n")
+    
+    app.run(host=args.host, port=args.port, debug=not args.no_debug)
+
+
+if __name__ == '__main__':
+    main()

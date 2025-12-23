@@ -154,8 +154,8 @@ def flatten_features(feature_map):
             flattened[timestep_key] = {
                 'features': flat_features,
                 'group_key': key,
-                'label': item['label'],  # Preserve label
-                'fruit_type': item['fruit_type']  # Preserve fruit_type
+                'label': item.get('label', 0),
+                'fruit_type': item.get('fruit_type', 'unknown')
             }
     
     return flattened
@@ -175,8 +175,8 @@ def temporal_pooling(flattened_features):
         if group_key not in grouped:
             grouped[group_key] = {
                 'features': [],
-                'label': data['label'],  # All timesteps have same label
-                'fruit_type': data['fruit_type']
+                'label': data.get('label', 0),
+                'fruit_type': data.get('fruit_type', 'unknown') 
             }
         grouped[group_key]['features'].append(data['features'])
     
@@ -219,8 +219,8 @@ def multi_view_fusion(pooled_vectors, target_views=4):
         if base_key not in grouped:
             grouped[base_key] = {
                 'features': [],
-                'label': data['label'],
-                'fruit_type': data['fruit_type']
+                'label': data.get('label', 0),
+                'fruit_type': data.get('fruit_type', 'unknown') 
             }
         grouped[base_key]['features'].append(data['features'])
     

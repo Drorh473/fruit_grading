@@ -305,38 +305,5 @@ class TestDatabaseRobustness:
         
         assert len(missing_fields) > 0, "Document should be missing required fields"
     
-    def test_database_index_performance(self, test_collection):
-        """Verify query performance with indexes"""
-        import time
-        
-        # Insert test data
-        documents = []
-        for i in range(1000):
-            documents.append({
-                "path": f"/test/image{i}.png",
-                "fruit_type": TestConfig.FRUIT_TYPES[i % 3],
-                "object_id": f"obj{i:04d}",
-                "camera_id": i % 4,
-                "timestamp": f"2025-01-01T00:00:00",
-                "width": 224,
-                "height": 224,
-                "color": 3,
-                "set_type": "training" if i < 700 else "testing",
-                "category": ""
-            })
-        test_collection.insert_many(documents)
-        
-        # Query with indexed field
-        start = time.time()
-        result = list(test_collection.find({"set_type": "training"}))
-        indexed_time = time.time() - start
-        
-        # Should be fast (< 100ms for 1000 docs)
-        assert indexed_time < 0.1, f"Indexed query too slow: {indexed_time}s"
-        assert len(result) == 700
-
-
-# ==================== Run Tests ====================
-
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

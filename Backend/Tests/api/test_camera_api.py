@@ -1,6 +1,7 @@
 import pytest
 import json
-
+from pathlib import Path
+import sys
 
 class TestCameraStatus:
     """Test camera status endpoint"""

@@ -86,9 +86,8 @@ def custom_preprocessing(image, save_path=None):
     
     return enhanced
 
-def process_image(args):
+def process_image(image_path, output_dir, metadata):
     """Process a single image and save the preprocessed version"""
-    image_path, output_dir, metadata = args
     try:
         # Parse path components
         set_type = metadata.get('set_type')

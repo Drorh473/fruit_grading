@@ -39,6 +39,10 @@ def get_camera_statuses():
 def get_camera_details(camera_id):
     """Get specific camera details"""
     try:
+        num_cameras = current_app.config.get('NUM_OF_CAMERAS', 4)
+        if camera_id < 0 or camera_id >= num_cameras:
+            return jsonify({'error': 'Camera not found'}), 404
+        
         angles = ['Front View', 'Right View', 'Back View', 'Left View']
         fps = current_app.config.get('CAMERA_FPS', 30)
         

@@ -4,7 +4,8 @@ Essential tests for operator dashboard statistics and results endpoints
 """
 import pytest
 import json
-
+from pathlib import Path
+import sys
 
 class TestDashboardStats:
     """Test dashboard statistics endpoint"""
@@ -41,11 +42,19 @@ class TestDashboardStats:
         assert data['standardCount'] >= 0
         assert data['premiumCount'] >= 0
         assert data['rejectCount'] >= 0
+    
+    def test_dashboard_stats_sum_consistency(self, client):
+        """Test that category counts sum correctly"""
+        response = client.get('/api/user/dashboard-stats')
+        data = json.loads(response.data)
         
-        # Total should equal sum of categories
+        # Total should equal sum of categories (if data exists)
         category_sum = (data['marketCount'] + data['standardCount'] + 
                        data['premiumCount'] + data['rejectCount'])
-        assert data['totalToday'] == category_sum or data['totalToday'] == 0
+        
+        # Either total matches sum, or everything is zero
+        assert (data['totalToday'] == category_sum or 
+                (data['totalToday'] == 0 and category_sum == 0))
 
 
 class TestRecentResults:
@@ -102,9 +111,20 @@ class TestRecentResults:
         # If we have multiple results, verify ordering
         if len(data) > 1:
             timestamps = [result['timestamp'] for result in data]
-            # Later items should have earlier timestamps
-            # (we can't strictly verify without parsing, but structure should be consistent)
+            # All timestamps should be strings
             assert all(isinstance(ts, str) for ts in timestamps)
+            
+            # Timestamps should be in valid format
+            for ts in timestamps:
+                assert len(ts) > 0
+    
+    def test_recent_results_limit(self, client):
+        """Test that results are limited to 10"""
+        response = client.get('/api/user/recent-results')
+        data = json.loads(response.data)
+        
+        # Should never exceed 10 items
+        assert len(data) <= 10
 
 
 class TestModelInfo:
@@ -143,10 +163,20 @@ class TestModelInfo:
         response = client.get('/api/user/model-info')
         data = json.loads(response.data)
         
-        # If model is trained, lastTrained should be present
+        # If model is trained (accuracy > 0), check consistency
         if data['accuracy'] > 0:
             # Should have training timestamp or be null
             assert data['lastTrained'] is None or len(data['lastTrained']) > 0
+    
+    def test_model_info_when_not_trained(self, client):
+        """Test model info when model is not trained"""
+        response = client.get('/api/user/model-info')
+        data = json.loads(response.data)
+        
+        # If not trained (accuracy == 0), verify defaults
+        if data['accuracy'] == 0.0:
+            assert data['totalSamples'] == 0
+            assert data['lastTrained'] is None
 
 
 class TestUserDashboardIntegration:
@@ -168,6 +198,11 @@ class TestUserDashboardIntegration:
         
         # Recent results should be a list
         assert isinstance(results_data, list)
+        
+        # If we have results, stats should have some counts
+        if len(results_data) > 0:
+            # At least totalToday should be >= 0
+            assert stats_data['totalToday'] >= 0
     
     def test_model_info_and_stats_consistency(self, client):
         """Test consistency between model info and stats"""
@@ -182,6 +217,22 @@ class TestUserDashboardIntegration:
         # Both should work
         assert model_response.status_code == 200
         assert stats_response.status_code == 200
+        
+        # Basic consistency checks
+        assert isinstance(model_data['accuracy'], (int, float))
+        assert isinstance(stats_data['totalToday'], int)
+    
+    def test_all_endpoints_accessible(self, client):
+        """Test all user dashboard endpoints are accessible"""
+        endpoints = [
+            '/api/user/dashboard-stats',
+            '/api/user/recent-results',
+            '/api/user/model-info'
+        ]
+        
+        for endpoint in endpoints:
+            response = client.get(endpoint)
+            assert response.status_code == 200
 
 
 class TestDashboardWithMetadata:
@@ -208,6 +259,17 @@ class TestDashboardWithMetadata:
         # Should return valid info regardless of metadata
         assert 'accuracy' in data
         assert 0.0 <= data['accuracy'] <= 1.0
+    
+    def test_fallback_to_database(self, client):
+        """Test endpoints fallback to database when metadata unavailable"""
+        # All endpoints should work even without metadata
+        stats_response = client.get('/api/user/dashboard-stats')
+        results_response = client.get('/api/user/recent-results')
+        model_response = client.get('/api/user/model-info')
+        
+        assert stats_response.status_code == 200
+        assert results_response.status_code == 200
+        assert model_response.status_code == 200
 
 
 class TestErrorHandling:
@@ -238,6 +300,10 @@ class TestErrorHandling:
         assert 'standardCount' in data
         assert 'premiumCount' in data
         assert 'rejectCount' in data
+        
+        # All should be integers
+        assert isinstance(data['totalToday'], int)
+        assert isinstance(data['marketCount'], int)
     
     def test_recent_results_error_returns_empty(self, client):
         """Test recent results returns empty list on error"""
@@ -260,6 +326,123 @@ class TestErrorHandling:
         assert 'accuracy' in data
         assert 'lastTrained' in data
         assert 'totalSamples' in data
+        
+        # Accuracy should be in valid range
+        assert 0.0 <= data['accuracy'] <= 1.0
+    
+    def test_invalid_http_methods(self, client):
+        """Test endpoints reject invalid HTTP methods"""
+        endpoints = [
+            '/api/user/dashboard-stats',
+            '/api/user/recent-results',
+            '/api/user/model-info'
+        ]
+        
+        for endpoint in endpoints:
+            # Should not accept POST
+            response = client.post(endpoint)
+            assert response.status_code in [405, 404]
+
+
+class TestResponseFormats:
+    """Test response formats are correct"""
+    
+    def test_all_endpoints_return_json(self, client):
+        """Test all endpoints return valid JSON"""
+        endpoints = [
+            '/api/user/dashboard-stats',
+            '/api/user/recent-results',
+            '/api/user/model-info'
+        ]
+        
+        for endpoint in endpoints:
+            response = client.get(endpoint)
+            assert 'application/json' in response.content_type
+            
+            # Should be valid JSON
+            try:
+                json.loads(response.data)
+            except json.JSONDecodeError:
+                pytest.fail(f"Invalid JSON from {endpoint}")
+    
+    def test_stats_returns_object(self, client):
+        """Test stats endpoint returns object not array"""
+        response = client.get('/api/user/dashboard-stats')
+        data = json.loads(response.data)
+        
+        # Should be dict/object, not list
+        assert isinstance(data, dict)
+        assert not isinstance(data, list)
+    
+    def test_results_returns_array(self, client):
+        """Test results endpoint returns array not object"""
+        response = client.get('/api/user/recent-results')
+        data = json.loads(response.data)
+        
+        # Should be list/array, not dict
+        assert isinstance(data, list)
+        assert not isinstance(data, dict)
+
+
+class TestPerformance:
+    """Test performance characteristics"""
+    
+    def test_dashboard_stats_performance(self, client):
+        """Test dashboard stats endpoint responds quickly"""
+        import time
+        
+        start = time.time()
+        response = client.get('/api/user/dashboard-stats')
+        elapsed = time.time() - start
+        
+        assert response.status_code == 200
+        assert elapsed < 2.0  # Should be reasonably fast
+    
+    def test_recent_results_performance(self, client):
+        """Test recent results endpoint responds quickly"""
+        import time
+        
+        start = time.time()
+        response = client.get('/api/user/recent-results')
+        elapsed = time.time() - start
+        
+        assert response.status_code == 200
+        assert elapsed < 2.0
+
+
+class TestEdgeCases:
+    """Test edge cases"""
+    
+    def test_concurrent_requests(self, client):
+        """Test handling concurrent requests"""
+        import threading
+        
+        results = []
+        
+        def get_stats():
+            response = client.get('/api/user/dashboard-stats')
+            results.append(response.status_code)
+        
+        # Create multiple threads
+        threads = [threading.Thread(target=get_stats) for _ in range(5)]
+        
+        # Start all threads
+        for t in threads:
+            t.start()
+        
+        # Wait for completion
+        for t in threads:
+            t.join()
+        
+        # All should succeed
+        assert len(results) == 5
+        assert all(status == 200 for status in results)
+    
+    def test_multiple_rapid_requests(self, client):
+        """Test multiple rapid requests to same endpoint"""
+        for _ in range(10):
+            response = client.get('/api/user/dashboard-stats')
+            assert response.status_code == 200
 
 
 if __name__ == "__main__":

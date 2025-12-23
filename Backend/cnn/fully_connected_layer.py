@@ -66,7 +66,7 @@ def forward_pass(X, params):
 
 
 # Loss Computation
-def compute_loss(y_pred, y_true, num_classes, params=None, lambda_reg=0.0):
+def compute_loss(y_pred, y_true, num_classes = 3, params=None, lambda_reg=0.0):
     """
     Compute cross-entropy loss with optional L2 regularization
     
@@ -104,7 +104,7 @@ def compute_loss(y_pred, y_true, num_classes, params=None, lambda_reg=0.0):
 
 
 # Backward Pass
-def backward_pass(y_true, params, cache, num_classes, lambda_reg=0.0):
+def backward_pass(y_true, params, cache, num_classes = 3, lambda_reg=0.0):
     """
     Backward pass (backpropagation) with optional L2 regularization
     
@@ -179,7 +179,7 @@ def update_parameters(params, grads, learning_rate):
 
 
 # Training Step
-def train_step(X, y, params, num_classes, learning_rate, lambda_reg=0.0):
+def train_step(X, y, params,learning_rate, num_classes = 3, lambda_reg=0.0):
     """
     Single training step (forward + backward + update) with L2 regularization
     
@@ -235,7 +235,7 @@ def predict(X, params):
 
 
 # Evaluation
-def evaluate(X, y, params, num_classes, lambda_reg=0.0):
+def evaluate(X, y, params, num_classes = 3, lambda_reg=0.0):
     """
     Evaluate the model with optional L2 regularization
     
@@ -259,7 +259,7 @@ def evaluate(X, y, params, num_classes, lambda_reg=0.0):
 
 
 # Training Loop (works with pre-batched data from generator)
-def train_from_generator(train_generator, val_generator, input_dim, hidden_dim, num_classes,
+def train_from_generator(train_generator, val_generator, input_dim = None , hidden_dim = None, num_classes = 3,
                         epochs=100, learning_rate=0.001, verbose=True):
     """
     Train the neural network using a batch generator

@@ -13,12 +13,23 @@ results_bp = Blueprint('results', __name__)
 @results_bp.route('/list', methods=['GET'])
 def get_results_list():
     """Get results list with filtering and pagination"""
+
     try:
+        try:
+            limit = int(request.args.get('limit', 100))
+            offset = int(request.args.get('offset', 0))
+        except (ValueError, TypeError):
+            return jsonify({
+                'error': 'Invalid limit or offset parameter'
+            }), 400
+        if limit < 0 or offset < 0:
+            return jsonify({
+                'error': 'Limit and offset must be non-negative'
+            }), 400
         collection = get_collection('images')
         
         # Get query parameters
-        limit = int(request.args.get('limit', 100))
-        offset = int(request.args.get('offset', 0))
+
         search = request.args.get('search', '')
         fruit_type = request.args.get('type', 'all')
         batch = request.args.get('batch', 'all')
@@ -74,7 +85,12 @@ def get_results_list():
         
     except Exception as e:
         print(f"Error in get_results_list: {e}")
-        return jsonify({'results': [], 'total': 0, 'limit': limit, 'offset': 0}), 200
+        return jsonify({
+            'results': [], 
+            'total': 0, 
+            'limit': 100, 
+            'offset': 0
+        }), 500
 
 
 @results_bp.route('/kpis', methods=['GET'])
@@ -382,37 +398,52 @@ def get_all_results():
     return get_results_list()
 
 
-@results_bp.route('/<object_id>', methods=['GET'])
+@results_bp.route('/details/<object_id>', methods=['GET'])
 def get_result_details(object_id):
-    """Get detailed results for a specific object"""
+    """Get detailed information for specific result"""
     try:
         collection = get_collection('images')
+        
+        # Find all images for this object
         images = list(collection.find({'object_id': object_id}))
         
+        # If no images found, return 404
         if not images:
-            return jsonify({'error': 'Object not found'}), 404
+            return jsonify({'error': 'Result not found'}), 404
         
+        # Get first image for basic info
+        first_image = images[0]
+        
+        # Organize images by camera
+        images_by_camera = {}
+        for img in images:
+            camera_id = img.get('camera_id', 0)
+            images_by_camera[camera_id] = {
+                'camera_id': camera_id,
+                'angle': img.get('camera_angle', f'Camera {camera_id}'),
+                'image_path': img.get('file_path', ''),
+                'timestamp': str(img.get('timestamp', ''))
+            }
+        
+        # Build response
         result = {
-            'objectId': object_id,
-            'fruitType': images[0].get('fruit_type'),
-            'timestamp': images[0]['timestamp'].isoformat() if hasattr(images[0]['timestamp'], 'isoformat') else str(images[0]['timestamp']),
-            'imageCount': len(images),
-            'images': [
-                {
-                    'cameraId': img.get('camera_id'),
-                    'angle': img.get('angle'),
-                    'frameNumber': img.get('frame_number'),
-                    'path': img.get('image_path')
-                }
-                for img in images
-            ]
+            'object_id': object_id,
+            'fruit_type': first_image.get('fruit_type', 'unknown'),
+            'confidence': first_image.get('confidence', 0.0),
+            'timestamp': str(first_image.get('timestamp', '')),
+            'batch_id': first_image.get('batch_id', ''),
+            'image_count': len(images),
+            'images': list(images_by_camera.values())
         }
         
         return jsonify(result), 200
         
     except Exception as e:
         print(f"Error in get_result_details: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
+
 
 
 @results_bp.route('/stats', methods=['GET'])
@@ -431,23 +462,35 @@ def get_results_stats():
         return jsonify({
             'totalObjects': unique_objects,
             'totalImages': total_images,
+            # ADD THESE FIELDS:
             'marketCount': next((r['count'] for r in type_counts if r['_id'] == 'market'), 0),
             'standardCount': next((r['count'] for r in type_counts if r['_id'] == 'standard'), 0),
             'premiumCount': next((r['count'] for r in type_counts if r['_id'] == 'premium'), 0),
             'rejectCount': next((r['count'] for r in type_counts if r['_id'] == 'reject'), 0)
         }), 200
-        
     except Exception as e:
         print(f"Error in get_results_stats: {e}")
-        return jsonify({'totalObjects': 0, 'totalImages': 0}), 200
-
+        return jsonify({
+            'totalObjects': 0, 
+            'totalImages': 0,
+            'marketCount': 0,
+            'standardCount': 0,
+            'premiumCount': 0,
+            'rejectCount': 0
+        }), 200
 
 @results_bp.route('/export', methods=['GET'])
 def export_results():
     """Export results as CSV"""
     try:
+        from flask import Response
+        import io
+        import csv
+        
+        # Use get_collection instead of current_app.mongo_client
         collection = get_collection('images')
         
+        # Aggregate results
         pipeline = [
             {'$sort': {'timestamp': -1}},
             {'$group': {
@@ -455,23 +498,45 @@ def export_results():
                 'fruit_type': {'$first': '$fruit_type'},
                 'timestamp': {'$first': '$timestamp'},
                 'confidence': {'$first': '$confidence'},
+                'batch_id': {'$first': '$batch_id'},
                 'image_count': {'$sum': 1}
             }},
             {'$sort': {'timestamp': -1}}
         ]
         
         results = list(collection.aggregate(pipeline))
-        csv_lines = ['Object ID,Fruit Type,Timestamp,Image Count']
         
-        for r in results:
-            timestamp_str = r['timestamp'].strftime('%Y-%m-%d %H:%M:%S') if hasattr(r['timestamp'], 'strftime') else str(r['timestamp'])
-            csv_lines.append(f"{r['_id']},{r['fruit_type']},{timestamp_str},{r['image_count']}")
+        # Create CSV in memory
+        output = io.StringIO()
+        writer = csv.writer(output)
         
-        return '\n'.join(csv_lines), 200, {
-            'Content-Type': 'text/csv',
-            'Content-Disposition': 'attachment; filename=fruit_results.csv'
-        }
+        # Write header
+        writer.writerow(['Object ID', 'Fruit Type', 'Timestamp', 
+                        'Confidence', 'Batch ID', 'Image Count'])
+        
+        # Write data
+        for result in results:
+            writer.writerow([
+                result.get('_id', ''),
+                result.get('fruit_type', ''),
+                str(result.get('timestamp', '')),
+                result.get('confidence', ''),
+                result.get('batch_id', ''),
+                result.get('image_count', 0)
+            ])
+        
+        # Create response
+        output.seek(0)
+        return Response(
+            output.getvalue(),
+            mimetype='text/csv',
+            headers={
+                'Content-Disposition': 'attachment; filename=results_export.csv'
+            }
+        )
         
     except Exception as e:
         print(f"Error in export_results: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500

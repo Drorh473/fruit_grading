@@ -28,8 +28,8 @@ load_dotenv(dotenv_path=env_path)
 class TestDatabaseSetup(unittest.TestCase):
     """Test cases for database setup step"""
     
-    @patch('build_model.process_dataset')
-    @patch('build_model.ORIGINAL_DATASET_PATH', '/test/dataset/path')
+    @patch('processes.build_model.process_dataset')
+    @patch('processes.build_model.ORIGINAL_DATASET_PATH', '/test/dataset/path')
     @patch('os.path.exists')
     def test_setup_database_success(self, mock_exists, mock_process):
         """Test successful database setup"""
@@ -41,15 +41,15 @@ class TestDatabaseSetup(unittest.TestCase):
         self.assertTrue(result)
         mock_process.assert_called_once()
     
-    @patch('build_model.ORIGINAL_DATASET_PATH', None)
+    @patch('processes.build_model.ORIGINAL_DATASET_PATH', None)
     def test_setup_database_no_path(self):
         """Test database setup with missing dataset path"""
         result = setup_database()
         
         self.assertFalse(result)
     
-    @patch('build_model.process_dataset')
-    @patch('build_model.ORIGINAL_DATASET_PATH', '/test/dataset/path')
+    @patch('processes.build_model.process_dataset')
+    @patch('processes.build_model.ORIGINAL_DATASET_PATH', '/test/dataset/path')
     @patch('os.path.exists')
     def test_setup_database_exception(self, mock_exists, mock_process):
         """Test database setup handles exceptions"""
@@ -64,7 +64,7 @@ class TestDatabaseSetup(unittest.TestCase):
 class TestPreprocessData(unittest.TestCase):
     """Test cases for data preprocessing step"""
     
-    @patch('build_model.load_dataset_with_preprocessing')
+    @patch('processes.build_model.load_dataset_with_preprocessing')
     def test_preprocess_data_success(self, mock_load):
         """Test successful data preprocessing"""
         # Create mock generators
@@ -82,7 +82,7 @@ class TestPreprocessData(unittest.TestCase):
         self.assertEqual(train_gen.num_batches, 10)
         self.assertEqual(test_gen.num_batches, 3)
     
-    @patch('build_model.load_dataset_with_preprocessing')
+    @patch('processes.build_model.load_dataset_with_preprocessing')
     def test_preprocess_data_failure(self, mock_load):
         """Test preprocessing handles failures"""
         mock_load.side_effect = Exception("Preprocessing error")
@@ -102,7 +102,7 @@ class TestExtractFeatures(unittest.TestCase):
         mock_gen.num_batches = 1
         return mock_gen
     
-    @patch('build_model.process_features')
+    @patch('processes.build_model.process_features')
     def test_extract_features_success(self, mock_process):
         """Test successful feature extraction"""
         mock_train_gen = self.create_mock_generator()
@@ -131,7 +131,7 @@ class TestExtractFeatures(unittest.TestCase):
         self.assertGreater(len(train_features), 0)
         self.assertGreater(len(test_features), 0)
     
-    @patch('build_model.process_features')
+    @patch('processes.build_model.process_features')
     def test_extract_features_failure(self, mock_process):
         """Test feature extraction handles failures"""
         mock_train_gen = self.create_mock_generator()
@@ -283,7 +283,7 @@ class TestGenerateConfusionMatrix(unittest.TestCase):
             }
         }
     
-    @patch('build_model.generate_full_confusion_matrix_report')
+    @patch('processes.build_model.generate_full_confusion_matrix_report')
     def test_generate_confusion_matrix_success(self, mock_generate):
         """Test successful confusion matrix generation"""
         mock_cm = np.array([[3, 0, 0],
@@ -297,7 +297,7 @@ class TestGenerateConfusionMatrix(unittest.TestCase):
         self.assertIsNotNone(cm)
         mock_generate.assert_called_once()
     
-    @patch('build_model.generate_full_confusion_matrix_report')
+    @patch('processes.build_model.generate_full_confusion_matrix_report')
     def test_generate_confusion_matrix_failure(self, mock_generate):
         """Test confusion matrix handles failures"""
         mock_generate.side_effect = Exception("Confusion matrix error")
@@ -310,14 +310,15 @@ class TestGenerateConfusionMatrix(unittest.TestCase):
 class TestPipelineIntegration(unittest.TestCase):
     """Integration tests for complete pipeline"""
     
-    @patch('build_model.setup_database')
-    @patch('build_model.preprocess_data')
-    @patch('build_model.extract_features')
-    @patch('build_model.train_classifier')
-    @patch('build_model.generate_confusion_matrix')
+    @patch('processes.build_model.setup_database')
+    @patch('processes.build_model.preprocess_data')
+    @patch('processes.build_model.extract_features')
+    @patch('processes.build_model.train_classifier')
+    @patch('processes.build_model.generate_confusion_matrix')
+    @patch('processes.build_model.save_dashboard_metadata')
     @patch('os.path.exists')
-    def test_run_full_pipeline_success(self, mock_exists, mock_cm, mock_train, 
-                                       mock_extract, mock_preprocess, mock_setup):
+    def test_run_full_pipeline_success(self, mock_exists, mock_save_metadata, mock_cm, 
+                                       mock_train, mock_extract, mock_preprocess, mock_setup):
         """Test successful full pipeline run"""
         # Mock all steps to succeed
         mock_exists.return_value = True
@@ -344,13 +345,14 @@ class TestPipelineIntegration(unittest.TestCase):
         mock_train.return_value = (mock_params, mock_results)
         
         mock_cm.return_value = np.eye(3)
+        mock_save_metadata.return_value = 'metadata.json'
         
         # Run pipeline
         result = run_full_pipeline(skip_tests=True, epochs=5)
         
         self.assertTrue(result)
     
-    @patch('build_model.setup_database')
+    @patch('processes.build_model.setup_database')
     @patch('os.path.exists')
     def test_run_full_pipeline_database_failure(self, mock_exists, mock_setup):
         """Test pipeline stops on database setup failure"""
@@ -361,8 +363,8 @@ class TestPipelineIntegration(unittest.TestCase):
         
         self.assertFalse(result)
     
-    @patch('build_model.setup_database')
-    @patch('build_model.preprocess_data')
+    @patch('processes.build_model.setup_database')
+    @patch('processes.build_model.preprocess_data')
     @patch('os.path.exists')
     def test_run_full_pipeline_preprocessing_failure(self, mock_exists, 
                                                      mock_preprocess, mock_setup):
@@ -376,7 +378,7 @@ class TestPipelineIntegration(unittest.TestCase):
         self.assertFalse(result)
     
     @patch('os.path.exists')
-    @patch('build_model.preprocess_data')
+    @patch('processes.build_model.preprocess_data')
     def test_run_full_pipeline_skip_existing_datasets(self, mock_preprocess, mock_exists):
         """Test pipeline skips setup when datasets exist"""
         # Mock both stored and processed datasets existing
@@ -387,14 +389,22 @@ class TestPipelineIntegration(unittest.TestCase):
         mock_preprocess.return_value = (mock_train_gen, mock_test_gen)
         
         # The pipeline should skip database setup and preprocessing
-        with patch('build_model.setup_database') as mock_setup:
-            with patch('build_model.extract_features') as mock_extract:
-                mock_extract.return_value = False  # Fail at extraction
+        with patch('processes.build_model.setup_database') as mock_setup:
+            with patch('processes.build_model.extract_features') as mock_extract:
+                # Return proper tuple, not False
+                mock_features = {
+                    'obj001': {'features': np.random.rand(100), 'label': 0}
+                }
+                mock_extract.return_value = (mock_features, mock_features)
                 
-                run_full_pipeline(skip_tests=True)
-                
-                # setup_database should not be called
-                mock_setup.assert_not_called()
+                with patch('processes.build_model.train_classifier') as mock_train:
+                    # Mock train to fail early
+                    mock_train.return_value = (None, None)
+                    
+                    run_full_pipeline(skip_tests=True)
+                    
+                    # setup_database should not be called
+                    mock_setup.assert_not_called()
 
 
 class TestPipelineHyperparameters(unittest.TestCase):
@@ -510,7 +520,7 @@ class TestPipelineOutputs(unittest.TestCase):
     """Test cases for pipeline outputs and artifacts"""
     
     @patch('os.makedirs')
-    @patch('build_model.save_model')
+    @patch('processes.build_model.save_model')
     def test_train_classifier_saves_model(self, mock_save, mock_makedirs):
         """Test classifier saves model to correct location"""
         train_features = {

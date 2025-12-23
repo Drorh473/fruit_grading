@@ -50,9 +50,18 @@ def collect_images(dataset_path=ORIGINAL_DATASET_PATH):
     width = int(os.getenv('IMAGE_SIZE_W')) 
     height = int(os.getenv('IMAGE_SIZE_H'))
     
+    # Check if path exists
+    if not dataset_path or not os.path.exists(dataset_path):
+        print(f"Warning: Dataset path does not exist: {dataset_path}")
+        return []
+    
     # Get fruit types
-    fruit_types = [d for d in os.listdir(dataset_path) 
-                  if os.path.isdir(os.path.join(dataset_path, d))]
+    try:
+        fruit_types = [d for d in os.listdir(dataset_path) 
+                      if os.path.isdir(os.path.join(dataset_path, d))]
+    except (FileNotFoundError, PermissionError) as e:
+        print(f"Error accessing dataset path: {e}")
+        return []
     
     for fruit_type in fruit_types:
         fruit_dir = os.path.join(dataset_path, fruit_type)
@@ -100,7 +109,6 @@ def collect_images(dataset_path=ORIGINAL_DATASET_PATH):
                 
                 # Process each image
                 for img_file in images:
-                    
                     img_path = os.path.join(angle_dir, img_file)
                     
                     # Generate timestamp for this frame
