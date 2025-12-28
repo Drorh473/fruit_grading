@@ -1,9 +1,18 @@
 import os
 import sys
-import unittest
-from pathlib import Path
 import numpy as np
+from pathlib import Path
 from dotenv import load_dotenv
+
+# Import pipeline components
+from Streamers.database_creation import process_dataset
+from preprocessing.preprocessing_from_db import load_dataset_with_preprocessing
+from cnn.pre_trained_feature_map import process_features
+from cnn.fully_connected_layer import train, evaluate, save_model
+from visuals.confusion_matrix import generate_full_confusion_matrix_report
+
+#import for the testing suit
+import subprocess
 
 # Load environment variables
 env_path = Path(__file__).parent.parent / '.env' 
@@ -14,15 +23,6 @@ if str(PROJECT_ROOT) not in sys.path:
 MODEL_DIR = os.getenv('MODEL_DIR')
 STORED_DATASET_PATH = os.getenv('STORED_DATASET_PATH')
 PROCESSED_DATASET_PATH = os.getenv('PROCESSED_DATASET_PATH')
-
-# Import pipeline components
-from Streamers.database_creation import process_dataset
-from preprocessing.preprocessing_from_db import load_dataset_with_preprocessing
-from cnn.pre_trained_feature_map import process_features
-from cnn.fully_connected_layer import train, evaluate, save_model
-from visuals.confusion_matrix import generate_full_confusion_matrix_report
-#import for the testing suit
-import subprocess
 
 # Import model metadata management
 sys.path.insert(0, '/home/claude')

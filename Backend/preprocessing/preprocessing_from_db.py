@@ -1,6 +1,5 @@
 import cv2
 import numpy as np
-import matplotlib.pyplot as plt
 import os
 from tqdm import tqdm
 import multiprocessing
@@ -10,7 +9,6 @@ from dotenv import load_dotenv
 import pymongo
 import time
 from bson.objectid import ObjectId
-import json
 
 # Load environment variables
 env_path = Path('.') / '.env'
@@ -277,7 +275,7 @@ def load_dataset_split_by_camera(db_name=os.getenv('DB_NAME'), collection_name="
     client = pymongo.MongoClient(MONGODB_CONNECTION_STRING)
     db = client[db_name]
     collection = db[collection_name]
-    sequenceofcamera = [[] for _ in range(0,NUM_OF_CAMERAS)]  # Create list of empty lists
+    sequenceofcamera = [[] for _ in range(0,NUM_OF_CAMERAS)]
     for image in collection.find():
         camera_id = image.get('camera_id')
         if 0 <= camera_id <= NUM_OF_CAMERAS-1:
@@ -343,7 +341,7 @@ def set_generator(image_paths, metadata_dict):
                     
                     if img is None:
                         files_failed_load += 1
-                        if files_failed_load <= 3:  # Show first 3
+                        if files_failed_load <= 3:
                             print(f"[Generator] Failed to load: {img_path}")
                         continue
                     

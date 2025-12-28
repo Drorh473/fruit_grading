@@ -119,7 +119,7 @@ def extract_features_from_generator(generator, set_type):
                 feature_map[key].append({
                     'features': features,
                     'timestamp': meta.get('timestamp'),
-                    'label': LABEL_DICT.get(fruit_type, 2),  # Store label here
+                    'label': LABEL_DICT.get(fruit_type, 2),
                     'fruit_type': fruit_type
                 })
     
@@ -270,19 +270,19 @@ def process_features(generator, set_type):
         Dictionary with final fused feature vectors (with labels)
     """ 
     # Extract features
-    print("\n✓ Extracting features...")
+    print("\nExtracting features...")
     features = extract_features_from_generator(generator, set_type)
     
     # Flatten
-    print("\n✓ Flattening features...")
+    print("\nFlattening features...")
     flattened = flatten_features(features)
     
     # Temporal pooling
-    print("\n✓ Temporal pooling...")
+    print("\nTemporal pooling...")
     pooled = temporal_pooling(flattened)
     
     # Multi-view fusion
-    print("\n✓ Multi-view fusion...")
+    print("\nMulti-view fusion...")
     fused = multi_view_fusion(pooled)
     
     return fused
