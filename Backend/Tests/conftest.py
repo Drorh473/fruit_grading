@@ -49,6 +49,11 @@ def app():
     app.config['BATCH_SIZE'] = 32
     app.config['MODEL_DIR'] = 'saved_models'
     
+    app.mongo_client = MongoClient(app.config['MONGO_CONNECTION_STRING'])
+    # Try to ping to verify connection
+    app.mongo_client.server_info()
+    print(f" MongoDB connected for testing: {app.config['DB_NAME']}")
+    
     # Try to import and register blueprints (with error handling)
     try:
         from routes.add_fruit import add_fruit_bp
@@ -92,7 +97,16 @@ def app():
     except (ImportError, AttributeError) as e:
         print(f"Warning: Could not import admin_dashboard_bp: {e}")
     
-    return app
+    yield app
+
+    if hasattr(app, 'mongo_client') and app.mongo_client:
+        try:
+            db = app.mongo_client[app.config['DB_NAME']]
+            db.images.delete_many({})
+            db.classification_results.delete_many({})
+        except:
+            pass
+        app.mongo_client.close()
 
 
 @pytest.fixture

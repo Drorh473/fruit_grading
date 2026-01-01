@@ -4,6 +4,7 @@ import numpy as np
 from pathlib import Path
 from dotenv import load_dotenv
 
+sys.path.insert(0, str(Path(__file__).parent)) 
 # Import pipeline components
 from Streamers.database_creation import process_dataset
 from preprocessing.preprocessing_from_db import load_dataset_with_preprocessing
@@ -25,9 +26,7 @@ STORED_DATASET_PATH = os.getenv('STORED_DATASET_PATH')
 PROCESSED_DATASET_PATH = os.getenv('PROCESSED_DATASET_PATH')
 
 # Import model metadata management
-sys.path.insert(0, '/home/claude')
 from model_metadata import save_dashboard_metadata
-
 
 # Get configuration
 ORIGINAL_DATASET_PATH = os.getenv('ORIGINAL_DATASET_PATH')

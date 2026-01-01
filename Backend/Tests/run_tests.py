@@ -56,7 +56,7 @@ class TestPhase:
                 cmd,
                 capture_output=True,
                 text=True,
-                timeout=300
+                timeout=120
             )
             
             self.duration = time.time() - start_time

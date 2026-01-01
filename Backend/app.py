@@ -113,9 +113,8 @@ def main():
     parser.add_argument('--no-debug', action='store_true', help='Disable debug mode')
     
     args = parser.parse_args()
-    
-    # Run tests
-    if not args.skip_tests:
+    is_reloader_process = os.environ.get('WERKZEUG_RUN_MAIN') == 'true'
+    if not args.skip_tests and not is_reloader_process:
         print("\n" + "="*70)
         print("PRE-STARTUP VALIDATION")
         print("="*70)
@@ -134,6 +133,8 @@ def main():
                 sys.exit(1)
         else:
             print("\nAll tests passed")
+    elif is_reloader_process:
+        print("\n[Reloader] Skipping tests on restart...")
     
     # Start server
     print("\n" + "="*70)

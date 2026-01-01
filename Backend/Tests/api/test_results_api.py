@@ -4,8 +4,7 @@ Essential tests for classification results retrieval and statistics endpoints
 """
 import pytest
 import json
-from pathlib import Path
-import sys
+
 
 
 class TestResultsList:
