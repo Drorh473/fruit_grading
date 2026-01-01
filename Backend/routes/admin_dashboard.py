@@ -23,8 +23,8 @@ def get_system_status():
             return jsonify({
                 'database': db_status,
                 'model': 'loaded',
-                'pipeline': 'idle',  # or get from pipeline_state
-                'cameras': [True, True, True, True]  # Mock - update with real camera status
+                'pipeline': 'idle',  
+                'cameras': [True, True, True, True]  
             }), 200
         
         # Fallback to pipeline_state

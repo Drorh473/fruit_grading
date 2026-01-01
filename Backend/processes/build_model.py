@@ -125,134 +125,6 @@ def extract_features(train_gen, test_gen):
         return False
 
 def train_classifier(train_features, test_features, 
-                    hidden_dim=256, epochs=100, learning_rate=0.001):
-    """
-    Step 4: Train fully connected classifier
-    
-    Args:
-        train_features: Dictionary with fused feature vectors from training set
-                       Format: {key: {'features': np.array, 'label': int, 'fruit_type': str}}
-        test_features: Dictionary with fused feature vectors from test set
-        hidden_dim: Hidden layer dimension
-        epochs: Number of training epochs
-        learning_rate: Learning rate
-    
-    Returns:
-        params: Trained parameters
-        results: Dictionary with evaluation results
-    """
-    print("\n" + "="*60)
-    print("STEP 4: CLASSIFIER TRAINING")
-    print("="*60 + "\n")
-    
-    try:
-        # Label mapping
-        label_mapping = {
-            'market': 0,
-            'standard': 1,
-            'premium': 2
-        }
-        
-        # Prepare training data from fused features
-        print("Preparing training data from fused features...")
-        X_train_list = []
-        y_train_list = []
-        
-        for key, data in train_features.items():
-            X_train_list.append(data['features'])
-            y_train_list.append(data['label'])
-        
-        X_train = np.array(X_train_list, dtype=np.float32)
-        y_train = np.array(y_train_list, dtype=np.int64)
-        
-        # Prepare testing data from fused features
-        print("Preparing testing data from fused features...")
-        X_test_list = []
-        y_test_list = []
-        
-        for key, data in test_features.items():
-            X_test_list.append(data['features'])
-            y_test_list.append(data['label'])
-        
-        X_test = np.array(X_test_list, dtype=np.float32)
-        y_test = np.array(y_test_list, dtype=np.int64)
-        
-        # Get dimensions
-        input_dim = X_train.shape[1]
-        num_classes = len(label_mapping)
-        
-        print(f"\nDataset info:")
-        print(f"  Training samples: {len(X_train)}")
-        print(f"  Testing samples: {len(X_test)}")
-        print(f"  Feature dimension: {input_dim:,}")
-        print(f"  Number of classes: {num_classes}")
-        
-        # Check label distribution
-        print(f"\nTraining label distribution:")
-        for fruit_type, label in sorted(label_mapping.items(), key=lambda x: x[1]):
-            count = np.sum(y_train == label)
-            print(f"  {fruit_type}: {count} samples")
-        
-        print(f"\nTesting label distribution:")
-        for fruit_type, label in sorted(label_mapping.items(), key=lambda x: x[1]):
-            count = np.sum(y_test == label)
-            print(f"  {fruit_type}: {count} samples")
-        
-        print(f"\nTraining for {epochs} epochs...")
-        params, history = train(
-            X_train, y_train,
-            X_test, y_test,
-            input_dim=input_dim,
-            hidden_dim=hidden_dim,
-            num_classes=num_classes,
-            epochs=epochs,
-            batch_size=32,
-            learning_rate=learning_rate,
-            verbose=True
-        )
-        
-        # Final evaluation
-        print("\n" + "="*60)
-        print("FINAL EVALUATION")
-        print("="*60)
-        
-        train_loss, train_acc = evaluate(X_train, y_train, params, num_classes)
-        test_loss, test_acc = evaluate(X_test, y_test, params, num_classes)
-        
-        print(f"\nTraining set:")
-        print(f"  Loss: {train_loss:.4f}")
-        print(f"  Accuracy: {train_acc:.4f} ({train_acc*100:.2f}%)")
-        
-        print(f"\nTest set:")
-        print(f"  Loss: {test_loss:.4f}")
-        print(f"  Accuracy: {test_acc:.4f} ({test_acc*100:.2f}%)")
-        
-        # Save model
-        os.makedirs(MODEL_DIR, exist_ok=True)
-        model_path = os.path.join(MODEL_DIR, 'fruit_classifier.pkl')
-        save_model(params, history, input_dim, hidden_dim, num_classes, model_path)
-        
-        results = {
-            'train_loss': train_loss,
-            'train_accuracy': train_acc,
-            'test_loss': test_loss,
-            'test_accuracy': test_acc,
-            'history': history,
-            'X_test': X_test,
-            'y_test': y_test,
-            'params': params,
-            'label_mapping': label_mapping
-        }
-        
-        print(f"\n Classifier training complete")
-        return params, results
-        
-    except Exception as e:
-        print(f"\n Classifier training failed: {e}")
-        import traceback
-        traceback.print_exc()
-        return None, None
-def train_classifier(train_features, test_features, 
                     hidden_dim=32, epochs=100, learning_rate=0.001, lambda_reg=0.01):
     """
     Step 4: Train fully connected classifier with L2 regularization
@@ -318,7 +190,6 @@ def train_classifier(train_features, test_features,
         # Get dimensions
         input_dim = X_train.shape[1]
         num_classes = len(label_mapping)
-        
         print(f"\nDataset info:")
         print(f"  Training samples: {len(X_train)}")
         print(f"  Testing samples: {len(X_test)}")
@@ -343,11 +214,11 @@ def train_classifier(train_features, test_features,
             X_test, y_test,
             input_dim=input_dim,
             hidden_dim=hidden_dim,
-            num_classes=num_classes,
+            num_classes=3,
             epochs=epochs,
             batch_size=32,
             learning_rate=learning_rate,
-            lambda_reg=lambda_reg,  # Pass lambda_reg here
+            lambda_reg=lambda_reg,
             verbose=True
         )
         
@@ -506,8 +377,8 @@ def run_full_pipeline(skip_tests=False,
     
     metadata_path = save_dashboard_metadata(results, MODEL_DIR, dataset_stats)
     if metadata_path:
-        print(f"  ✓ Metadata saved successfully")
-        print(f"  ✓ Dashboards can now display this model's results")
+        print(f"   Metadata saved successfully")
+        print(f"   Dashboards can now display this model's results")
     
     # Success
     print("\n" + "="*60)

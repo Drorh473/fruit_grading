@@ -22,6 +22,7 @@ def initialize_parameters(input_dim, hidden_dim, num_classes):
     Returns:
         Dictionary containing W1, b1, W2, b2
     """
+    
     params = {
         'W1': np.random.randn(input_dim, hidden_dim) * np.sqrt(2.0 / input_dim),
         'b1': np.zeros((1, hidden_dim)),
@@ -81,7 +82,7 @@ def compute_loss(y_pred, y_true, num_classes = 3, params=None, lambda_reg=0.0):
         Loss value (cross-entropy + L2 penalty)
     """
     batch_size = y_pred.shape[0]
-    
+    print(f" before change to int compute loss: {num_classes}")
     # Convert to one-hot if needed
     if y_true.ndim == 1:
         y_true_onehot = np.zeros((batch_size, num_classes))
@@ -119,7 +120,6 @@ def backward_pass(y_true, params, cache, num_classes = 3, lambda_reg=0.0):
         grads: Dictionary with gradients (dW1, db1, dW2, db2)
     """
     batch_size = cache['X'].shape[0]
-    
     # Convert to one-hot if needed
     if y_true.ndim == 1:
         y_true_onehot = np.zeros((batch_size, num_classes))
@@ -179,7 +179,7 @@ def update_parameters(params, grads, learning_rate):
 
 
 # Training Step
-def train_step(X, y, params,learning_rate, num_classes = 3, lambda_reg=0.0):
+def train_step(X, y, params,num_classes, learning_rate, lambda_reg=0.005):
     """
     Single training step (forward + backward + update) with L2 regularization
     
@@ -198,7 +198,7 @@ def train_step(X, y, params,learning_rate, num_classes = 3, lambda_reg=0.0):
     """
     # Forward pass
     y_pred, cache = forward_pass(X, params)
-    
+
     # Compute loss (with L2 regularization)
     loss = compute_loss(y_pred, y, num_classes, params, lambda_reg)
     
@@ -260,7 +260,7 @@ def evaluate(X, y, params, num_classes = 3, lambda_reg=0.0):
 
 # Training Loop (works with pre-batched data from generator)
 def train_from_generator(train_generator, val_generator, input_dim = None , hidden_dim = None, num_classes = 3,
-                        epochs=100, learning_rate=0.001, verbose=True):
+                        epochs=100, learning_rate=0.001, verbose=True,lambda_reg = 0.005):
     """
     Train the neural network using a batch generator
     
@@ -296,7 +296,7 @@ def train_from_generator(train_generator, val_generator, input_dim = None , hidd
         # Process each batch from generator
         for batch_x, batch_y in train_generator():
             loss, accuracy, params = train_step(batch_x, batch_y, params, 
-                                               num_classes, learning_rate)
+                                               num_classes, learning_rate,lambda_reg)
             epoch_losses.append(loss)
             epoch_accuracies.append(accuracy)
         
@@ -313,7 +313,7 @@ def train_from_generator(train_generator, val_generator, input_dim = None , hidd
             val_accs = []
             
             for batch_x, batch_y in val_generator():
-                val_loss, val_acc = evaluate(batch_x, batch_y, params, num_classes)
+                val_loss, val_acc = evaluate(batch_x, batch_y, params, num_classes,lambda_reg)
                 val_losses.append(val_loss)
                 val_accs.append(val_acc)
             
@@ -337,7 +337,7 @@ def train_from_generator(train_generator, val_generator, input_dim = None , hidd
 
 # Training Loop (for pre-loaded numpy arrays)
 def train(X_train, y_train, X_val, y_val, input_dim, hidden_dim, num_classes,
-          epochs=100, batch_size=32, learning_rate=0.001, lambda_reg=0.0, verbose=True):
+          epochs=100, batch_size=32, learning_rate=0.001, lambda_reg=0.005, verbose=True):
     """
     Train the neural network with pre-loaded data and L2 regularization
     
@@ -359,6 +359,7 @@ def train(X_train, y_train, X_val, y_val, input_dim, hidden_dim, num_classes,
         params: Trained parameters
         history: Training history
     """
+
     # Initialize parameters
     params = initialize_parameters(input_dim, hidden_dim, num_classes)
     
@@ -389,7 +390,6 @@ def train(X_train, y_train, X_val, y_val, input_dim, hidden_dim, num_classes,
             
             X_batch = X_train_shuffled[start_idx:end_idx]
             y_batch = y_train_shuffled[start_idx:end_idx]
-            
             loss, accuracy, params = train_step(X_batch, y_batch, params, 
                                                num_classes, learning_rate, lambda_reg)
             epoch_losses.append(loss)
@@ -470,10 +470,3 @@ def load_model(filepath):
     
     print(f"Model loaded from {filepath}")
     return params, model_info
-
-
-
-
-
-
-

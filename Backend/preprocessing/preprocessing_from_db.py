@@ -189,7 +189,7 @@ def preprocess_and_save_dataset(sequanceofcameras, output_dir=None, db_name=os.g
         num_processes = max(1, multiprocessing.cpu_count() - 1)
         with Pool(processes=num_processes) as pool:
             results = list(tqdm(
-                pool.imap(process_image, process_args),
+                pool.starmap(process_image, process_args),
                 total=len(camera),
                 desc=f"Camera {cam_idx}"
             ))

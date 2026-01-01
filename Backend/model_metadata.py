@@ -128,7 +128,7 @@ def save_dashboard_metadata(results, train_features, test_features, params, labe
     with open(metadata_path, 'w') as f:
         json.dump(metadata, f, indent=2)
     
-    print(f"\n✓ Dashboard metadata saved to {metadata_path}")
+    print(f"\n Dashboard metadata saved to {metadata_path}")
     
     # Also save a pickle version for backward compatibility
     pickle_path = os.path.join(MODEL_DIR, 'dashboard_metadata.pkl')

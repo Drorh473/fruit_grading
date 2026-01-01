@@ -18,13 +18,19 @@ try:
     if str(PROJECT_ROOT) not in sys.path:
         sys.path.insert(0, str(PROJECT_ROOT))
     
+    # Import from the processes directory
     from processes.build_model import (
         run_tests, setup_database, preprocess_data,
         extract_features, train_classifier,
         generate_confusion_matrix
     )
+    print("Successfully imported build_model functions")
+    
 except ImportError as e:
-    print(f"Warning: Could not import build_model functions: {e}")
+    print(f"ERROR: Could not import build_model functions: {e}")
+    print(f"PROJECT_ROOT: {PROJECT_ROOT}")
+    print(f"sys.path: {sys.path}")
+    # Set to None to prevent crashes
     run_tests = None
     setup_database = None
     preprocess_data = None
@@ -53,15 +59,14 @@ def run_pipeline_background(config):
         learning_rate = config.get('learningRate', 0.0005)
         lambda_reg = config.get('lambdaReg', 0.001)
         
-        # Initialize variables that might be used later
         train_gen = None
         test_gen = None
         train_features = None
         test_features = None
         params = None
-        results = None  # Initialize results to None
+        results = None 
         
-        # Step 0: Tests (optional)
+        # Step 0: Tests
         if not skip_tests:
             pipeline_state.add_log("Running test suite...", 'info')
             test_success = run_tests()
@@ -75,7 +80,7 @@ def run_pipeline_background(config):
             pipeline_state.update_step(1, 'processing')
             pipeline_state.add_log("Step 1/5: Setting up database...", 'info')
             
-            success = setup_database()  # Call the actual function
+            success = setup_database()  
             if not success:
                 pipeline_state.add_log("Database setup failed!", 'error')
                 pipeline_state.update_step(1, 'failed')
@@ -149,7 +154,7 @@ def run_pipeline_background(config):
             pipeline_state.update_step(5, 'completed')
             pipeline_state.add_log("Evaluation complete", 'success')
         
-        # Step 6: Save dashboard metadata (NEW)
+        # Step 6: Save dashboard metadata
         if results is not None and train_features is not None and test_features is not None:
             pipeline_state.add_log("Step 6/6: Saving dashboard metadata...", 'info')
             try:
