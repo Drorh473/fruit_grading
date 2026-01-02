@@ -7,8 +7,8 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from Streamers.database_creation import store_in_database
-from preprocessing.preprocessing_from_db import custom_preprocessing, process_image, set_generator
+from Streamers.database_creation import store_in_database, split_data
+from preprocessing.preprocessing_from_db import custom_preprocessing
 
 
 class TestDatabaseToPreprocessing:
@@ -177,6 +177,14 @@ class TestDatasetGeneration:
         # Insert documents
         test_collection.insert_many(sample_image_documents)
         
+        # Assign set_type to field
+        split_data(
+            db_name=TestConfig.TEST_DB_NAME,
+            collection_name=TestConfig.TEST_COLLECTION_NAME, 
+            training_percentage=70,
+            testing_percentage=30
+        )
+
         # Query training data
         training_docs = list(test_collection.find({"set_type": "training"}))
         
@@ -193,6 +201,14 @@ class TestDatasetGeneration:
         # Insert documents
         test_collection.insert_many(sample_image_documents)
         
+        # Assign set_type to field
+        split_data(
+            db_name=TestConfig.TEST_DB_NAME,
+            collection_name=TestConfig.TEST_COLLECTION_NAME, 
+            training_percentage=70,
+            testing_percentage=30
+        )
+
         # Query testing data
         testing_docs = list(test_collection.find({"set_type": "testing"}))
         

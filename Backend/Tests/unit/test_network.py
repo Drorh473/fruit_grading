@@ -261,8 +261,7 @@ class TestTrainingStep:
         X = np.random.rand(10, test_config['FEATURE_DIM'])
         y = np.array([0, 1, 2, 0, 1, 2, 0, 1, 2, 0])
         
-        # FIXED: train_step returns (loss, accuracy, params)
-        loss, accuracy, params = train_step(X, y, mock_model_parameters, learning_rate=0.01)
+        loss, accuracy, params = train_step(X, y, mock_model_parameters, 3, learning_rate=0.01)
         
         assert isinstance(loss, (float, np.floating))
         assert loss > 0
@@ -276,7 +275,7 @@ class TestTrainingStep:
         original_W1 = mock_model_parameters['W1'].copy()
         
         # FIXED: Unpack 3 values
-        loss, accuracy, params = train_step(X, y, mock_model_parameters, learning_rate=0.01)
+        loss, accuracy, params = train_step(X, y, mock_model_parameters, 3, learning_rate=0.01)
         
         assert not np.array_equal(params['W1'], original_W1)
 
@@ -346,7 +345,7 @@ class TestModelTraining:
         train_losses = []
         for epoch in range(20):
             # FIXED: Unpack 3 values
-            loss, accuracy, params = train_step(X, y, params, learning_rate=0.01)
+            loss, accuracy, params = train_step(X, y, params, 3, learning_rate=0.01)
             train_losses.append(loss)
         
         # Training loss should generally decrease
@@ -366,13 +365,13 @@ class TestModelTraining:
         # Train without regularization
         params_no_reg = {k: v.copy() for k, v in params.items()}
         for _ in range(10):
-            loss, acc, params_no_reg = train_step(X, y, params_no_reg, learning_rate=0.01, lambda_reg=0.0)
+            loss, acc, params_no_reg = train_step(X, y, params_no_reg, 3, learning_rate=0.01, lambda_reg=0.0)
         
         # Train with L2 regularization
         params_l2 = {k: v.copy() for k, v in params.items()}
         for _ in range(10):
-            loss, acc, params_l2 = train_step(X, y, params_l2, learning_rate=0.01, lambda_reg=0.001)
-        
+            loss, acc, params_l2 = train_step(X, y, params_l2, 3, learning_rate=0.01, lambda_reg=0.001)
+                                             
         # Parameters should be different
         assert not np.array_equal(params_no_reg['W1'], params_l2['W1'])
 

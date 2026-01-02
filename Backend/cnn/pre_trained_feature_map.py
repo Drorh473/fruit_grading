@@ -209,10 +209,10 @@ def multi_view_fusion(pooled_vectors, target_views=4):
     Returns:
         Dictionary with fused features (preserving labels)
     """
-    # Group by object (remove camera suffix)
+    # Group by object
     grouped = {}
     for key, data in pooled_vectors.items():
-        # Try to extract base object ID (remove camera_id)
+        # Try to extract base object ID 
         parts = key.rsplit('_', 1)  # Split from right
         base_key = parts[0] if len(parts) > 1 else key
         

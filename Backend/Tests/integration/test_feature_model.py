@@ -42,8 +42,8 @@ class TestFeaturesToTraining:
         
         # Step 4: Train for a few steps
         for _ in range(5):
-            params, loss = train_step(X_train, y_train, params, learning_rate=0.01)
-        
+            loss, accuracy, params = train_step(X_train, y_train, params, TestConfig.NUM_CLASSES, learning_rate=0.01)
+                                     
         # Should complete without errors
         assert loss >= 0
     
@@ -61,11 +61,11 @@ class TestFeaturesToTraining:
         
         # Quick training
         for _ in range(10):
-            params, _ = train_step(X_train, y_train, params, learning_rate=0.01)
+            loss, accuracy, params = train_step(X_train, y_train, params, TestConfig.NUM_CLASSES, learning_rate=0.01)
         
         # Test inference on new features
         X_test = np.random.rand(5, TestConfig.FEATURE_DIM)
-        predictions = predict(X_test, params)
+        predictions, probabilities = predict(X_test, params)
         
         # Predictions should be valid class indices
         assert all(0 <= p < TestConfig.NUM_CLASSES for p in predictions)
@@ -75,16 +75,18 @@ class TestFeaturesToTraining:
         # Step 1: Simulate multi-view fusion output
         num_objects = 15
         fused_features = {}
-        true_labels = {}
-        
+
         for i in range(num_objects):
             obj_id = f'obj{i:04d}'
-            fused_features[obj_id] = np.random.rand(TestConfig.FEATURE_DIM)
-            true_labels[obj_id] = i % TestConfig.NUM_CLASSES
+            fused_features[obj_id] = {
+                'features': np.random.uniform(0, 1, TestConfig.FEATURE_DIM),
+                'label': i % TestConfig.NUM_CLASSES,
+                'fruit_type': ['apple', 'banana', 'orange'][i % TestConfig.NUM_CLASSES]
+            }
         
-        # Step 2: Prepare data
-        X = np.array(list(fused_features.values()))
-        y = np.array(list(true_labels.values()))
+        # Step 2: Prepare data - extract from dictionary structure
+        X = np.array([data['features'] for data in fused_features.values()])
+        y = np.array([data['label'] for data in fused_features.values()])
         
         # Split train/test
         split_idx = int(0.7 * len(X))
@@ -99,14 +101,13 @@ class TestFeaturesToTraining:
         )
         
         for _ in range(20):
-            params, _ = train_step(X_train, y_train, params, learning_rate=0.01)
+            loss, accuracy, params = train_step(X_train, y_train, params, TestConfig.NUM_CLASSES, learning_rate=0.01)
         
         # Step 4: Evaluate
-        accuracy, conf_matrix = evaluate(X_test, y_test, params)
+        test_loss, test_accuracy = evaluate(X_test, y_test, params, TestConfig.NUM_CLASSES)
         
-        # Should produce valid accuracy and confusion matrix
-        assert 0.0 <= accuracy <= 1.0
-        assert conf_matrix.shape == (TestConfig.NUM_CLASSES, TestConfig.NUM_CLASSES)
+        assert 0.0 <= test_accuracy <= 1.0
+        assert test_loss >= 0
 
 
 class TestFeatureQualityForTraining:
@@ -114,19 +115,23 @@ class TestFeatureQualityForTraining:
     
     def test_feature_dimension_consistency(self):
         """Test that all features have consistent dimensions"""
-        # Simulate multi-camera features
-        features = {}
+        pooled_features = {}
         
         for i in range(10):
             for cam_id in range(TestConfig.NUM_OF_CAMERAS):
                 key = f'obj{i:04d}_{cam_id}'
-                features[key] = np.random.rand(TestConfig.FEATURE_DIM)
+                # Each value must be a dictionary with 'features', 'label', 'fruit_type'
+                pooled_features[key] = {
+                    'features': np.random.uniform(0, 1, TestConfig.FEATURE_DIM),
+                    'label': i % TestConfig.NUM_CLASSES,
+                    'fruit_type': 'apple'
+                }
         
-        # Fuse features
-        fused = multi_view_fusion(features)
+        fused = multi_view_fusion(pooled_features)
         
-        # All fused features should have same dimension
-        feature_dims = [f.shape[0] for f in fused.values()]
+        # Extract features 
+        feature_arrays = [obj_data['features'] for obj_data in fused.values()]
+        feature_dims = [f.shape[0] for f in feature_arrays]
         assert len(set(feature_dims)) == 1  # All same dimension
     
     def test_feature_normalization(self):
@@ -158,8 +163,9 @@ class TestModelPerformanceOnFeatures:
             label = i % TestConfig.NUM_CLASSES
             
             # Create features with slight class-specific pattern
-            feature = np.random.rand(TestConfig.FEATURE_DIM)
-            feature[:10] += label * 0.5  # Add class-specific signal
+            feature = np.random.uniform(0, 1, TestConfig.FEATURE_DIM)
+            feature[:10] += label * 0.1
+            feature = np.clip(feature, 0, 1)
             
             X.append(feature)
             y.append(label)
@@ -178,7 +184,7 @@ class TestModelPerformanceOnFeatures:
         final_loss = None
         
         for epoch in range(50):
-            params, loss = train_step(X, y, params, learning_rate=0.01)
+            loss, accuracy, params = train_step(X, y, params, TestConfig.NUM_CLASSES, learning_rate=0.01)
             
             if epoch == 0:
                 initial_loss = loss
@@ -186,6 +192,7 @@ class TestModelPerformanceOnFeatures:
                 final_loss = loss
         
         # Loss should decrease
-        assert final_loss < initial_loss       
+        assert final_loss < initial_loss      
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

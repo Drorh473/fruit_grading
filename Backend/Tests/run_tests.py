@@ -41,7 +41,7 @@ class TestPhase:
         print(f"{'='*70}\n")
         start_time = time.time()
         
-        # Build pytest command - quiet with summary line
+        # Build pytest command
         cmd = ['pytest', '-q']
         cmd.extend(self.test_paths)
         cmd.extend([
@@ -64,7 +64,7 @@ class TestPhase:
             # Get output
             output = result.stdout + result.stderr
             
-            # Debug: Always show pytest output for now
+            # Debug: Always show pytest output
             if output.strip():
                 print("Pytest output:")
                 print(output)

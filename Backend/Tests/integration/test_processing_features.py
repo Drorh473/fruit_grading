@@ -72,7 +72,8 @@ class TestPreprocessedToFeatures:
         
         # Final feature should be concatenation of all cameras
         expected_dim = TestConfig.FEATURE_DIM * TestConfig.NUM_OF_CAMERAS
-        assert fused['apple_obj001'].shape[0] == expected_dim
+        fused_features = fused['apple_obj001']['features']
+        assert fused_features.shape[0] == expected_dim
     
     def test_batch_processing_consistency(self):
         """Test batch size doesn't affect final features"""
@@ -98,7 +99,9 @@ class TestPreprocessedToFeatures:
         fused_2 = multi_view_fusion(pooled_2)
         
         # Results should be identical
-        np.testing.assert_array_almost_equal(fused_1['obj001'], fused_2['obj001'])
+        features_1 = fused_1['obj001']['features']
+        features_2 = fused_2['obj001']['features']
+        np.testing.assert_array_almost_equal(features_1, features_2)
 
 
 class TestPreprocessingQuality:

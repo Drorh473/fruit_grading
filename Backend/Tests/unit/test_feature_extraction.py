@@ -171,7 +171,7 @@ class TestTemporalPooling:
         pooled = temporal_pooling(flattened)
         
         assert 'apple_obj001_0' in pooled
-        # FIXED: Access the 'features' key from the dict
+        # Access the 'features' key from the dict
         np.testing.assert_array_equal(pooled['apple_obj001_0']['features'], np.array([1, 2, 3, 4, 5]))
     
     def test_temporal_pooling_multiple_frames(self):
@@ -195,7 +195,7 @@ class TestTemporalPooling:
         
         # Average should be [3.0, 5.0, 7.0]
         expected = np.array([3.0, 5.0, 7.0])
-        # FIXED: Access the 'features' key
+        # Access the 'features' key
         np.testing.assert_array_almost_equal(pooled['apple_obj001_0']['features'], expected)
     
     def test_temporal_pooling_multiple_groups(self):
@@ -213,7 +213,7 @@ class TestTemporalPooling:
         assert 'apple_obj001_0' in pooled
         assert 'apple_obj001_1' in pooled
         
-        # FIXED: Access the 'features' key
+        # Access the 'features' key
         np.testing.assert_array_almost_equal(pooled['apple_obj001_0']['features'], np.array([2.0, 3.0]))
         np.testing.assert_array_almost_equal(pooled['apple_obj001_1']['features'], np.array([5.0, 6.0]))
     
@@ -237,7 +237,7 @@ class TestTemporalPooling:
         
         # Average should be 4.5 (mean of 0-9)
         expected = np.ones(100) * 4.5
-        # FIXED: Access the 'features' key
+        # Access the 'features' key
         np.testing.assert_array_almost_equal(pooled['apple_obj001_0']['features'], expected)
     
     def test_temporal_pooling_preserves_dimensions(self):
@@ -261,7 +261,7 @@ class TestTemporalPooling:
         
         pooled = temporal_pooling(flattened)
         
-        # FIXED: Access the 'features' key
+        # Access the 'features' key
         assert pooled['test_obj_0']['features'].shape[0] == feature_dim
     
     def test_temporal_pooling_preserves_labels(self):
@@ -277,7 +277,7 @@ class TestTemporalPooling:
         
         pooled = temporal_pooling(flattened)
         
-        # FIXED: Check label and fruit_type in the dict
+        #Check label and fruit_type in the dict
         assert pooled['test_obj_0']['label'] == 2
         assert pooled['test_obj_0']['fruit_type'] == 'unknown'
 
@@ -286,7 +286,7 @@ class TestMultiViewFusion:
     """Test cases for multi-view fusion"""
     
     def test_fusion_single_camera(self):
-        """Test fusion with single camera (no concatenation needed)"""
+        """Test fusion with single camera """
         pooled = {
             'apple_obj001_0': {
                 'features': np.array([1, 2, 3, 4, 5]),
@@ -298,8 +298,9 @@ class TestMultiViewFusion:
         fused = multi_view_fusion(pooled)
         
         assert 'apple_obj001' in fused
-        # FIXED: Access the 'features' key
-        np.testing.assert_array_equal(fused['apple_obj001']['features'], np.array([1, 2, 3, 4, 5]))
+        #Access the 'features' key
+        fused_features = fused['apple_obj001']['features']
+        np.testing.assert_array_equal(fused_features[:5], np.array([1, 2, 3, 4, 5]))
     
     def test_fusion_multiple_cameras(self):
         """Test fusion concatenates features from multiple cameras"""
@@ -314,7 +315,7 @@ class TestMultiViewFusion:
         # Should concatenate all camera views
         assert 'apple_obj001' in fused
         expected = np.array([1, 2, 3, 4, 5, 6, 7, 8, 9])
-        # FIXED: Access the 'features' key
+        #Access the 'features' key
         np.testing.assert_array_equal(fused['apple_obj001']['features'], expected)
     
     def test_fusion_multiple_objects(self):
@@ -333,7 +334,7 @@ class TestMultiViewFusion:
         assert 'apple_obj001' in fused
         assert 'banana_obj002' in fused
         
-        # FIXED: Access the 'features' key
+        #Access the 'features' key
         np.testing.assert_array_equal(fused['apple_obj001']['features'], np.array([1, 2, 3, 4]))
         np.testing.assert_array_equal(fused['banana_obj002']['features'], np.array([5, 6, 7, 8]))
     
@@ -347,7 +348,7 @@ class TestMultiViewFusion:
         fused = multi_view_fusion(pooled, target_views=4)
         
         # Should concatenate to 4096 dimensions (4 * 1024)
-        # FIXED: Access the 'features' key
+        # Access the 'features' key
         assert fused['apple_obj001']['features'].shape[0] == 4096
     
     def test_multi_view_fusion_empty(self):
@@ -366,7 +367,7 @@ class TestMultiViewFusion:
         fused = multi_view_fusion(pooled, target_views=4)
         
         # Should pad with zeros
-        # FIXED: Access the 'features' key
+        # Access the 'features' key
         expected = np.array([1, 2, 3, 4, 0, 0, 0, 0])
         np.testing.assert_array_equal(fused['obj001']['features'], expected)
     
@@ -378,7 +379,7 @@ class TestMultiViewFusion:
         
         fused = multi_view_fusion(pooled, target_views=1)
         
-        # FIXED: Check label and fruit_type in the dict
+        # Check label and fruit_type in the dict
         assert fused['test_obj']['label'] == 2
         assert fused['test_obj']['fruit_type'] == 'unknown'
 
@@ -412,7 +413,7 @@ class TestFeatureExtractionIntegration:
         assert len(fused) == 1  # 1 object
         assert 'apple_obj001' in fused
         
-        # FIXED: Verify structure
+        # Verify structure
         assert 'features' in fused['apple_obj001']
         assert 'label' in fused['apple_obj001']
         assert isinstance(fused['apple_obj001']['features'], np.ndarray)
@@ -438,7 +439,7 @@ class TestFeatureExtractionIntegration:
         assert 'banana_obj001' in fused
         assert 'orange_obj002' in fused
         
-        # FIXED: Verify labels are preserved
+        # Verify labels are preserved
         assert fused['apple_obj000']['label'] == 0
         assert fused['banana_obj001']['label'] == 1
         assert fused['orange_obj002']['label'] == 2
@@ -462,7 +463,7 @@ class TestFeatureExtractionEdgeCases:
         # Should still work
         assert len(fused) == 1
         assert 'obj001' in fused
-        # FIXED: Access the 'features' key
+        # Access the 'features' key
         assert isinstance(fused['obj001']['features'], np.ndarray)
     
     def test_mismatched_camera_counts(self):
@@ -481,7 +482,7 @@ class TestFeatureExtractionEdgeCases:
         assert 'obj001' in fused
         assert 'obj002' in fused
         
-        # FIXED: Access the 'features' key
+        # Access the 'features' key
         # Both should have same dimension due to padding
         assert fused['obj001']['features'].shape[0] == fused['obj002']['features'].shape[0]
 

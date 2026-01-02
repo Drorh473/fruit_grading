@@ -82,7 +82,7 @@ def compute_loss(y_pred, y_true, num_classes = 3, params=None, lambda_reg=0.0):
         Loss value (cross-entropy + L2 penalty)
     """
     batch_size = y_pred.shape[0]
-    print(f" before change to int compute loss: {num_classes}")
+
     # Convert to one-hot if needed
     if y_true.ndim == 1:
         y_true_onehot = np.zeros((batch_size, num_classes))
