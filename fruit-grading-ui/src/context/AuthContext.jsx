@@ -19,7 +19,18 @@ export const AuthProvider = ({ children }) => {
     const savedUser = localStorage.getItem('fruitGradingUser');
     if (savedUser) {
       try {
-        setUser(JSON.parse(savedUser));
+        const userData = JSON.parse(savedUser);
+        // Check if session is expired (1 hour)
+        const loginTime = new Date(userData.loginTime);
+        const now = new Date();
+        const hoursSinceLogin = (now - loginTime) / (1000 * 60 * 60);
+        
+        if (hoursSinceLogin > 1) {
+          // Session expired, clear storage
+          localStorage.removeItem('fruitGradingUser');
+        } else {
+          setUser(userData);
+        }
       } catch (error) {
         localStorage.removeItem('fruitGradingUser');
       }
