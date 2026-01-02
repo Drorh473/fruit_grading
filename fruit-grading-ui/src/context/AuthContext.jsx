@@ -39,10 +39,6 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const login = (username, password, role) => {
-    // In production, this would call your backend API
-    // For now, we'll simulate authentication
-    
-    // Demo credentials:
     // Admin: username="admin", password="admin123"
     // User: username="user", password="user123"
     

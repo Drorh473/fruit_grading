@@ -53,16 +53,16 @@ class PipelineState:
                     data = json.load(f)
                     self._results_cache = data
                     self._cache_timestamp = datetime.now()
-                    print(f"✓ Dashboard metadata loaded from {self._metadata_path} (startup)")
+                    print(f"Dashboard metadata loaded from {self._metadata_path} (startup)")
             else:
-                print(f"ℹ No metadata file found at {self._metadata_path}")
+                print(f"No metadata file found at {self._metadata_path}")
         except Exception as e:
-            print(f"⚠ Error loading dashboard metadata: {e}")
+            print(f"Error loading dashboard metadata: {e}")
             self._results_cache = None
     
     def invalidate_cache(self):
         """Force reload of results from disk (call after pipeline completion)"""
-        print("♻ Invalidating results cache - reloading from disk")
+        print("Invalidating results cache - reloading from disk")
         self._load_results_from_disk()
     
     def get_state(self):
@@ -103,7 +103,7 @@ class PipelineState:
             self._state['currentStep'] = 0
             self._state['progress'] = 0
             self._state['logs'] = []
-            # Don't reset results - they're cached until new model is trained
+
             for step in self._state['steps']:
                 step['status'] = 'pending'
     
@@ -139,9 +139,9 @@ class PipelineState:
             self._metadata_path.parent.mkdir(parents=True, exist_ok=True)
             with open(self._metadata_path, 'w') as f:
                 json.dump(results, f, indent=2)
-            print(f"✓ Dashboard metadata saved to {self._metadata_path}")
+            print(f"Dashboard metadata saved to {self._metadata_path}")
         except Exception as e:
-            print(f"⚠ Error saving dashboard metadata: {e}")
+            print(f"Error saving dashboard metadata: {e}")
     
     def is_running(self):
         """Check if pipeline is running"""
