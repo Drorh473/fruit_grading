@@ -93,7 +93,7 @@ class PipelineState:
                     step['status'] = status
                     break
             self._state['currentStep'] = step_id
-            self._state['progress'] = int((step_id / len(self._state['steps'])) * 100)
+            self._state['progress'] = int((step_id / len(self._state['steps'])) * 100 - 20)
     
     def reset_pipeline(self):
         """Reset pipeline for new run"""
