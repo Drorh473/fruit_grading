@@ -1,0 +1,6 @@
+"""
+Frontend Tests Package
+Python-based tests using Pytest and Playwright
+"""
+
+__version__ = "1.0.0"
