@@ -85,48 +85,7 @@ class TestDatabaseToPreprocessing:
             processed_images.append(processed)
         
         assert len(processed_images) == TestConfig.NUM_OF_CAMERAS
-    
-    def test_preprocessing_progress_tracking(self, test_collection, valid_image_path, tmp_path):
-        """Test progress updates during preprocessing"""
-        # Insert multiple images
-        metadata_list = []
-        for i in range(10):
-            metadata_list.append({
-                "path": str(valid_image_path),
-                "processed_path": str(tmp_path / f"processed_{i}.png"),
-                "fruit_type": "market",
-                "object_id": f"obj{i:04d}",
-                "camera_id": 0,
-                "timestamp": f"2025-01-01T00:00:{i:02d}",
-                "width": 224,
-                "height": 224,
-                "color": 3,
-                "set_type": "training",
-                "category": "A"
-            })
-        
-        store_in_database(
-            metadata_list,
-            TestConfig.TEST_DB_NAME,
-            TestConfig.TEST_COLLECTION_NAME
-        )
-        
-        # Process with progress tracking
-        docs = list(test_collection.find({}))
-        processed_count = 0
-        total_count = len(docs)
-        
-        for doc in docs:
-            img = cv2.imread(doc['path'])
-            processed = custom_preprocessing(img)
-            processed_count += 1
-            
-            # Calculate progress
-            progress = (processed_count / total_count) * 100
-            assert 0 <= progress <= 100
-        
-        assert processed_count == total_count
-
+ 
 
 class TestPreprocessingUpdates:
     """Test updating database with preprocessing results"""

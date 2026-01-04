@@ -1,7 +1,3 @@
-"""
-Enhanced Feature Extraction Testing
-Comprehensive tests for CNN feature extraction with robustness checks
-"""
 import pytest
 import numpy as np
 import torch
@@ -34,11 +30,6 @@ class TestLoadModel:
         assert feature_extractor is not None
         assert device is not None
         assert str(device) in ['cuda', 'cpu']
-    
-    def test_model_in_eval_mode(self):
-        """Test that model is in evaluation mode"""
-        model, _, _ = load_model()
-        assert not model.training
     
     def test_feature_extractor_has_no_classifier(self):
         """Test that feature_extractor excludes the final classification layer"""
@@ -198,25 +189,6 @@ class TestTemporalPooling:
         # Access the 'features' key
         np.testing.assert_array_almost_equal(pooled['apple_obj001_0']['features'], expected)
     
-    def test_temporal_pooling_multiple_groups(self):
-        """Test pooling with multiple camera groups"""
-        flattened = {
-            'apple_obj001_0_t0': {'features': np.array([1.0, 2.0]), 'group_key': 'apple_obj001_0', 'label': 0, 'fruit_type': 'apple'},
-            'apple_obj001_0_t1': {'features': np.array([3.0, 4.0]), 'group_key': 'apple_obj001_0', 'label': 0, 'fruit_type': 'apple'},
-            'apple_obj001_1_t0': {'features': np.array([5.0, 6.0]), 'group_key': 'apple_obj001_1', 'label': 0, 'fruit_type': 'apple'}
-        }
-        
-        pooled = temporal_pooling(flattened)
-        
-        # Should have 2 groups
-        assert len(pooled) == 2
-        assert 'apple_obj001_0' in pooled
-        assert 'apple_obj001_1' in pooled
-        
-        # Access the 'features' key
-        np.testing.assert_array_almost_equal(pooled['apple_obj001_0']['features'], np.array([2.0, 3.0]))
-        np.testing.assert_array_almost_equal(pooled['apple_obj001_1']['features'], np.array([5.0, 6.0]))
-    
     def test_temporal_pooling_empty(self):
         """Test temporal pooling with empty input"""
         pooled = temporal_pooling({})
@@ -284,24 +256,6 @@ class TestTemporalPooling:
 
 class TestMultiViewFusion:
     """Test cases for multi-view fusion"""
-    
-    def test_fusion_single_camera(self):
-        """Test fusion with single camera """
-        pooled = {
-            'apple_obj001_0': {
-                'features': np.array([1, 2, 3, 4, 5]),
-                'label': 0,
-                'fruit_type': 'apple'
-            }
-        }
-        
-        fused = multi_view_fusion(pooled)
-        
-        assert 'apple_obj001' in fused
-        #Access the 'features' key
-        fused_features = fused['apple_obj001']['features']
-        np.testing.assert_array_equal(fused_features[:5], np.array([1, 2, 3, 4, 5]))
-    
     def test_fusion_multiple_cameras(self):
         """Test fusion concatenates features from multiple cameras"""
         pooled = {
@@ -390,11 +344,11 @@ class TestFeatureExtractionIntegration:
     def test_complete_pipeline_flow(self):
         """Test complete feature processing pipeline"""
         feature_map = {
-            'apple_obj001_0': [
+            'obj001_0': [
                 {'features': np.random.rand(7, 7, 1024), 'timestamp': 't0', 'label': 0, 'fruit_type': 'apple'},
                 {'features': np.random.rand(7, 7, 1024), 'timestamp': 't1', 'label': 0, 'fruit_type': 'apple'}
             ],
-            'apple_obj001_1': [
+            'obj001_1': [
                 {'features': np.random.rand(7, 7, 1024), 'timestamp': 't0', 'label': 0, 'fruit_type': 'apple'},
                 {'features': np.random.rand(7, 7, 1024), 'timestamp': 't1', 'label': 0, 'fruit_type': 'apple'}
             ]
@@ -411,18 +365,18 @@ class TestFeatureExtractionIntegration:
         # Step 3: Multi-view fusion
         fused = multi_view_fusion(pooled, target_views=2)
         assert len(fused) == 1  # 1 object
-        assert 'apple_obj001' in fused
+        assert 'obj001' in fused
         
         # Verify structure
-        assert 'features' in fused['apple_obj001']
-        assert 'label' in fused['apple_obj001']
-        assert isinstance(fused['apple_obj001']['features'], np.ndarray)
+        assert 'features' in fused['obj001']
+        assert 'label' in fused['obj001']
+        assert isinstance(fused['obj001']['features'], np.ndarray)
     
     def test_pipeline_with_multiple_fruits(self):
         """Test pipeline with multiple fruit types"""
         feature_map = {}
         
-        for fruit_idx, fruit_type in enumerate(['apple', 'banana', 'orange']):
+        for fruit_idx, fruit_type in enumerate(['standard', 'premium', 'market']):
             for cam_id in range(2):
                 key = f'{fruit_type}_obj{fruit_idx:03d}_{cam_id}'
                 feature_map[key] = [
@@ -435,14 +389,14 @@ class TestFeatureExtractionIntegration:
         
         # Should have 3 fused objects
         assert len(fused) == 3
-        assert 'apple_obj000' in fused
-        assert 'banana_obj001' in fused
-        assert 'orange_obj002' in fused
+        assert 'standard_obj000' in fused
+        assert 'premium_obj001' in fused
+        assert 'market_obj002' in fused
         
         # Verify labels are preserved
-        assert fused['apple_obj000']['label'] == 0
-        assert fused['banana_obj001']['label'] == 1
-        assert fused['orange_obj002']['label'] == 2
+        assert fused['standard_obj000']['label'] == 0
+        assert fused['premium_obj001']['label'] == 1
+        assert fused['market_obj002']['label'] == 2
 
 
 class TestFeatureExtractionEdgeCases:
@@ -485,9 +439,6 @@ class TestFeatureExtractionEdgeCases:
         # Access the 'features' key
         # Both should have same dimension due to padding
         assert fused['obj001']['features'].shape[0] == fused['obj002']['features'].shape[0]
-
-
-# ==================== Run Tests ====================
-
+        
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

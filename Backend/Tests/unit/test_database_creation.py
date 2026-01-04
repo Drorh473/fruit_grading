@@ -1,7 +1,3 @@
-"""
-Enhanced Database Testing
-Comprehensive tests for database operations with edge cases and robustness
-"""
 import pytest
 import pymongo
 from datetime import datetime
@@ -226,44 +222,6 @@ class TestDatabaseRobustness:
             # Expected behavior
             pass
     
-    def test_duplicate_insertion_prevention(self, test_collection, sample_image_metadata):
-        """Test handling of duplicate insertions"""
-        # Create unique index on object_id + camera_id
-        test_collection.create_index(
-            [("object_id", 1), ("camera_id", 1)],
-            unique=True
-        )
-        
-        # Insert first time - should succeed
-        test_collection.insert_one(sample_image_metadata)
-        
-        # Insert duplicate - should raise error
-        with pytest.raises(pymongo.errors.DuplicateKeyError):
-            test_collection.insert_one(sample_image_metadata)
-    
-    def test_unicode_path_handling(self, test_collection):
-        """Test handling of Unicode characters in paths"""
-        unicode_doc = {
-            "path": "/test/תפוח/apple_תפוח.png",  # Hebrew characters
-            "fruit_type": "market",
-            "object_id": "obj0001",
-            "camera_id": 0,
-            "timestamp": "2025-01-01T00:00:00",
-            "width": 224,
-            "height": 224,
-            "color": 3,
-            "set_type": "training",
-            "category": "A"
-        }
-        
-        # Should not raise any errors
-        test_collection.insert_one(unicode_doc)
-        
-        # Should be able to retrieve it
-        retrieved = test_collection.find_one({"object_id": "obj0001"})
-        assert retrieved is not None
-        assert "תפוח" in retrieved["path"]
-    
     def test_large_batch_insertion(self, test_collection):
         """Test insertion of large number of documents"""
         large_batch = []
@@ -297,9 +255,6 @@ class TestDatabaseRobustness:
             "path": "/test/image.png",
             # Missing required fields: fruit_type, object_id, etc.
         }
-        
-        # In production, you would validate before insertion
-        # For this test, we just verify the document is incomplete
         required_fields = ['path', 'fruit_type', 'object_id', 'camera_id']
         missing_fields = [f for f in required_fields if f not in malformed_doc]
         

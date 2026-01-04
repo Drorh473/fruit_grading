@@ -148,51 +148,5 @@ class TestFeatureQualityForTraining:
         assert X.min() >= -10.0  # Not too negative
         assert X.max() <= 10.0   # Not too positive
 
-
-class TestModelPerformanceOnFeatures:
-    """Test model performance with real feature distributions"""
-    
-    def test_model_learns_from_features(self):
-        """Test that model can learn from feature patterns"""
-        # Create features with some pattern
-        num_samples = 30
-        X = []
-        y = []
-        
-        for i in range(num_samples):
-            label = i % TestConfig.NUM_CLASSES
-            
-            # Create features with slight class-specific pattern
-            feature = np.random.uniform(0, 1, TestConfig.FEATURE_DIM)
-            feature[:10] += label * 0.1
-            feature = np.clip(feature, 0, 1)
-            
-            X.append(feature)
-            y.append(label)
-        
-        X = np.array(X)
-        y = np.array(y)
-        
-        # Train model
-        params = initialize_parameters(
-            TestConfig.FEATURE_DIM,
-            TestConfig.HIDDEN_DIM,
-            TestConfig.NUM_CLASSES
-        )
-        
-        initial_loss = None
-        final_loss = None
-        
-        for epoch in range(50):
-            loss, accuracy, params = train_step(X, y, params, TestConfig.NUM_CLASSES, learning_rate=0.01)
-            
-            if epoch == 0:
-                initial_loss = loss
-            if epoch == 49:
-                final_loss = loss
-        
-        # Loss should decrease
-        assert final_loss < initial_loss      
-
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

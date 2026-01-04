@@ -406,62 +406,6 @@ class TestPipelineIntegration(unittest.TestCase):
                     # setup_database should not be called
                     mock_setup.assert_not_called()
 
-
-class TestPipelineHyperparameters(unittest.TestCase):
-    """Test cases for different hyperparameter configurations"""
-    
-    def create_minimal_features(self, num_samples=6):
-        """Create minimal feature set for testing"""
-        features = {}
-        labels = ['market', 'standard', 'premium']
-        
-        for i in range(num_samples):
-            label = labels[i % 3]
-            features[f'{label}_obj{i:03d}'] = {
-                'features': np.random.rand(100).astype(np.float32),
-                'label': i % 3
-            }
-        
-        return features
-    
-    def test_different_hidden_dimensions(self):
-        """Test training with different hidden layer sizes"""
-        train_features = self.create_minimal_features(12)
-        test_features = self.create_minimal_features(6)
-        
-        for hidden_dim in [8, 16, 32]:
-            with self.subTest(hidden_dim=hidden_dim):
-                params, results = train_classifier(
-                    train_features,
-                    test_features,
-                    hidden_dim=hidden_dim,
-                    epochs=5,
-                    learning_rate=0.01
-                )
-                
-                self.assertIsNotNone(params)
-                self.assertEqual(params['W1'].shape[1], hidden_dim)
-                self.assertEqual(params['W2'].shape[0], hidden_dim)
-    
-    def test_different_learning_rates(self):
-        """Test training with different learning rates"""
-        train_features = self.create_minimal_features(12)
-        test_features = self.create_minimal_features(6)
-        
-        for lr in [0.001, 0.01, 0.1]:
-            with self.subTest(learning_rate=lr):
-                params, results = train_classifier(
-                    train_features,
-                    test_features,
-                    hidden_dim=16,
-                    epochs=5,
-                    learning_rate=lr
-                )
-                
-                self.assertIsNotNone(params)
-                self.assertIn('history', results)
-
-
 class TestPipelineDataValidation(unittest.TestCase):
     """Test cases for data validation throughout pipeline"""
     

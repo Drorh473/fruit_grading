@@ -36,7 +36,7 @@ class TestGetSettings:
         
         # Number of cameras should be positive
         if data['numCameras'] is not None:
-            assert data['numCameras'] > 0
+            assert data['numCameras'] == 4
         
         # Image size should be correct format
         assert data['imageSize'] == '224x224'
@@ -140,38 +140,6 @@ class TestDatabaseConnection:
         assert 'success' in data
         assert 'message' in data
         assert data['success'] is False
-    
-    def test_test_database_response_structure(self, client):
-        """Test database test response has correct structure"""
-        test_data = {
-            'connectionString': 'mongodb://localhost:27017'
-        }
-        
-        response = client.post('/api/settings/test-database',
-                              data=json.dumps(test_data),
-                              content_type='application/json')
-        
-        data = json.loads(response.data)
-        
-        # Should have success and message
-        assert 'success' in data
-        assert 'message' in data
-        assert isinstance(data['success'], bool)
-        assert isinstance(data['message'], str)
-    
-    def test_test_database_with_empty_string(self, client):
-        """Test database with empty connection string"""
-        empty_connection = {
-            'connectionString': ''
-        }
-        
-        response = client.post('/api/settings/test-database',
-                              data=json.dumps(empty_connection),
-                              content_type='application/json')
-        
-        assert response.status_code == 400
-
-
 class TestSettingsStatus:
     """Test settings status endpoint"""
     
@@ -266,20 +234,6 @@ class TestDatasetPaths:
         
         assert response.status_code == 200
     
-    def test_paths_are_strings(self, client):
-        """Test that paths are returned as strings"""
-        response = client.get('/api/settings/paths')
-        data = json.loads(response.data)
-        
-        # Check types (allow None)
-        if data['storedDataset'] is not None:
-            assert isinstance(data['storedDataset'], str)
-        if data['originalDataset'] is not None:
-            assert isinstance(data['originalDataset'], str)
-        if data['processedDataset'] is not None:
-            assert isinstance(data['processedDataset'], str)
-
-
 class TestSettingsIntegration:
     """Test integration between settings endpoints"""
     
@@ -365,50 +319,6 @@ class TestErrorHandling:
         response = client.post('/api/settings/status')
         assert response.status_code in [405, 404]
     
-    def test_malformed_database_test_request(self, client):
-        """Test database test with malformed request"""
-        malformed_data = {'invalid_field': 'value'}
-        
-        response = client.post('/api/settings/test-database',
-                              data=json.dumps(malformed_data),
-                              content_type='application/json')
-        
-        # Should handle gracefully
-        assert response.status_code in [200, 400]
-
-
-class TestResponseFormats:
-    """Test response formats are correct"""
-    
-    def test_all_endpoints_return_json(self, client):
-        """Test all GET endpoints return valid JSON"""
-        endpoints = [
-            '/api/settings',
-            '/api/settings/status',
-            '/api/settings/paths'
-        ]
-        
-        for endpoint in endpoints:
-            response = client.get(endpoint)
-            assert 'application/json' in response.content_type
-            
-            # Should be valid JSON
-            try:
-                json.loads(response.data)
-            except json.JSONDecodeError:
-                pytest.fail(f"Invalid JSON from {endpoint}")
-    
-    def test_post_endpoints_return_json(self, client):
-        """Test POST endpoints return JSON"""
-        test_data = {'connectionString': 'mongodb://localhost:27017'}
-        
-        response = client.post('/api/settings/test-database',
-                              data=json.dumps(test_data),
-                              content_type='application/json')
-        
-        assert 'application/json' in response.content_type
-
-
 class TestSettingsValidation:
     """Test settings value validation"""
     

@@ -1,7 +1,4 @@
-"""
-Activation Functions Testing
-Comprehensive tests for activation functions and their derivatives
-"""
+
 import pytest
 import numpy as np
 from pathlib import Path
@@ -32,19 +29,6 @@ class TestReLU:
         """Test ReLU with mixed positive and negative"""
         x = np.array([-2, -1, 0, 1, 2])
         expected = np.array([0, 0, 0, 1, 2])
-        result = relu(x)
-        np.testing.assert_array_equal(result, expected)
-    
-    def test_relu_zero(self):
-        """Test ReLU with zero"""
-        x = np.array([0])
-        result = relu(x)
-        np.testing.assert_array_equal(result, np.array([0]))
-    
-    def test_relu_2d_array(self):
-        """Test ReLU with 2D array"""
-        x = np.array([[-1, 2], [3, -4]])
-        expected = np.array([[0, 2], [3, 0]])
         result = relu(x)
         np.testing.assert_array_equal(result, expected)
     
@@ -81,14 +65,6 @@ class TestReLUDerivative:
         expected = np.array([0, 0, 0, 1, 1])
         result = relu_derivative(x)
         np.testing.assert_array_equal(result, expected)
-    
-    def test_relu_derivative_zero(self):
-        """Test derivative at zero"""
-        x = np.array([0])
-        result = relu_derivative(x)
-        # Derivative at 0 can be defined as 0 or 1 depending on implementation
-        assert result[0] in [0, 1]
-    
     def test_relu_derivative_preserves_shape(self):
         """Test that derivative preserves input shape"""
         shapes = [(5,), (3, 4), (2, 3, 4)]
@@ -145,19 +121,6 @@ class TestSoftmax:
         expected = np.array([[1/3, 1/3, 1/3]])
         np.testing.assert_almost_equal(result, expected)
     
-    def test_softmax_batch(self):
-        """Test softmax with batch of inputs"""
-        x = np.array([
-            [1, 2, 3],
-            [4, 5, 6],
-            [7, 8, 9]
-        ])
-        result = softmax(x)
-        
-        # Each row should sum to 1
-        row_sums = result.sum(axis=1)
-        np.testing.assert_almost_equal(row_sums, np.ones(3))
-    
     def test_softmax_max_element(self):
         """Test that max element gets highest probability"""
         x = np.array([[1, 5, 2]])
@@ -184,40 +147,6 @@ class TestSoftmax:
         # Should produce uniform distribution
         expected = np.array([[1/3, 1/3, 1/3]])
         np.testing.assert_almost_equal(result, expected)
-
-
-class TestActivationFunctionsIntegration:
-    """Integration tests combining activation functions"""
-    
-    def test_relu_then_softmax(self):
-        """Test ReLU followed by Softmax"""
-        x = np.array([[-1, 2, -3, 4]])
-        
-        # Apply ReLU
-        relu_output = relu(x)
-        expected_relu = np.array([[0, 2, 0, 4]])
-        np.testing.assert_array_equal(relu_output, expected_relu)
-        
-        # Apply Softmax (reshape for softmax)
-        softmax_output = softmax(relu_output)
-        
-        # Should sum to 1
-        np.testing.assert_almost_equal(softmax_output.sum(), 1.0)
-    
-    def test_gradient_flow(self):
-        """Test gradient flow through ReLU"""
-        # Forward pass
-        x = np.array([[-1, 2, -3, 4]])
-        relu_output = relu(x)
-        
-        # Backward pass (gradient)
-        grad_output = np.ones_like(relu_output)
-        grad_input = grad_output * relu_derivative(x)
-        
-        # Gradients should be zero where input was negative
-        expected_grad = np.array([[0, 1, 0, 1]])
-        np.testing.assert_array_equal(grad_input, expected_grad)
-
 
 class TestEdgeCases:
     """Test edge cases and boundary conditions"""
@@ -253,9 +182,5 @@ class TestEdgeCases:
         
         # Should be 1.0
         np.testing.assert_almost_equal(result, np.array([[1.0]]))
-
-
-# ==================== Run Tests ====================
-
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

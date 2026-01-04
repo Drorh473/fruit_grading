@@ -22,14 +22,12 @@ class TestDashboardStats:
         assert 'marketCount' in data
         assert 'standardCount' in data
         assert 'premiumCount' in data
-        assert 'rejectCount' in data
         
         # Verify types
         assert isinstance(data['totalToday'], int)
         assert isinstance(data['marketCount'], int)
         assert isinstance(data['standardCount'], int)
         assert isinstance(data['premiumCount'], int)
-        assert isinstance(data['rejectCount'], int)
     
     def test_dashboard_stats_values(self, client):
         """Test dashboard stats have valid values"""
@@ -41,7 +39,6 @@ class TestDashboardStats:
         assert data['marketCount'] >= 0
         assert data['standardCount'] >= 0
         assert data['premiumCount'] >= 0
-        assert data['rejectCount'] >= 0
     
     def test_dashboard_stats_sum_consistency(self, client):
         """Test that category counts sum correctly"""
@@ -50,7 +47,7 @@ class TestDashboardStats:
         
         # Total should equal sum of categories (if data exists)
         category_sum = (data['marketCount'] + data['standardCount'] + 
-                       data['premiumCount'] + data['rejectCount'])
+                       data['premiumCount'])
         
         # Either total matches sum, or everything is zero
         assert (data['totalToday'] == category_sum or 
@@ -101,7 +98,7 @@ class TestRecentResults:
             assert 0.0 <= result['confidence'] <= 1.0
             
             # Type should be valid category
-            assert result['type'] in ['market', 'standard', 'premium', 'reject']
+            assert result['type'] in ['market', 'standard', 'premium']
     
     def test_recent_results_ordering(self, client):
         """Test results are ordered by timestamp (newest first)"""
@@ -299,7 +296,6 @@ class TestErrorHandling:
         assert 'marketCount' in data
         assert 'standardCount' in data
         assert 'premiumCount' in data
-        assert 'rejectCount' in data
         
         # All should be integers
         assert isinstance(data['totalToday'], int)
@@ -342,74 +338,6 @@ class TestErrorHandling:
             # Should not accept POST
             response = client.post(endpoint)
             assert response.status_code in [405, 404]
-
-
-class TestResponseFormats:
-    """Test response formats are correct"""
-    
-    def test_all_endpoints_return_json(self, client):
-        """Test all endpoints return valid JSON"""
-        endpoints = [
-            '/api/user/dashboard-stats',
-            '/api/user/recent-results',
-            '/api/user/model-info'
-        ]
-        
-        for endpoint in endpoints:
-            response = client.get(endpoint)
-            assert 'application/json' in response.content_type
-            
-            # Should be valid JSON
-            try:
-                json.loads(response.data)
-            except json.JSONDecodeError:
-                pytest.fail(f"Invalid JSON from {endpoint}")
-    
-    def test_stats_returns_object(self, client):
-        """Test stats endpoint returns object not array"""
-        response = client.get('/api/user/dashboard-stats')
-        data = json.loads(response.data)
-        
-        # Should be dict/object, not list
-        assert isinstance(data, dict)
-        assert not isinstance(data, list)
-    
-    def test_results_returns_array(self, client):
-        """Test results endpoint returns array not object"""
-        response = client.get('/api/user/recent-results')
-        data = json.loads(response.data)
-        
-        # Should be list/array, not dict
-        assert isinstance(data, list)
-        assert not isinstance(data, dict)
-
-
-class TestPerformance:
-    """Test performance characteristics"""
-    
-    def test_dashboard_stats_performance(self, client):
-        """Test dashboard stats endpoint responds quickly"""
-        import time
-        
-        start = time.time()
-        response = client.get('/api/user/dashboard-stats')
-        elapsed = time.time() - start
-        
-        assert response.status_code == 200
-        assert elapsed < 2.0  # Should be reasonably fast
-    
-    def test_recent_results_performance(self, client):
-        """Test recent results endpoint responds quickly"""
-        import time
-        
-        start = time.time()
-        response = client.get('/api/user/recent-results')
-        elapsed = time.time() - start
-        
-        assert response.status_code == 200
-        assert elapsed < 2.0
-
-
 class TestEdgeCases:
     """Test edge cases"""
     

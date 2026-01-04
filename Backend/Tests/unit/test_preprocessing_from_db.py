@@ -1,19 +1,10 @@
-"""
-Enhanced Preprocessing Testing
-Comprehensive tests for image preprocessing with robustness checks
-"""
 import pytest
 import numpy as np
 import cv2
 import os
 from pathlib import Path
-
-
-# Import functions to test
 import sys
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-
-
 from preprocessing.preprocessing_from_db import (
     custom_preprocessing,
     process_image

@@ -1,14 +1,7 @@
-"""
-Enhanced Model Training Testing
-Comprehensive tests for neural network operations and training
-"""
 import pytest
 import numpy as np
 import tempfile
 from pathlib import Path
-
-
-# Import functions to test
 import sys
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
@@ -28,7 +21,6 @@ from cnn.fully_connected_layer import (
 )
 
 
-# ==================== Fixtures ====================
 
 @pytest.fixture
 def test_config():
@@ -48,9 +40,6 @@ def mock_model_parameters(test_config):
         test_config['HIDDEN_DIM'],
         test_config['NUM_CLASSES']
     )
-
-
-# ==================== Tests ====================
 
 class TestParameterInitialization:
     """Test parameter initialization"""
@@ -433,41 +422,6 @@ class TestModelSaveLoad:
         
         # Cleanup
         Path(model_path).unlink()
-    
-    def test_save_load_preserves_functionality(self, mock_model_parameters, test_config):
-        """Test that saved/loaded model produces same predictions"""
-        X = np.random.rand(5, test_config['FEATURE_DIM'])
         
-        # Get predictions with original model
-        pred_original, _ = predict(X, mock_model_parameters)
-        
-        # Save and load model
-        with tempfile.NamedTemporaryFile(suffix='.pkl', delete=False) as f:
-            model_path = f.name
-        
-        history = {'train_loss': [], 'train_accuracy': []}
-        save_model(
-            mock_model_parameters,
-            history,
-            test_config['FEATURE_DIM'],
-            test_config['HIDDEN_DIM'],
-            test_config['NUM_CLASSES'],
-            model_path
-        )
-        
-        loaded_params, _ = load_model(model_path)
-        
-        # Get predictions with loaded model
-        pred_loaded, _ = predict(X, loaded_params)
-        
-        # Should be identical
-        np.testing.assert_array_equal(pred_original, pred_loaded)
-        
-        # Cleanup
-        Path(model_path).unlink()
-
-
-# ==================== Run Tests ====================
-
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

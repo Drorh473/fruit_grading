@@ -44,8 +44,7 @@ def get_dashboard_stats():
             'totalToday': sum(r['count'] for r in results),
             'marketCount': next((r['count'] for r in results if r['_id'] == 'market'), 0),
             'standardCount': next((r['count'] for r in results if r['_id'] == 'standard'), 0),
-            'premiumCount': next((r['count'] for r in results if r['_id'] == 'premium'), 0),
-            'rejectCount': next((r['count'] for r in results if r['_id'] == 'reject'), 0)
+            'premiumCount': next((r['count'] for r in results if r['_id'] == 'premium'), 0)
         }
         
         return jsonify(stats), 200
@@ -56,8 +55,7 @@ def get_dashboard_stats():
             'totalToday': 0,
             'marketCount': 0,
             'standardCount': 0,
-            'premiumCount': 0,
-            'rejectCount': 0
+            'premiumCount': 0
         }), 200
 
 
