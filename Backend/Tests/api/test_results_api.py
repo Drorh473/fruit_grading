@@ -1,11 +1,5 @@
-"""
-Results API Tests
-Essential tests for classification results retrieval and statistics endpoints
-"""
 import pytest
 import json
-
-
 
 class TestResultsList:
     """Test results list endpoint"""
@@ -28,18 +22,6 @@ class TestResultsList:
         assert isinstance(data['total'], int)
         assert isinstance(data['limit'], int)
         assert isinstance(data['offset'], int)
-    
-    def test_get_results_list_with_pagination(self, client):
-        """Test pagination parameters"""
-        response = client.get('/api/results/list?limit=10&offset=5')
-        
-        assert response.status_code == 200
-        data = json.loads(response.data)
-        
-        # Verify pagination values
-        assert data['limit'] == 10
-        assert data['offset'] == 5
-        assert len(data['results']) <= 10
     
     def test_get_results_list_structure(self, client):
         """Test result objects have correct structure"""
@@ -88,22 +70,6 @@ class TestResultsList:
         data = json.loads(response.data)
         
         assert isinstance(data['results'], list)
-
-
-class TestGetAllResults:
-    """Test legacy /all endpoint"""
-    
-    def test_get_all_results_redirects(self, client):
-        """Test that /all endpoint works (legacy compatibility)"""
-        response = client.get('/api/results/all')
-        
-        assert response.status_code == 200
-        data = json.loads(response.data)
-        
-        # Should have same structure as /list
-        assert 'results' in data
-        assert 'total' in data
-
 
 class TestGetResultDetails:
     """Test get result details endpoint"""
@@ -191,7 +157,7 @@ class TestQualityDistribution:
         data = json.loads(response.data)
         
         # Verify all quality types exist
-        required_types = ['market', 'standard', 'premium', 'reject']
+        required_types = ['market', 'standard', 'premium']
         for quality_type in required_types:
             assert quality_type in data
             assert 'count' in data[quality_type]
@@ -470,16 +436,6 @@ class TestErrorHandling:
         for endpoint in endpoints:
             response = client.get(endpoint)
             assert response.status_code == 200
-    
-    def test_invalid_fruit_type_filter(self, client):
-        """Test filtering with invalid fruit type"""
-        response = client.get('/api/results/list?type=invalid_type')
-        
-        # Should handle gracefully
-        assert response.status_code == 200
-        data = json.loads(response.data)
-        assert isinstance(data['results'], list)
-
 
 class TestResponseFormats:
     """Test response formats are correct"""

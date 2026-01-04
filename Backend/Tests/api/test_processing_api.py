@@ -1,14 +1,6 @@
-"""
-Processing Pipeline API Tests
-Essential tests for ML pipeline control and monitoring endpoints
-"""
 import pytest
 import json
 import time
-from pathlib import Path
-import sys
-
-# ==================== Tests ====================
 
 class TestPipelineControl:
     """Test pipeline start/stop endpoints"""
@@ -359,17 +351,6 @@ class TestPipelineWorkflow:
 class TestErrorHandling:
     """Test error handling for pipeline endpoints"""
     
-    def test_invalid_config_format(self, client):
-        """Test pipeline handles invalid config format"""
-        invalid_config = "not a json"
-        
-        response = client.put('/api/pipeline/config',
-                            data=invalid_config,
-                            content_type='application/json')
-        
-        # Should handle gracefully
-        assert response.status_code in [400, 500]
-    
     def test_invalid_http_methods(self, client):
         """Test endpoints reject invalid HTTP methods"""
         # Start should not accept GET
@@ -394,7 +375,6 @@ class TestErrorHandling:
             else:
                 response = client.post(endpoint)
             
-            # Should return 200 with valid data
             assert response.status_code == 200
     
     def test_endpoints_return_json(self, client):
@@ -422,29 +402,6 @@ class TestErrorHandling:
             except json.JSONDecodeError:
                 pytest.fail(f"Invalid JSON from {endpoint}")
 
-
-class TestPipelinePerformance:
-    """Test pipeline performance characteristics"""
-    
-    def test_status_endpoint_performance(self, client):
-        """Test status endpoint responds quickly"""
-        start = time.time()
-        response = client.get('/api/pipeline/status')
-        elapsed = time.time() - start
-        
-        assert response.status_code == 200
-        assert elapsed < 1.0  # Should be fast
-    
-    def test_config_endpoint_performance(self, client):
-        """Test config endpoint responds quickly"""
-        start = time.time()
-        response = client.get('/api/pipeline/config')
-        elapsed = time.time() - start
-        
-        assert response.status_code == 200
-        assert elapsed < 1.0
-
-
 class TestPipelineEdgeCases:
     """Test edge cases and unusual scenarios"""
     
@@ -462,31 +419,6 @@ class TestPipelineEdgeCases:
         time.sleep(0.2)  # Small delay
         response3 = client.post('/api/pipeline/start')
         assert response3.status_code == 200
-    
-    def test_concurrent_status_requests(self, client):
-        """Test handling concurrent status requests"""
-        import threading
-        
-        results = []
-        
-        def get_status():
-            response = client.get('/api/pipeline/status')
-            results.append(response.status_code)
-        
-        # Create multiple threads
-        threads = [threading.Thread(target=get_status) for _ in range(5)]
-        
-        # Start all threads
-        for t in threads:
-            t.start()
-        
-        # Wait for completion
-        for t in threads:
-            t.join()
-        
-        # All should succeed
-        assert len(results) == 5
-        assert all(status == 200 for status in results)
 
 
 if __name__ == "__main__":

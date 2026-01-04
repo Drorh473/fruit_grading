@@ -1,11 +1,5 @@
-"""
-Settings API Tests
-Essential tests for system settings and configuration endpoints
-"""
 import pytest
 import json
-from pathlib import Path
-import sys
 
 class TestGetSettings:
     """Test get settings endpoint"""

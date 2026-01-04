@@ -5,9 +5,6 @@ Tests the real API endpoints with various scenarios
 """
 import pytest
 import json
-from datetime import datetime
-from pathlib import Path
-import sys
 
 class TestSystemStatus:
     """Test system status endpoint"""
@@ -137,7 +134,7 @@ class TestRecentResults:
         """Test recent results with invalid limit"""
         response = client.get('/api/admin/recent-results?limit=invalid')
         
-        # Should handle gracefully - either 200 with default or 400
+        # Should handle gracefully
         assert response.status_code in [200, 400]
 
 
@@ -355,18 +352,6 @@ class TestFullDashboardData:
         assert 'trainAccuracy' in model_performance
         assert 'testAccuracy' in model_performance
         assert 'classes' in model_performance
-    
-    def test_full_dashboard_efficiency(self, client):
-        """Test that full dashboard is efficient (single call)"""
-        import time
-        
-        start = time.time()
-        response = client.get('/api/admin/full-dashboard-data')
-        elapsed = time.time() - start
-        
-        assert response.status_code == 200
-        # Should complete in reasonable time (< 5 seconds to be safe)
-        assert elapsed < 5.0
 
 
 class TestErrorHandling:

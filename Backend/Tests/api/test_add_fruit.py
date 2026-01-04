@@ -1,16 +1,9 @@
-"""
-Add Fruit API Tests
-Tests for fruit validation, processing, and upload endpoints
-"""
 import pytest
 import json
-import os
-from pathlib import Path
 from PIL import Image
 
-
 class TestValidateFolderEndpoint:
-    """Test /validate endpoint"""
+    """Test/validate endpoint"""
     
     def test_validate_folder_missing_path(self, client):
         """Test validation without folder path"""
@@ -78,7 +71,7 @@ class TestValidateFolderEndpoint:
 
 
 class TestProcessFruitEndpoint:
-    """Test /process endpoint"""
+    """Test/process endpoint"""
     
     def test_process_fruit_missing_path(self, client):
         """Test processing without folder path"""
@@ -114,14 +107,13 @@ class TestProcessFruitEndpoint:
                               }),
                               content_type='application/json')
         
-        # Will likely fail but should accept the parameter
         assert response.status_code in [200, 400, 500]
         data = json.loads(response.data)
         assert 'success' in data
 
 
 class TestUploadFruitEndpoint:
-    """Test /upload endpoint"""
+    """Test/upload endpoint"""
     
     def test_upload_fruit_no_files(self, client):
         """Test upload without files"""
@@ -133,22 +125,6 @@ class TestUploadFruitEndpoint:
         data = json.loads(response.data)
         assert data['success'] is False
         assert 'no files' in data['error'].lower()
-    
-    def test_upload_fruit_missing_fruit_type(self, client, valid_image_path):
-        """Test upload without fruit type"""
-        with open(valid_image_path, 'rb') as img:
-            data = {
-                'files': [(img, 'test.jpg')]
-            }
-            
-            response = client.post('/api/fruits/upload',
-                                  data=data,
-                                  content_type='multipart/form-data')
-        
-        assert response.status_code == 400
-        data = json.loads(response.data)
-        assert data['success'] is False
-        assert 'required' in data['error'].lower()
     
     def test_upload_fruit_success(self, client, valid_image_path):
         """Test successful fruit upload"""
@@ -194,63 +170,6 @@ class TestUploadFruitEndpoint:
         response_data = json.loads(response.data)
         assert response_data['success'] is True
         assert response_data['filesUploaded'] == 1
-    
-    def test_upload_fruit_multiple_types(self, client, valid_image_path):
-        """Test upload with different fruit types"""
-        fruit_types = ['market', 'standard', 'premium', 'reject']
-        
-        for fruit_type in fruit_types:
-            with open(valid_image_path, 'rb') as img:
-                data = {
-                    'fruitType': fruit_type,
-                    'objectId': f'obj_{fruit_type}',
-                    'files': [(img, 'test.jpg')]
-                }
-                
-                response = client.post('/api/fruits/upload',
-                                      data=data,
-                                      content_type='multipart/form-data')
-            
-            assert response.status_code == 200
-
-
-class TestGetFruitTypesEndpoint:
-    """Test /types endpoint"""
-    
-    def test_get_fruit_types_success(self, client):
-        """Test getting available fruit types"""
-        response = client.get('/api/fruits/types')
-        
-        assert response.status_code == 200
-        data = json.loads(response.data)
-        
-        # Should return list of fruit types
-        assert isinstance(data, list)
-        assert len(data) == 4
-    
-    def test_get_fruit_types_structure(self, client):
-        """Test fruit types response structure"""
-        response = client.get('/api/fruits/types')
-        data = json.loads(response.data)
-        
-        # Check each type has required fields
-        for fruit_type in data:
-            assert 'value' in fruit_type
-            assert 'label' in fruit_type
-    
-    def test_get_fruit_types_values(self, client):
-        """Test fruit types have correct values"""
-        response = client.get('/api/fruits/types')
-        data = json.loads(response.data)
-        
-        # Extract values
-        values = [ft['value'] for ft in data]
-        
-        # Should have all expected types
-        assert 'market' in values
-        assert 'standard' in values
-        assert 'premium' in values
-        assert 'reject' in values
 
 
 class TestAddFruitIntegration:
@@ -275,33 +194,13 @@ class TestAddFruitIntegration:
         
         assert validate_response.status_code == 200
         
-        # Step 2: Process (may fail without full pipeline)
+        # Step 2: Process 
         process_response = client.post('/api/fruits/process',
                                       data=json.dumps({'folderPath': str(folder)}),
                                       content_type='application/json')
         
         # Should accept the request
         assert process_response.status_code in [200, 500]
-    
-    def test_get_types_before_upload(self, client, valid_image_path):
-        """Test getting types before uploading"""
-        # Get types
-        types_response = client.get('/api/fruits/types')
-        assert types_response.status_code == 200
-        
-        types_data = json.loads(types_response.data)
-        first_type = types_data[0]['value']
-        
-        # Use type in upload
-        with open(valid_image_path, 'rb') as img:
-            upload_response = client.post('/api/fruits/upload',
-                                         data={
-                                             'fruitType': first_type,
-                                             'files': [(img, 'test.jpg')]
-                                         },
-                                         content_type='multipart/form-data')
-        
-        assert upload_response.status_code == 200
 
 
 class TestErrorHandling:

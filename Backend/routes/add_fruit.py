@@ -177,21 +177,3 @@ def upload_fruit():
             'success': False,
             'error': str(e)
         }), 500
-
-
-@add_fruit_bp.route('/types', methods=['GET'])
-def get_fruit_types():
-    """Get available fruit types"""
-    try:
-        fruit_types = [
-            {'value': 'market', 'label': 'Market'},
-            {'value': 'standard', 'label': 'Standard'},
-            {'value': 'premium', 'label': 'Premium'},
-            {'value': 'reject', 'label': 'Reject'}
-        ]
-        
-        return jsonify(fruit_types), 200
-        
-    except Exception as e:
-        print(f"Error in get_fruit_types: {e}")
-        return jsonify([]), 200

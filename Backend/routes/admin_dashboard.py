@@ -202,7 +202,7 @@ def get_model_performance():
 
 @admin_dashboard_bp.route('/per-class-performance', methods=['GET'])
 def get_per_class_performance():
-    """Get per-class performance metrics (NEW ENDPOINT)"""
+    """Get per-class performance metrics"""
     try:
         metadata = load_dashboard_metadata()
         if metadata and 'per_class_performance' in metadata:
