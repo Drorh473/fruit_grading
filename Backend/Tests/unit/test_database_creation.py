@@ -1,7 +1,7 @@
 import pytest
 import pymongo
 from datetime import datetime
-from Tests.test_config import TestConfig
+from Backend.Tests.test_config import TestConfig
 
 # Import functions to test
 import sys

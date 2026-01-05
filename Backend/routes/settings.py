@@ -83,8 +83,8 @@ def test_database():
 def get_settings_status():
     """Get system status for settings page"""
     try:
-        from utils import check_db_connection
-        from shared_state import pipeline_state
+        from Backend.utils.utils import check_db_connection
+        from Backend.utils.shared_state import pipeline_state
         
         db_status = 'connected' if check_db_connection() else 'disconnected'
         state = pipeline_state.get_state()

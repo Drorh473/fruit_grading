@@ -234,7 +234,6 @@ class TestOrchestrator:
         print("QUICK PRE-PIPELINE VALIDATION")
         print("Unit Tests + Integration Tests Only")
         print("="*70)
-        
         start_time = time.time()
         all_passed = True
         

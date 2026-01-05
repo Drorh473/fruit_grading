@@ -33,7 +33,6 @@ def run_tests(mode='full', verbose=True):
         bool: True if tests passed
     """
     orchestrator = TestOrchestrator()
-    
     if mode == 'critical':
         print("\nRunning critical tests only...")
         return orchestrator.run_critical_only(verbose=verbose)

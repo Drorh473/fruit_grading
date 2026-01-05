@@ -26,7 +26,7 @@ STORED_DATASET_PATH = os.getenv('STORED_DATASET_PATH')
 PROCESSED_DATASET_PATH = os.getenv('PROCESSED_DATASET_PATH')
 
 # Import model metadata management
-from model_metadata import save_dashboard_metadata
+from utils.model_metadata import save_dashboard_metadata
 
 # Get configuration
 ORIGINAL_DATASET_PATH = os.getenv('ORIGINAL_DATASET_PATH')

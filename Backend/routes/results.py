@@ -5,7 +5,7 @@ Endpoints for viewing and exporting classification results
 from flask import Blueprint, jsonify, request
 from datetime import datetime, timedelta
 from collections import Counter
-from utils import get_collection
+from utils.utils import get_collection
 
 results_bp = Blueprint('results', __name__)
 

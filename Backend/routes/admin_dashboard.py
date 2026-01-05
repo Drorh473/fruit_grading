@@ -5,9 +5,9 @@ Now uses dashboard_metadata.json from last model build
 """
 from flask import Blueprint, jsonify, request
 from datetime import datetime
-from utils import get_collection, check_db_connection
-from shared_state import pipeline_state
-from model_metadata import load_dashboard_metadata, format_for_admin_dashboard
+from utils.utils import get_collection, check_db_connection
+from utils.shared_state import pipeline_state
+from utils.model_metadata import load_dashboard_metadata, format_for_admin_dashboard
 
 admin_dashboard_bp = Blueprint('admin_dashboard', __name__)
 

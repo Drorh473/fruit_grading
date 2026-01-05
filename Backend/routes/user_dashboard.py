@@ -5,8 +5,8 @@ Now uses dashboard_metadata.json from last model build
 """
 from flask import Blueprint, jsonify
 from datetime import datetime, timedelta
-from utils import get_collection
-from model_metadata import load_dashboard_metadata, format_for_user_dashboard
+from utils.utils import get_collection
+from utils.model_metadata import load_dashboard_metadata, format_for_user_dashboard
 
 user_dashboard_bp = Blueprint('user_dashboard', __name__)
 

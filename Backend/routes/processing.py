@@ -1,14 +1,10 @@
-"""
-Processing Pipeline Routes
-Endpoints for ML pipeline control and monitoring
-"""
 from flask import Blueprint, jsonify, request, current_app
 from datetime import datetime
 import threading
 import traceback
 import sys
 from pathlib import Path
-from shared_state import pipeline_state
+from utils.shared_state import pipeline_state
 
 processing_bp = Blueprint('processing', __name__)
 
@@ -183,7 +179,7 @@ def run_pipeline_background(config):
         if results is not None and train_features is not None and test_features is not None:
             pipeline_state.add_log("Saving dashboard metadata...", 'info')
             try:
-                from model_metadata import save_dashboard_metadata
+                from utils.model_metadata import save_dashboard_metadata
                 
                 # Get label mapping
                 label_mapping = results.get('label_mapping', {
@@ -220,13 +216,13 @@ def run_pipeline_background(config):
             })
         
         # Complete
-        pipeline_state.update_state(status='completed', progress=100, running=False,currentStep=0)
+        pipeline_state.update_state(status='completed', progress=100, running=False,currentStep=1)
         pipeline_state.add_log("Pipeline completed successfully!", 'success')
         
     except Exception as e:
         pipeline_state.add_log(f"Pipeline error: {str(e)}", 'error')
         pipeline_state.add_log(traceback.format_exc(), 'error')
-        pipeline_state.update_state(status='failed', running=False,currentStep=0)
+        pipeline_state.update_state(status='failed', running=False,currentStep=1)
         
         # Mark current step as failed
         state = pipeline_state.get_state()

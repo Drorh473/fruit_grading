@@ -9,7 +9,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 # Import TestConfig for test database settings
-from Tests.test_config import TestConfig
+from Backend.Tests.test_config import TestConfig
 
 from preprocessing.preprocessing_from_db import (
     custom_preprocessing,

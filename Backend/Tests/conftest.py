@@ -1,7 +1,9 @@
 """
 Pytest configuration and fixtures for test suite
+Ensures complete database isolation from production
 """
 import sys
+import os
 import pytest
 import numpy as np
 from pathlib import Path
@@ -9,21 +11,37 @@ from pymongo import MongoClient
 from PIL import Image
 from flask import Flask
 
+# CRITICAL: Set test environment BEFORE any other imports
+os.environ['TESTING'] = 'true'
+os.environ['DB_NAME'] = 'test_fruit_grading'
 
 # Add project root to path
 project_root = Path(__file__).parent.parent
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
-
 # Add Tests directory to path
 tests_dir = Path(__file__).parent
 if str(tests_dir) not in sys.path:
     sys.path.insert(0, str(tests_dir))
 
+# Import test configuration (this also loads .env.test)
+from Backend.Tests.test_config import TestConfig, ensure_test_environment
 
-# Import test configuration
-from test_config import TestConfig
+# Ensure test environment is active
+ensure_test_environment()
+
+
+# ==================== Database Isolation Guard ====================
+
+def _verify_not_production_db(db_name):
+    """Safety check to prevent accidental production database access"""
+    production_names = ['fruit_grading', 'fruit_rotation_db', 'production', 'prod']
+    if db_name.lower() in [n.lower() for n in production_names]:
+        raise RuntimeError(
+            f"CRITICAL: Attempted to access production database '{db_name}' in tests! "
+            "Check your test configuration."
+        )
 
 
 # ==================== Flask Application Fixtures ====================
@@ -31,82 +49,72 @@ from test_config import TestConfig
 @pytest.fixture
 def app():
     """Create Flask app for testing with all blueprints registered"""
+    # Verify test mode
+    ensure_test_environment()
+    
     app = Flask(__name__)
     app.config['TESTING'] = True
     
-    # Set test configuration - Use getattr with defaults to avoid AttributeError
+    # Set test configuration - ALWAYS use test database
     app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max
-    app.config['DB_NAME'] = getattr(TestConfig, 'TEST_DB_NAME', 'test_fruit_grading')
-    app.config['MONGO_CONNECTION_STRING'] = getattr(TestConfig, 'MONGO_CONNECTION_STRING', 'mongodb://localhost:27017')
+    app.config['DB_NAME'] = TestConfig.TEST_DB_NAME  # Force test DB
+    app.config['MONGO_CONNECTION_STRING'] = TestConfig.MONGO_CONNECTION_STRING
+    
+    # Verify not production
+    _verify_not_production_db(app.config['DB_NAME'])
     
     # Handle directory paths with fallback
-    app.config['STORED_DATASET_PATH'] = str(getattr(TestConfig, 'TEMP_STORED_DATASET_DIR', Path('/tmp/stored_dataset')))
-    app.config['ORIGINAL_DATASET_PATH'] = str(getattr(TestConfig, 'TEMP_ORIGINAL_DATASET_DIR', Path('/tmp/original_dataset')))
-    app.config['PROCESSED_DATASET_PATH'] = str(getattr(TestConfig, 'TEMP_PROCESSED_DATASET_DIR', Path('/tmp/processed_dataset')))
+    app.config['STORED_DATASET_PATH'] = str(TestConfig.TEMP_STORED_DATASET_DIR)
+    app.config['ORIGINAL_DATASET_PATH'] = str(TestConfig.TEMP_ORIGINAL_DATASET_DIR)
+    app.config['PROCESSED_DATASET_PATH'] = str(TestConfig.TEMP_PROCESSED_DATASET_DIR)
     
     app.config['CAMERA_FPS'] = 30
     app.config['NUM_OF_CAMERAS'] = 4
     app.config['BATCH_SIZE'] = 32
-    app.config['MODEL_DIR'] = 'saved_models'
+    app.config['MODEL_DIR'] = '/tmp/test_models'
     
-    app.mongo_client = MongoClient(app.config['MONGO_CONNECTION_STRING'])
-    # Try to ping to verify connection
-    app.mongo_client.server_info()
-    print(f" MongoDB connected for testing: {app.config['DB_NAME']}")
+    try:
+        app.mongo_client = MongoClient(app.config['MONGO_CONNECTION_STRING'])
+        app.mongo_client.server_info()
+        print(f"[Test] MongoDB connected to TEST database: {app.config['DB_NAME']}")
+    except Exception as e:
+        print(f"[Test] MongoDB connection failed: {e}")
+        app.mongo_client = None
     
     # Try to import and register blueprints (with error handling)
-    try:
-        from routes.add_fruit import add_fruit_bp
-        app.register_blueprint(add_fruit_bp, url_prefix='/api/fruits')
-    except (ImportError, AttributeError) as e:
-        print(f"Warning: Could not import add_fruit_bp: {e}")
+    blueprint_imports = [
+        ('routes.add_fruit', 'add_fruit_bp', '/api/fruits'),
+        ('routes.camera_monitor', 'cameras_bp', '/api/cameras'),
+        ('routes.processing', 'processing_bp', '/api/pipeline'),
+        ('routes.results', 'results_bp', '/api/results'),
+        ('routes.settings', 'settings_bp', '/api/settings'),
+        ('routes.user_dashboard', 'user_dashboard_bp', '/api/user'),
+        ('routes.admin_dashboard', 'admin_dashboard_bp', '/api/admin'),
+    ]
     
-    try:
-        from routes.camera_monitor import cameras_bp
-        app.register_blueprint(cameras_bp, url_prefix='/api/cameras')
-    except (ImportError, AttributeError) as e:
-        print(f"Warning: Could not import cameras_bp: {e}")
-    
-    try:
-        from routes.processing import processing_bp
-        app.register_blueprint(processing_bp, url_prefix='/api/pipeline')
-    except (ImportError, AttributeError) as e:
-        print(f"Warning: Could not import processing_bp: {e}")
-    
-    try:
-        from routes.results import results_bp
-        app.register_blueprint(results_bp, url_prefix='/api/results')
-    except (ImportError, AttributeError) as e:
-        print(f"Warning: Could not import results_bp: {e}")
-    
-    try:
-        from routes.settings import settings_bp
-        app.register_blueprint(settings_bp, url_prefix='/api/settings')
-    except (ImportError, AttributeError) as e:
-        print(f"Warning: Could not import settings_bp: {e}")
-    
-    try:
-        from routes.user_dashboard import user_dashboard_bp
-        app.register_blueprint(user_dashboard_bp, url_prefix='/api/user')
-    except (ImportError, AttributeError) as e:
-        print(f"Warning: Could not import user_dashboard_bp: {e}")
-    
-    try:
-        from routes.admin_dashboard import admin_dashboard_bp
-        app.register_blueprint(admin_dashboard_bp, url_prefix='/api/admin')
-    except (ImportError, AttributeError) as e:
-        print(f"Warning: Could not import admin_dashboard_bp: {e}")
+    for module_name, bp_name, url_prefix in blueprint_imports:
+        try:
+            module = __import__(module_name, fromlist=[bp_name])
+            bp = getattr(module, bp_name)
+            app.register_blueprint(bp, url_prefix=url_prefix)
+        except (ImportError, AttributeError) as e:
+            print(f"[Test] Warning: Could not import {bp_name}: {e}")
     
     yield app
 
+    # Cleanup: Drop test database collections
     if hasattr(app, 'mongo_client') and app.mongo_client:
         try:
             db = app.mongo_client[app.config['DB_NAME']]
-            db.images.delete_many({})
-            db.classification_results.delete_many({})
-        except:
-            pass
-        app.mongo_client.close()
+            # Only clean if it's the test database
+            if app.config['DB_NAME'] == TestConfig.TEST_DB_NAME:
+                db.images.delete_many({})
+                db.classification_results.delete_many({})
+                db.test_images.delete_many({})
+        except Exception as e:
+            print(f"[Test] Cleanup warning: {e}")
+        finally:
+            app.mongo_client.close()
 
 
 @pytest.fixture
@@ -120,28 +128,54 @@ def client(app):
 @pytest.fixture(scope='session')
 def mongo_client():
     """Provide MongoDB client for testing"""
-    connection_string = getattr(TestConfig, 'MONGO_CONNECTION_STRING', 'mongodb://localhost:27017')
+    ensure_test_environment()
+    
+    connection_string = TestConfig.MONGO_CONNECTION_STRING
     client = MongoClient(connection_string)
+    
     yield client
-    client.close()
+    
+    # Session cleanup: drop entire test database
+    try:
+        _verify_not_production_db(TestConfig.TEST_DB_NAME)
+        client.drop_database(TestConfig.TEST_DB_NAME)
+        print(f"[Test Session] Dropped test database: {TestConfig.TEST_DB_NAME}")
+    except Exception as e:
+        print(f"[Test Session] Database cleanup warning: {e}")
+    finally:
+        client.close()
 
 
 @pytest.fixture
 def test_db(mongo_client):
-    """Provide test database"""
-    db_name = getattr(TestConfig, 'TEST_DB_NAME', 'test_fruit_grading')
+    """Provide test database - automatically cleaned after each test"""
+    db_name = TestConfig.TEST_DB_NAME
+    _verify_not_production_db(db_name)
+    
     db = mongo_client[db_name]
+    
     yield db
-    mongo_client.drop_database(db_name)
+    
+    # Cleanup after each test
+    try:
+        mongo_client.drop_database(db_name)
+    except Exception as e:
+        print(f"[Test] Database cleanup warning: {e}")
 
 
 @pytest.fixture
 def test_collection(test_db):
-    """Provide test collection"""
-    collection_name = getattr(TestConfig, 'TEST_COLLECTION_NAME', 'images')
+    """Provide test collection - automatically cleaned after each test"""
+    collection_name = TestConfig.TEST_COLLECTION_NAME
     collection = test_db[collection_name]
+    
     yield collection
-    collection.drop()
+    
+    # Cleanup
+    try:
+        collection.drop()
+    except Exception as e:
+        print(f"[Test] Collection cleanup warning: {e}")
 
 
 # ==================== Image Fixtures ====================
@@ -170,7 +204,7 @@ def sample_image_metadata():
 @pytest.fixture
 def sample_image_documents():
     """Provide multiple sample image documents for testing"""
-    camera_angles = getattr(TestConfig, 'CAMERA_ANGLES', ['Front View', 'Right View', 'Back View', 'Left View'])
+    camera_angles = TestConfig.CAMERA_ANGLES
     return [
         {
             'fruit_type': 'market',
@@ -237,13 +271,19 @@ def mock_model_parameters():
 @pytest.fixture(scope='session', autouse=True)
 def setup_test_environment():
     """Setup test environment before all tests"""
-    # Check if TestConfig has create_temp_dirs method
-    if hasattr(TestConfig, 'create_temp_dirs'):
-        TestConfig.create_temp_dirs()
+    # Ensure test mode
+    ensure_test_environment()
+    
+    # Create temp directories
+    TestConfig.create_temp_dirs()
+    
+    print(f"\n[Test Session] Started with database: {TestConfig.TEST_DB_NAME}")
+    
     yield
-    # Check if TestConfig has cleanup_temp_dirs method
-    if hasattr(TestConfig, 'cleanup_temp_dirs'):
-        TestConfig.cleanup_temp_dirs()
+    
+    # Cleanup temp directories
+    TestConfig.cleanup_temp_dirs()
+    print(f"\n[Test Session] Completed and cleaned up")
 
 
 @pytest.fixture
@@ -256,7 +296,7 @@ def temp_test_dir(tmp_path):
 def reset_pipeline_state():
     """Reset pipeline state before each test"""
     try:
-        from shared_state import pipeline_state
+        from Backend.utils.shared_state import pipeline_state
         pipeline_state.reset_pipeline()
     except (ImportError, AttributeError):
         pass
@@ -265,7 +305,7 @@ def reset_pipeline_state():
     
     # Cleanup after test
     try:
-        from shared_state import pipeline_state
+        from Backend.utils.shared_state import pipeline_state
         pipeline_state.reset_pipeline()
     except (ImportError, AttributeError):
         pass
@@ -288,6 +328,28 @@ def cleanup_uploaded_files():
                     shutil.rmtree(item)
     except Exception:
         pass  # Silent cleanup
+
+
+@pytest.fixture(autouse=True)
+def enforce_test_database(monkeypatch):
+    """
+    Automatically patch environment variables for EVERY test
+    to ensure test database is always used
+    """
+    monkeypatch.setenv('DB_NAME', TestConfig.TEST_DB_NAME)
+    monkeypatch.setenv('TESTING', 'true')
+    
+    # Also patch os.getenv to return test values for critical vars
+    original_getenv = os.getenv
+    
+    def patched_getenv(key, default=None):
+        if key == 'DB_NAME':
+            return TestConfig.TEST_DB_NAME
+        if key == 'TESTING':
+            return 'true'
+        return original_getenv(key, default)
+    
+    monkeypatch.setattr(os, 'getenv', patched_getenv)
 
 
 # ==================== API Testing Fixtures ====================
@@ -357,7 +419,7 @@ def seed_test_data(test_collection):
     """Seed database with test data"""
     from datetime import datetime
     
-    camera_angles = getattr(TestConfig, 'CAMERA_ANGLES', ['Front View', 'Right View', 'Back View', 'Left View'])
+    camera_angles = TestConfig.CAMERA_ANGLES
     
     test_data = [
         {

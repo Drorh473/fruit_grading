@@ -1,5 +1,5 @@
 import pymongo
-from Tests.test_config import TestConfig
+from Backend.Tests.test_config import TestConfig
 
 
 def clear_test_database(db_name=None):

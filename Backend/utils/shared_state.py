@@ -1,7 +1,3 @@
-"""
-Shared Pipeline State
-Manages ML pipeline state across all routes
-"""
 from datetime import datetime
 from threading import Lock
 
@@ -13,7 +9,7 @@ class PipelineState:
         self._state = {
             'running': False,
             'status': 'idle',
-            'currentStep': 0,
+            'currentStep': 1,
             'progress': 0,
             'logs': [],
             'steps': [
@@ -77,7 +73,7 @@ class PipelineState:
         with self._lock:
             self._state['running'] = False
             self._state['status'] = 'idle'
-            self._state['currentStep'] = 0
+            self._state['currentStep'] = 1
             self._state['progress'] = 0
             self._state['logs'] = []
             self._state['results'] = None

@@ -1,7 +1,7 @@
 import pytest
 import numpy as np
 from pathlib import Path
-from Tests.test_config import TestConfig
+from Backend.Tests.test_config import TestConfig
 import sys
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
