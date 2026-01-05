@@ -1,8 +1,3 @@
-"""
-Pre-Pipeline Test Orchestrator
-Runs comprehensive unit and integration tests before pipeline execution
-Uses pytest for test discovery and execution
-"""
 import sys
 import subprocess
 import time
@@ -10,14 +5,12 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
-# Use current working directory (where the script is run from)
 PROJECT_DIR = Path(os.getcwd()).absolute()
 if str(PROJECT_DIR) not in sys.path:
     sys.path.insert(0, str(PROJECT_DIR))
 
-env_path = Path('.') / '.env'
+env_path = Path('.') / '.env.test'
 load_dotenv(dotenv_path=env_path)
-
 
 class TestPhase:
     """Represents a testing phase with specific test files"""
@@ -94,7 +87,7 @@ class TestPhase:
             return self.passed
             
         except subprocess.TimeoutExpired:
-            print(f"ERROR: Tests timed out after 300 seconds")
+            print(f"ERROR: Tests timed out after 120 seconds")
             self.duration = time.time() - start_time
             return False
         except Exception as e:
@@ -231,6 +224,36 @@ class TestOrchestrator:
         phase = self.phases[phase_number - 1]
         return phase.run(verbose=verbose)
     
+    def run_quick_validation(self, verbose=True):
+        """
+        Run quick pre-pipeline validation - only unit and integration tests.
+        Skips API tests and full pipeline integration.
+        Perfect for validating before running build_model pipeline.
+        """
+        print("\n" + "="*70)
+        print("QUICK PRE-PIPELINE VALIDATION")
+        print("Unit Tests + Integration Tests Only")
+        print("="*70)
+        
+        start_time = time.time()
+        all_passed = True
+        
+        # Run Phase 1, 2, and 4 only (skip API tests and full pipeline)
+        phases_to_run = [1, 2, 4]  # Critical Unit, ML Pipeline, Integration
+        
+        for phase_num in phases_to_run:
+            phase = self.phases[phase_num - 1]
+            success = phase.run(verbose=verbose)
+            if not success:
+                all_passed = False
+                print(f"\nSTOPPING: Phase {phase_num} failed")
+                break
+        
+        self.total_duration = time.time() - start_time
+        self._print_summary(all_passed, mode="quick")
+        
+        return all_passed
+    
     def run_critical_only(self, verbose=True):
         """Run only critical phases (skip optional API tests)"""
         print("\n" + "="*70)
@@ -292,10 +315,11 @@ class TestOrchestrator:
         total_errors = 0
         
         for phase in self.phases:
-            phase.print_summary()
-            total_tests += phase.tests_run
-            total_failures += phase.failures
-            total_errors += phase.errors
+            if phase.tests_run > 0:  # Only show phases that ran
+                phase.print_summary()
+                total_tests += phase.tests_run
+                total_failures += phase.failures
+                total_errors += phase.errors
         
         print("\n" + "-"*70)
         print("OVERALL STATISTICS")
@@ -352,6 +376,11 @@ def main():
         help='Run specific phase (1=Critical Unit, 2=ML Pipeline, 3=API, 4=Integration, 5=Full Pipeline)'
     )
     parser.add_argument(
+        '--quick',
+        action='store_true',
+        help='Quick validation before pipeline - Unit + Integration tests only (skips API tests)'
+    )
+    parser.add_argument(
         '--critical-only',
         action='store_true',
         help='Run only critical tests (skip optional API tests)'
@@ -385,6 +414,11 @@ def main():
     if args.phase:
         print(f"\nRunning Phase {args.phase} only...")
         success = orchestrator.run_phase(args.phase, verbose=not args.quiet)
+        sys.exit(0 if success else 1)
+    
+    # Run quick validation (unit + integration only)
+    if args.quick:
+        success = orchestrator.run_quick_validation(verbose=not args.quiet)
         sys.exit(0 if success else 1)
     
     # Run critical tests only

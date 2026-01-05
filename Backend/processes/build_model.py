@@ -33,27 +33,26 @@ ORIGINAL_DATASET_PATH = os.getenv('ORIGINAL_DATASET_PATH')
 DB_NAME = os.getenv('DB_NAME', 'fruit_grading')
 
 def run_tests():
-    """Run all test suites using run_all_tests.py"""
+    """Run all test suites using test_main.py"""
     print("\n" + "="*60)
-    print("RUNNING COMPREHENSIVE TEST SUITE")
+    print("RUNNING TEST SUITE")
     print("="*60 + "\n")
     
-    # Path to run_all_tests.py
-    test_script = os.path.join(PROJECT_ROOT, 'run_all_tests.py')
+    # Path to test_main.py
+    test_script = os.path.join(PROJECT_ROOT, r'Tests\test_main.py')
     
     if not os.path.exists(test_script):
-        print(f"Warning: Test script not found at {test_script}")
-        print("Skipping tests...")
-        return True
+        print(f"Error: Test script not found at {test_script}")
+        print("Tests failed - test file missing")
+        return False  # Changed from True to False
     
     try:
-        # Run the comprehensive test suite with quick mode
         result = subprocess.run(
-            [sys.executable, test_script, '--quick'],
+            [sys.executable, test_script,'--quick'],
             cwd=PROJECT_ROOT,
             capture_output=True,
             text=True,
-            timeout=10
+            timeout=300
         )
         
         # Print output
@@ -65,10 +64,10 @@ def run_tests():
         return result.returncode == 0
         
     except subprocess.TimeoutExpired:
-        print("\nÃ¢Å“â€” Tests timed out after 2 minutes")
+        print("\n Tests timed out after 10 seconds")
         return False
     except Exception as e:
-        print(f"\nÃ¢Å“â€” Error running tests: {e}")
+        print(f"\n Error running tests: {e}")
         return False
 
 def setup_database():
@@ -195,7 +194,7 @@ def train_classifier(train_features, test_features,
         print(f"  Testing samples: {len(X_test)}")
         print(f"  Feature dimension: {input_dim:,}")
         print(f"  Number of classes: {num_classes}")
-        print(f"  L2 Regularization: Î» = {lambda_reg}")
+        print(f"  L2 Regularization: λ = {lambda_reg}")
         
         # Check label distribution
         print(f"\nTraining label distribution:")

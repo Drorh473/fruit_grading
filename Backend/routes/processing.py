@@ -66,64 +66,83 @@ def run_pipeline_background(config):
         params = None
         results = None 
         
-        # Step 0: Tests
+        # Step 1: Tests (now a visible step)
         if not skip_tests:
-            pipeline_state.add_log("Running test suite...", 'info')
+            pipeline_state.update_step(1, 'processing')
+            pipeline_state.add_log("Step 1/6: Running test suite...", 'info')
+            
             test_success = run_tests()
             if not test_success:
                 pipeline_state.add_log("Tests failed! Aborting pipeline.", 'error')
-                pipeline_state.update_state(status='failed', running=False)
-                return
-        
-        # Step 1: Database Setup
-        if setup_database_con:
-            pipeline_state.update_step(1, 'processing')
-            pipeline_state.add_log("Step 1/5: Setting up database...", 'info')
-            
-            success = setup_database()  
-            if not success:
-                pipeline_state.add_log("Database setup failed!", 'error')
                 pipeline_state.update_step(1, 'failed')
                 pipeline_state.update_state(status='failed', running=False)
                 return
             
             pipeline_state.update_step(1, 'completed')
-            pipeline_state.add_log("Database setup complete", 'success')
+            pipeline_state.add_log("Test suite passed", 'success')
+        else:
+            # Mark tests as skipped (completed)
+            pipeline_state.update_step(1, 'completed')
+            pipeline_state.add_log("Step 1/6: Tests skipped", 'info')
         
-        # Step 2: Preprocessing
-        if preprocess_data_flag:
+        # Step 2: Database Setup
+        if setup_database_con:
             pipeline_state.update_step(2, 'processing')
-            pipeline_state.add_log("Step 2/5: Preprocessing data...", 'info')
+            pipeline_state.add_log("Step 2/6: Setting up database...", 'info')
             
-            train_gen, test_gen = preprocess_data()
-            if not train_gen or not test_gen:
-                pipeline_state.add_log("Preprocessing failed!", 'error')
+            success = setup_database()  
+            if not success:
+                pipeline_state.add_log("Database setup failed!", 'error')
                 pipeline_state.update_step(2, 'failed')
                 pipeline_state.update_state(status='failed', running=False)
                 return
             
             pipeline_state.update_step(2, 'completed')
-            pipeline_state.add_log(f"Preprocessing complete", 'success')
+            pipeline_state.add_log("Database setup complete", 'success')
+        else:
+            pipeline_state.update_step(2, 'completed')
+            pipeline_state.add_log("Step 2/6: Database setup skipped", 'info')
         
-        # Step 3: Feature Extraction
-        if extract_features_flag:
+        # Step 3: Preprocessing
+        if preprocess_data_flag:
             pipeline_state.update_step(3, 'processing')
-            pipeline_state.add_log("Step 3/5: Extracting features...", 'info')
+            pipeline_state.add_log("Step 3/6: Preprocessing data...", 'info')
             
-            train_features, test_features = extract_features(train_gen, test_gen)
-            if not train_features or not test_features:
-                pipeline_state.add_log("Feature extraction failed!", 'error')
+            train_gen, test_gen = preprocess_data()
+            if not train_gen or not test_gen:
+                pipeline_state.add_log("Preprocessing failed!", 'error')
                 pipeline_state.update_step(3, 'failed')
                 pipeline_state.update_state(status='failed', running=False)
                 return
             
             pipeline_state.update_step(3, 'completed')
-            pipeline_state.add_log(f"Feature extraction complete", 'success')
+            pipeline_state.add_log("Preprocessing complete", 'success')
+        else:
+            pipeline_state.update_step(3, 'completed')
+            pipeline_state.add_log("Step 3/6: Preprocessing skipped", 'info')
         
-        # Step 4: Model Training
-        if train_classifier_flag:
+        # Step 4: Feature Extraction
+        if extract_features_flag:
             pipeline_state.update_step(4, 'processing')
-            pipeline_state.add_log(f"Step 4/5: Training classifier...", 'info')
+            pipeline_state.add_log("Step 4/6: Extracting features...", 'info')
+            
+            train_features, test_features = extract_features(train_gen, test_gen)
+            if not train_features or not test_features:
+                pipeline_state.add_log("Feature extraction failed!", 'error')
+                pipeline_state.update_step(4, 'failed')
+                pipeline_state.update_state(status='failed', running=False)
+                return
+            
+            pipeline_state.update_step(4, 'completed')
+            pipeline_state.add_log("Feature extraction complete", 'success')
+        else:
+            pipeline_state.update_step(4, 'completed')
+            pipeline_state.add_log("Step 4/6: Feature extraction skipped", 'info')
+        
+        # Step 5: Model Training
+        if train_classifier_flag:
+            pipeline_state.update_step(5, 'processing')
+            pipeline_state.add_log("Step 5/6: Training classifier...", 'info')
             
             params, results = train_classifier(
                 train_features, test_features,
@@ -135,28 +154,34 @@ def run_pipeline_background(config):
             
             if params is None or results is None:
                 pipeline_state.add_log("Classifier training failed!", 'error')
-                pipeline_state.update_step(4, 'failed')
+                pipeline_state.update_step(5, 'failed')
                 pipeline_state.update_state(status='failed', running=False)
                 return
             
-            pipeline_state.update_step(4, 'completed')
+            pipeline_state.update_step(5, 'completed')
             pipeline_state.add_log(f"Training complete - Accuracy: {results['test_accuracy']*100:.2f}%", 'success')
+        else:
+            pipeline_state.update_step(5, 'completed')
+            pipeline_state.add_log("Step 5/6: Model training skipped", 'info')
         
-        # Step 5: Evaluation
+        # Step 6: Evaluation
+        pipeline_state.update_step(6, 'processing')
+        pipeline_state.add_log("Step 6/6: Generating evaluation metrics...", 'info')
+        
         if generate_confusion_matrix_flag and results is not None:
-            pipeline_state.update_step(5, 'processing')
-            pipeline_state.add_log("Step 5/5: Generating evaluation metrics...", 'info')
-            
             cm = generate_confusion_matrix(results)
             if cm is not None:
                 results['confusion_matrix'] = cm
-            
-            pipeline_state.update_step(5, 'completed')
             pipeline_state.add_log("Evaluation complete", 'success')
+        else:
+            pipeline_state.add_log("Evaluation skipped (no results)", 'info')
         
-        # Step 6: Save dashboard metadata
+        # Always mark step 6 as completed
+        pipeline_state.update_step(6, 'completed')
+        
+        # Save dashboard metadata (after all steps complete)
         if results is not None and train_features is not None and test_features is not None:
-            pipeline_state.add_log("Step 6/6: Saving dashboard metadata...", 'info')
+            pipeline_state.add_log("Saving dashboard metadata...", 'info')
             try:
                 from model_metadata import save_dashboard_metadata
                 
@@ -195,13 +220,13 @@ def run_pipeline_background(config):
             })
         
         # Complete
-        pipeline_state.update_state(status='completed', progress=100, running=False)
-        pipeline_state.add_log(f"Pipeline completed successfully!", 'success')
+        pipeline_state.update_state(status='completed', progress=100, running=False,currentStep=0)
+        pipeline_state.add_log("Pipeline completed successfully!", 'success')
         
     except Exception as e:
         pipeline_state.add_log(f"Pipeline error: {str(e)}", 'error')
         pipeline_state.add_log(traceback.format_exc(), 'error')
-        pipeline_state.update_state(status='failed', running=False)
+        pipeline_state.update_state(status='failed', running=False,currentStep=0)
         
         # Mark current step as failed
         state = pipeline_state.get_state()

@@ -18,7 +18,7 @@ PROJECT_ROOT = Path(__file__).parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from Tests.run_tests import TestOrchestrator
+from Tests.test_main import TestOrchestrator
 
 
 def run_tests(mode='full', verbose=True):

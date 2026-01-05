@@ -41,15 +41,25 @@ const Processing = ({ setProcessingStats }) => {
     batchSize: [8, 16, 32, 64, 128, 256],
   };
 
+  // Updated steps - Testing is now Step 1
   const defaultSteps = [
-    { id: 1, name: "Database Setup", status: "pending" },
-    { id: 2, name: "Data Preprocessing", status: "pending" },
-    { id: 3, name: "Feature Extraction", status: "pending" },
-    { id: 4, name: "Model Training", status: "pending" },
-    { id: 5, name: "Evaluation", status: "pending" },
+    { id: 1, name: "Testing", status: "pending" },
+    { id: 2, name: "Database Setup", status: "pending" },
+    { id: 3, name: "Data Preprocessing", status: "pending" },
+    { id: 4, name: "Feature Extraction", status: "pending" },
+    { id: 5, name: "Model Training", status: "pending" },
+    { id: 6, name: "Evaluation", status: "pending" },
   ];
 
   const [steps, setSteps] = useState(defaultSteps);
+
+  // Calculate progress based on completed steps only
+  const calculateProgress = (stepsArray) => {
+    const completedCount = stepsArray.filter(
+      (step) => step.status === "completed"
+    ).length;
+    return Math.round((completedCount / stepsArray.length) * 100);
+  };
 
   useEffect(() => {
     loadConfig();
@@ -59,8 +69,8 @@ const Processing = ({ setProcessingStats }) => {
   useEffect(() => {
     let interval;
     if (isProcessing) {
-      // Poll for status updates every 2 seconds while processing
-      interval = setInterval(updateStatus, 2000);
+      // Poll for status updates every 10 seconds while processing
+      interval = setInterval(updateStatus, 10000);
     }
     return () => clearInterval(interval);
   }, [isProcessing]);
@@ -135,7 +145,6 @@ const Processing = ({ setProcessingStats }) => {
     if (statusData.steps) {
       setSteps(statusData.steps);
     } else if (statusData.currentStep) {
-      // Fallback if backend doesn't send full steps
       const updatedSteps = defaultSteps.map((step, index) => {
         if (index < statusData.currentStep - 1) {
           return { ...step, status: "completed" };
@@ -168,9 +177,9 @@ const Processing = ({ setProcessingStats }) => {
       setSteps(defaultSteps); // Reset steps
       setOpenDropdown(null);
 
-      // Start pipeline with current config
+      // Start pipeline with current config - skipTests is now false by default
       const response = await startPipeline({
-        skipTests: true,
+        skipTests: false,
         hiddenDim: config.hiddenDim,
         epochs: config.epochs,
         learningRate: config.learningRate,
@@ -224,6 +233,9 @@ const Processing = ({ setProcessingStats }) => {
     if (step.status === "failed") return "step-failed";
     return "step-pending";
   };
+
+  // Get display progress - only shows completed steps
+  const displayProgress = calculateProgress(steps);
 
   if (loading) {
     return (
@@ -281,16 +293,16 @@ const Processing = ({ setProcessingStats }) => {
         </div>
       )}
 
-      {/* Progress Overview */}
+      {/* Progress Overview - Uses completed steps only */}
       <div className="card">
         <div className="card-header">
           <h2 className="card-title">Pipeline Progress</h2>
-          <span className="progress-percent">{status?.progress || 0}%</span>
+          <span className="progress-percent">{displayProgress}%</span>
         </div>
         <div className="progress-bar">
           <div
             className="progress-fill"
-            style={{ width: `${status?.progress || 0}%` }}
+            style={{ width: `${displayProgress}%` }}
           />
         </div>
         {isProcessing && (

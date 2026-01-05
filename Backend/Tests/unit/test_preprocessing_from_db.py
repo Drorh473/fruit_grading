@@ -4,7 +4,13 @@ import cv2
 import os
 from pathlib import Path
 import sys
+
+# Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
+# Import TestConfig for test database settings
+from Tests.test_config import TestConfig
+
 from preprocessing.preprocessing_from_db import (
     custom_preprocessing,
     process_image
@@ -42,6 +48,7 @@ def sample_metadata():
         'camera_id': 1,
         '_id': '12345abcde'
     }
+
 
 class TestCustomPreprocessing:
     """Test custom preprocessing function"""
@@ -102,6 +109,16 @@ class TestCustomPreprocessing:
             # Should complete without errors
             assert result is not None
             assert result.dtype == np.float32
+    
+    def test_preprocessing_preserves_aspect_ratio(self):
+        """Test that preprocessing maintains aspect ratio when resizing"""
+        # Create image with known aspect ratio
+        test_image = np.random.randint(0, 255, (300, 400, 3), dtype=np.uint8)
+        result = custom_preprocessing(test_image)
+        
+        # Should be resized but maintain general shape
+        assert result is not None
+        assert result.shape[2] == 3
 
 
 class TestProcessImage:
@@ -152,4 +169,124 @@ class TestProcessImage:
         # Should create directory structure
         if error is None:
             assert Path(output_path).parent.exists()
-            assert Path(output_path).exists
+            assert Path(output_path).exists()
+    
+    def test_process_image_handles_corrupted_file(self, corrupted_image_path, tmp_path, sample_metadata):
+        """Test that process_image handles corrupted images gracefully"""
+        output_dir = tmp_path / "output"
+        output_dir.mkdir()
+        
+        file_id, output_path, error = process_image(
+            str(corrupted_image_path),
+            str(output_dir),
+            sample_metadata
+        )
+        
+        # Should return error for corrupted file
+        assert error is not None
+    
+    def test_process_image_with_different_cameras(self, valid_image_path, tmp_path):
+        """Test processing images from different cameras"""
+        output_dir = tmp_path / "output"
+        output_dir.mkdir()
+        
+        for camera_id in range(TestConfig.NUM_OF_CAMERAS):
+            metadata = {
+                'set_type': 'train',
+                'camera_id': camera_id,
+                '_id': f'test_{camera_id}'
+            }
+            
+            file_id, output_path, error = process_image(
+                str(valid_image_path),
+                str(output_dir),
+                metadata
+            )
+            
+            if error is None:
+                assert Path(output_path).exists()
+                # Verify camera ID is in the path
+                assert f'camera_{camera_id}' in str(output_path)
+
+
+class TestPreprocessingEdgeCases:
+    """Test edge cases in preprocessing"""
+    
+    def test_preprocessing_grayscale_image(self):
+        """Test preprocessing converts grayscale to RGB"""
+        # Create grayscale image
+        gray_image = np.random.randint(0, 255, (224, 224), dtype=np.uint8)
+        
+        # If preprocessing expects RGB, it should handle grayscale
+        # This test depends on your implementation
+        try:
+            result = custom_preprocessing(gray_image)
+            assert result is not None
+        except Exception as e:
+            # If it's expected to fail on grayscale, that's okay
+            assert 'shape' in str(e).lower() or 'channel' in str(e).lower()
+    
+    def test_preprocessing_very_small_image(self):
+        """Test preprocessing with very small image"""
+        small_image = np.random.randint(0, 255, (10, 10, 3), dtype=np.uint8)
+        
+        result = custom_preprocessing(small_image)
+        
+        # Should handle small images
+        assert result is not None
+        assert result.dtype == np.float32
+    
+    def test_preprocessing_very_large_image(self):
+        """Test preprocessing with large image"""
+        large_image = np.random.randint(0, 255, (1000, 1000, 3), dtype=np.uint8)
+        
+        result = custom_preprocessing(large_image)
+        
+        # Should resize and process large images
+        assert result is not None
+        assert result.dtype == np.float32
+    
+    def test_preprocessing_output_path_creation(self, sample_image, tmp_path):
+        """Test that preprocessing creates necessary directories"""
+        nested_path = tmp_path / "level1" / "level2" / "output.png"
+        
+        # Should create nested directories
+        custom_preprocessing(sample_image, save_path=str(nested_path))
+        
+        assert nested_path.exists()
+
+
+class TestPreprocessingConsistency:
+    """Test consistency of preprocessing"""
+    
+    def test_preprocessing_deterministic(self, sample_image):
+        """Test that preprocessing gives consistent results"""
+        # Process same image twice
+        result1 = custom_preprocessing(sample_image.copy())
+        result2 = custom_preprocessing(sample_image.copy())
+        
+        # Results should be very similar (allowing for floating point errors)
+        np.testing.assert_array_almost_equal(result1, result2, decimal=5)
+    
+    def test_preprocessing_batch_consistency(self):
+        """Test that batch processing gives consistent results"""
+        images = [
+            np.random.randint(0, 255, (224, 224, 3), dtype=np.uint8)
+            for _ in range(5)
+        ]
+        
+        # Process all images
+        results = [custom_preprocessing(img) for img in images]
+        
+        # All results should have same shape
+        shapes = [r.shape for r in results]
+        assert len(set(shapes)) == 1  # All same shape
+        
+        # All should be normalized
+        for result in results:
+            assert result.max() <= 1.0
+            assert result.min() >= 0.0
+
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])

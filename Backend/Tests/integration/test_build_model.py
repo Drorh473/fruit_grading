@@ -21,7 +21,7 @@ from processes.build_model import (
 )
 
 # Load environment
-env_path = Path('.') / '.env'
+env_path = Path('.') / '.env.test'
 load_dotenv(dotenv_path=env_path)
 
 
