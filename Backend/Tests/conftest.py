@@ -1,7 +1,3 @@
-"""
-Pytest configuration and fixtures for test suite
-Ensures complete database isolation from production
-"""
 import sys
 import os
 import pytest
@@ -26,13 +22,10 @@ if str(tests_dir) not in sys.path:
     sys.path.insert(0, str(tests_dir))
 
 # Import test configuration (this also loads .env.test)
-from Backend.Tests.test_config import TestConfig, ensure_test_environment
+from Tests.test_config import TestConfig, ensure_test_environment
 
 # Ensure test environment is active
 ensure_test_environment()
-
-
-# ==================== Database Isolation Guard ====================
 
 def _verify_not_production_db(db_name):
     """Safety check to prevent accidental production database access"""

@@ -277,7 +277,7 @@ const Results = () => {
 
           <div className="kpi-card">
             <div className="kpi-header">
-              <span className="kpi-label">Processing Speed</span>
+              <span className="kpi-label">Processing Speed(per day)</span>
             </div>
             <div className="kpi-value">{kpis.processingSpeed || 0} obj/hr</div>
             {kpis.trends?.processingSpeed && (

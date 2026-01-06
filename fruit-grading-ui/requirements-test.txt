@@ -3,7 +3,7 @@
 # Core testing
 pytest>=7.4.0
 pytest-playwright>=0.4.0
-playwright>=1.40.0
+playwright==1.48.0
 
 # Test reporting
 pytest-html>=4.0.0
@@ -15,4 +15,5 @@ pytest-xdist>=3.5.0  # Parallel testing
 requests>=2.31.0     # API testing
 
 # Additional dependencies
-coverage>=7.0.0      # Coverage library
+coverage>=7.0.0     
+
