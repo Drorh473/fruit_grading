@@ -5,20 +5,10 @@ Updated to match actual JSX components
 """
 
 import pytest
-from playwright.sync_api import sync_playwright, Browser, BrowserContext, Page
-
-
-# ============================================================================
-# CONFIGURATION
-# ============================================================================
+from playwright.sync_api import sync_playwright, Browser, BrowserContext, Page ,expect
 
 BASE_URL = "http://localhost:3000"
 API_URL = "http://localhost:5000/api"
-
-
-# ============================================================================
-# BROWSER FIXTURES
-# ============================================================================
 
 @pytest.fixture(scope="session")
 def browser():
@@ -50,11 +40,6 @@ def page(context: BrowserContext):
     page = context.new_page()
     yield page
     page.close()
-
-
-# ============================================================================
-# AUTHENTICATION FIXTURES
-# ============================================================================
 
 @pytest.fixture
 def admin_credentials():
@@ -109,34 +94,31 @@ def logged_in_admin(page: Page, admin_credentials):
     
     return page
 
-
 @pytest.fixture
 def logged_in_user(page: Page, user_credentials):
-    """
-    Pre-authenticated regular user
-    Returns page already logged in as user
-    Updated to match Login.jsx
-    """
+    """Pre-authenticated regular user"""
     page.goto(f"{BASE_URL}/login")
-    
-    # Fill login form
     page.fill('input[placeholder="Enter username"]', user_credentials['username'])
     page.fill('input[placeholder="Enter password"]', user_credentials['password'])
-    
-    # User role is selected by default in Login.jsx
-    
-    # Submit
+    page.locator('.role-option:has-text("Operator")').click()
+    expect(page.locator('input[type="radio"][value="user"]')).to_be_checked()
     page.click('button.login-button')
-    
-    # Wait for navigation to user dashboard
-    page.wait_for_url(f"{BASE_URL}/user-dashboard", timeout=10000)
-    
+    try:
+
+        page.wait_for_url(f"{BASE_URL}/user-dashboard", timeout=5000)
+    except Exception:
+
+        error_msg = page.locator('.login-error span')
+        if error_msg.is_visible():
+            text = error_msg.text_content()
+            raise Exception(f"Login Failed with UI Error: {text}")
+        
+        if "/login" in page.url:
+             raise Exception("Login Failed: Stuck on login page without error message.")
+        
+        raise
+
     return page
-
-
-# ============================================================================
-# API FIXTURES
-# ============================================================================
 
 @pytest.fixture
 def api_client():
@@ -149,22 +131,12 @@ def api_client():
     yield session
     session.close()
 
-
-# ============================================================================
-# UTILITY FIXTURES
-# ============================================================================
-
 @pytest.fixture
 def wait_for_element(page: Page):
     """Helper to wait for elements"""
     def _wait(selector, timeout=5000):
         return page.wait_for_selector(selector, timeout=timeout)
     return _wait
-
-
-# ============================================================================
-# HOOKS
-# ============================================================================
 
 @pytest.hookimpl(tryfirst=True, hookwrapper=True)
 def pytest_runtest_makereport(item, call):
@@ -173,10 +145,6 @@ def pytest_runtest_makereport(item, call):
     rep = outcome.get_result()
     setattr(item, f"rep_{rep.when}", rep)
 
-
-# ============================================================================
-# MARKERS
-# ============================================================================
 
 def pytest_configure(config):
     """Register custom markers"""
