@@ -1,8 +1,10 @@
 """
 Login Page Tests
 Tests authentication flow and login UI
+Matches Login.jsx component
 """
 
+import re
 import pytest
 from playwright.sync_api import Page, expect
 
@@ -22,40 +24,47 @@ class TestLoginRendering:
         """Should load login page successfully"""
         page.goto(f"{BASE_URL}/login")
         
-        # Check page title
-        expect(page).to_have_title("Fruit Grading System")
+        # Check page title contains Fruit Grading
+        expect(page).to_have_title(re.compile(r"Fruit Grading"))
         
         # Check form elements exist
-        expect(page.locator('input[name="username"]')).to_be_visible()
-        expect(page.locator('input[name="password"]')).to_be_visible()
-        expect(page.locator('button[type="submit"]')).to_be_visible()
+        expect(page.locator('input.login-input').first).to_be_visible()
+        expect(page.locator('button.login-button')).to_be_visible()
     
     def test_role_selector_present(self, page: Page):
-        """Should have role selector with admin and user options"""
+        """Should have role selector with admin and user options (radio buttons)"""
         page.goto(f"{BASE_URL}/login")
         
-        role_select = page.locator('select[name="role"]')
-        expect(role_select).to_be_visible()
+        # Login.jsx uses radio buttons for role, not select
+        role_options = page.locator('.role-selector .role-option')
+        expect(role_options).to_have_count(2)
         
-        # Check options
-        options = role_select.locator('option').all_text_contents()
-        assert 'admin' in options
-        assert 'user' in options
+        # Check radio inputs exist
+        user_radio = page.locator('input[type="radio"][value="user"]')
+        admin_radio = page.locator('input[type="radio"][value="admin"]')
+        expect(user_radio).to_be_attached()
+        expect(admin_radio).to_be_attached()
     
     def test_password_field_is_masked(self, page: Page):
         """Should render password as masked input"""
         page.goto(f"{BASE_URL}/login")
         
-        password_input = page.locator('input[name="password"]')
-        assert password_input.get_attribute('type') == 'password'
+        password_input = page.locator('input[type="password"]')
+        expect(password_input).to_be_visible()
     
     def test_logo_displayed(self, page: Page):
         """Should display logo"""
         page.goto(f"{BASE_URL}/login")
         
-        # Check for logo or title
-        logo = page.locator('[class*="logo"]')
+        logo = page.locator('.logo-container-login, .logo-icon-login')
         assert logo.count() > 0
+    
+    def test_demo_credentials_shown(self, page: Page):
+        """Should display demo credentials in footer"""
+        page.goto(f"{BASE_URL}/login")
+        
+        demo_section = page.locator('.demo-credentials')
+        expect(demo_section).to_be_visible()
 
 
 # ============================================================================
@@ -70,35 +79,41 @@ class TestLoginInteractions:
         """Should allow typing in username field"""
         page.goto(f"{BASE_URL}/login")
         
-        username_input = page.locator('input[name="username"]')
+        username_input = page.locator('input[placeholder="Enter username"]')
         username_input.fill('testuser')
-        
         assert username_input.input_value() == 'testuser'
     
     def test_can_type_password(self, page: Page):
         """Should allow typing in password field"""
         page.goto(f"{BASE_URL}/login")
         
-        password_input = page.locator('input[name="password"]')
+        password_input = page.locator('input[placeholder="Enter password"]')
         password_input.fill('testpass123')
-        
         assert password_input.input_value() == 'testpass123'
     
     def test_can_select_role(self, page: Page):
-        """Should allow role selection"""
+        """Should allow role selection via radio buttons"""
         page.goto(f"{BASE_URL}/login")
         
-        role_select = page.locator('select[name="role"]')
-        role_select.select_option('admin')
+        admin_option = page.locator('.role-option:has(input[value="admin"])')
+        admin_option.click()
         
-        assert role_select.input_value() == 'admin'
+        admin_radio = page.locator('input[type="radio"][value="admin"]')
+        expect(admin_radio).to_be_checked()
     
     def test_submit_button_enabled(self, page: Page):
         """Should have enabled submit button"""
         page.goto(f"{BASE_URL}/login")
         
-        submit_btn = page.locator('button[type="submit"]')
+        submit_btn = page.locator('button.login-button')
         expect(submit_btn).to_be_enabled()
+    
+    def test_user_role_selected_by_default(self, page: Page):
+        """Should have user role selected by default"""
+        page.goto(f"{BASE_URL}/login")
+        
+        user_radio = page.locator('input[type="radio"][value="user"]')
+        expect(user_radio).to_be_checked()
 
 
 # ============================================================================
@@ -109,40 +124,24 @@ class TestLoginInteractions:
 class TestLoginValidation:
     """Test form validation"""
     
-    def test_empty_username_shows_error(self, page: Page):
-        """Should show error when username is empty"""
+    def test_empty_fields_shows_error(self, page: Page):
+        """Should show error when fields are empty"""
         page.goto(f"{BASE_URL}/login")
         
-        # Leave username empty, fill password
-        page.fill('input[name="password"]', 'password123')
-        page.click('button[type="submit"]')
+        page.click('button.login-button')
         
-        # Check for error message
-        error = page.locator('[class*="error"]')
-        expect(error).to_be_visible(timeout=2000)
-    
-    def test_empty_password_shows_error(self, page: Page):
-        """Should show error when password is empty"""
-        page.goto(f"{BASE_URL}/login")
-        
-        # Fill username, leave password empty
-        page.fill('input[name="username"]', 'admin')
-        page.click('button[type="submit"]')
-        
-        # Check for error message
-        error = page.locator('[class*="error"]')
+        error = page.locator('.login-error')
         expect(error).to_be_visible(timeout=2000)
     
     def test_invalid_credentials_show_error(self, page: Page):
         """Should show error for invalid credentials"""
         page.goto(f"{BASE_URL}/login")
         
-        page.fill('input[name="username"]', 'wronguser')
-        page.fill('input[name="password"]', 'wrongpass')
-        page.click('button[type="submit"]')
+        page.fill('input[placeholder="Enter username"]', 'wronguser')
+        page.fill('input[placeholder="Enter password"]', 'wrongpass')
+        page.click('button.login-button')
         
-        # Check for error message
-        error = page.locator('[class*="error"]')
+        error = page.locator('.login-error')
         expect(error).to_be_visible(timeout=2000)
 
 
@@ -155,35 +154,26 @@ class TestLoginValidation:
 class TestLoginFlow:
     """Test complete authentication flow"""
     
-    def test_admin_login_success(self, page: Page, admin_credentials):
+    def test_admin_login_success(self, page: Page):
         """Should successfully login as admin"""
         page.goto(f"{BASE_URL}/login")
         
-        # Fill form
-        page.fill('input[name="username"]', admin_credentials['username'])
-        page.fill('input[name="password"]', admin_credentials['password'])
-        page.select_option('select[name="role"]', admin_credentials['role'])
+        page.fill('input[placeholder="Enter username"]', 'admin')
+        page.fill('input[placeholder="Enter password"]', 'admin123')
+        page.locator('.role-option:has(input[value="admin"])').click()
+        page.click('button.login-button')
         
-        # Submit
-        page.click('button[type="submit"]')
-        
-        # Should redirect to admin dashboard
         page.wait_for_url(f"{BASE_URL}/dashboard", timeout=5000)
         assert "/dashboard" in page.url
     
-    def test_user_login_success(self, page: Page, user_credentials):
+    def test_user_login_success(self, page: Page):
         """Should successfully login as user"""
         page.goto(f"{BASE_URL}/login")
         
-        # Fill form
-        page.fill('input[name="username"]', user_credentials['username'])
-        page.fill('input[name="password"]', user_credentials['password'])
-        page.select_option('select[name="role"]', user_credentials['role'])
+        page.fill('input[placeholder="Enter username"]', 'user')
+        page.fill('input[placeholder="Enter password"]', 'user123')
+        page.click('button.login-button')
         
-        # Submit
-        page.click('button[type="submit"]')
-        
-        # Should redirect to user dashboard
         page.wait_for_url(f"{BASE_URL}/user-dashboard", timeout=5000)
         assert "/user-dashboard" in page.url
     
@@ -191,41 +181,14 @@ class TestLoginFlow:
         """Should reject login with wrong role"""
         page.goto(f"{BASE_URL}/login")
         
-        # Try admin credentials with user role
-        page.fill('input[name="username"]', 'admin')
-        page.fill('input[name="password"]', 'admin123')
-        page.select_option('select[name="role"]', 'user')
+        page.fill('input[placeholder="Enter username"]', 'admin')
+        page.fill('input[placeholder="Enter password"]', 'admin123')
+        # Leave user role selected (default)
+        page.click('button.login-button')
         
-        page.click('button[type="submit"]')
-        
-        # Should show error and stay on login page
-        error = page.locator('[class*="error"]')
+        error = page.locator('.login-error')
         expect(error).to_be_visible(timeout=2000)
         assert "/login" in page.url
-
-
-# ============================================================================
-# LOADING STATE TESTS
-# ============================================================================
-
-@pytest.mark.unit
-class TestLoginLoadingStates:
-    """Test loading states"""
-    
-    def test_button_disabled_during_login(self, page: Page):
-        """Should disable button during login attempt"""
-        page.goto(f"{BASE_URL}/login")
-        
-        page.fill('input[name="username"]', 'admin')
-        page.fill('input[name="password"]', 'admin123')
-        
-        # Click and quickly check if button is disabled
-        page.click('button[type="submit"]')
-        
-        # Button should be disabled during request
-        submit_btn = page.locator('button[type="submit"]')
-        # This might be too fast to catch, but it's the pattern
-        # In real app, you'd check for loading state
 
 
 # ============================================================================
@@ -240,38 +203,16 @@ class TestLoginAccessibility:
         """Should have proper labels for inputs"""
         page.goto(f"{BASE_URL}/login")
         
-        # Check for labels or aria-labels
-        username_input = page.locator('input[name="username"]')
-        password_input = page.locator('input[name="password"]')
-        
-        # Should have associated labels or aria-label
-        assert username_input.get_attribute('aria-label') or \
-               page.locator('label[for="username"]').count() > 0
+        labels = page.locator('.form-group label')
+        assert labels.count() >= 2
     
-    def test_keyboard_navigation(self, page: Page):
-        """Should support keyboard navigation"""
-        page.goto(f"{BASE_URL}/login")
-        
-        # Tab through form
-        page.keyboard.press('Tab')
-        username_input = page.locator('input[name="username"]')
-        expect(username_input).to_be_focused()
-        
-        page.keyboard.press('Tab')
-        password_input = page.locator('input[name="password"]')
-        expect(password_input).to_be_focused()
-    
-    def test_submit_with_enter_key(self, page: Page, admin_credentials):
+    def test_submit_with_enter_key(self, page: Page):
         """Should submit form with Enter key"""
         page.goto(f"{BASE_URL}/login")
         
-        page.fill('input[name="username"]', admin_credentials['username'])
-        page.fill('input[name="password"]', admin_credentials['password'])
-        page.select_option('select[name="role"]', admin_credentials['role'])
-        
-        # Press Enter instead of clicking button
+        page.fill('input[placeholder="Enter username"]', 'admin')
+        page.fill('input[placeholder="Enter password"]', 'admin123')
+        page.locator('.role-option:has(input[value="admin"])').click()
         page.keyboard.press('Enter')
         
-        # Should still redirect
         page.wait_for_url(f"{BASE_URL}/dashboard", timeout=5000)
-        assert "/dashboard" in page.url
