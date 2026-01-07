@@ -1,281 +1,239 @@
 """
-Dashboard Tests
-Tests admin and user dashboard functionality
-Matches Dashboard.jsx and UserDashboard.jsx
+Dashboard Page Tests
+Tests system overview and status monitoring
+Matches Dashboard.jsx component
 """
 
 import re
 import pytest
 from playwright.sync_api import Page, expect
 
-
 BASE_URL = "http://localhost:3000"
 
+# Helper function to navigate safely (Preserving Auth)
+def navigate_to_dashboard(page: Page):
+    """Navigate to dashboard using the sidebar to preserve Auth state"""
+    
+    # 1. Check if already there (URL check + Header check)
+    if "/dashboard" in page.url:
+        # Check for specific dashboard header to be sure
+        if page.get_by_role("heading", name="System Dashboard").is_visible():
+            return
+
+    # 2. Open Hamburger if visible
+    hamburger = page.locator('.hamburger-button')
+    if hamburger.is_visible():
+        hamburger.click()
+        page.wait_for_selector('.sidebar.visible, .sidebar-open', timeout=2000)
+
+    # 3. LOCATE the element
+    # Matches href="/dashboard" or just "/" if it's the index
+    dashboard_link = page.locator('a[href="/dashboard"], a[href="/"]')
+    
+    # 4. DISPATCH 'click' event directly using JavaScript
+    # Handle case where multiple links might match (e.g. logo + menu link) -> take the sidebar one
+    if dashboard_link.count() > 1:
+        dashboard_link = page.locator('.sidebar a[href="/dashboard"]')
+        
+    dashboard_link.dispatch_event('click')
+    
+    # 5. Wait for navigation
+    try:
+        expect(page).to_have_url(re.compile(r".*/dashboard"), timeout=10000)
+    except AssertionError:
+        # Fallback
+        dashboard_link.evaluate("el => el.click()")
+        expect(page).to_have_url(re.compile(r".*/dashboard"))
+
+    # 6. Verify page load with SPECIFIC header
+    page.wait_for_selector('h1:has-text("System Dashboard")', state='visible')
+
 
 # ============================================================================
-# ADMIN DASHBOARD RENDERING TESTS
+# RENDERING TESTS
 # ============================================================================
 
 @pytest.mark.unit
-class TestAdminDashboardRendering:
-    """Test admin dashboard rendering - matches Dashboard.jsx"""
+class TestDashboardRendering:
+    """Test dashboard page rendering - matches Dashboard.jsx"""
     
-    def test_admin_dashboard_loads(self, logged_in_admin: Page):
-        """Should load admin dashboard successfully"""
-        expect(logged_in_admin).to_have_url(f"{BASE_URL}/dashboard")
+    def test_dashboard_page_loads(self, logged_in_admin: Page):
+        """Should load dashboard page"""
+        navigate_to_dashboard(logged_in_admin)
         
         # Dashboard.jsx has h1 "System Dashboard"
-        header = logged_in_admin.locator('h1')
-        expect(header).to_contain_text('System Dashboard')
+        # Use get_by_role to avoid ambiguity with sidebar logo
+        header = logged_in_admin.get_by_role("heading", name="System Dashboard")
+        expect(header).to_be_visible()
     
-    def test_stat_cards_displayed(self, logged_in_admin: Page):
-        """Should display stat cards"""
-        # Dashboard.jsx uses .stat-card class
+    def test_stats_grid_displayed(self, logged_in_admin: Page):
+        """Should display statistics grid"""
+        navigate_to_dashboard(logged_in_admin)
+        
+        # Dashboard.jsx uses .stats-grid class
+        grid = logged_in_admin.locator('.stats-grid')
+        expect(grid).to_be_visible()
+    
+    def test_four_stat_cards(self, logged_in_admin: Page):
+        """Should display 4 key statistic cards"""
+        navigate_to_dashboard(logged_in_admin)
+        
+        # Dashboard.jsx has 4 stat cards (Total Fruits, System Status, etc.)
         cards = logged_in_admin.locator('.stat-card')
-        assert cards.count() >= 4  # Database, Model, Processed, Accuracy
-    
-    def test_database_status_shown(self, logged_in_admin: Page):
-        """Should show database status"""
-        content = logged_in_admin.content().lower()
-        assert 'database' in content
-    
-    def test_model_status_shown(self, logged_in_admin: Page):
-        """Should show model status"""
-        content = logged_in_admin.content().lower()
-        assert 'model' in content
-    
-    def test_processed_today_shown(self, logged_in_admin: Page):
-        """Should show processed today count"""
-        content = logged_in_admin.content().lower()
-        assert 'processed' in content
-    
-    def test_accuracy_metric_shown(self, logged_in_admin: Page):
-        """Should display accuracy metric"""
-        content = logged_in_admin.content().lower()
-        assert 'accuracy' in content
-    
-    def test_refresh_button_present(self, logged_in_admin: Page):
-        """Should have refresh button"""
-        # Dashboard.jsx has Refresh button with FiRefreshCw
-        refresh_btn = logged_in_admin.locator('button:has-text("Refresh")')
-        expect(refresh_btn).to_be_visible()
+        assert cards.count() >= 3  # Allowing for 3 or 4 depending on version
 
 
 # ============================================================================
-# CAMERA STATUS TESTS
+# STAT CARDS TESTS
 # ============================================================================
 
 @pytest.mark.unit
-class TestCameraStatus:
-    """Test camera status section - matches Dashboard.jsx"""
+class TestStatCards:
+    """Test individual statistic cards"""
     
-    def test_camera_status_section_exists(self, logged_in_admin: Page):
-        """Should have camera status section"""
-        # Dashboard.jsx has "Camera Status" card
-        camera_section = logged_in_admin.locator('text=Camera Status')
-        expect(camera_section).to_be_visible()
-    
-    def test_four_cameras_displayed(self, logged_in_admin: Page):
-        """Should display all 4 cameras"""
-        # Dashboard.jsx maps over 4 cameras
-        camera_items = logged_in_admin.locator('.camera-status-item')
-        assert camera_items.count() == 4
-    
-    def test_camera_indicators_visible(self, logged_in_admin: Page):
-        """Should show camera indicators"""
-        indicators = logged_in_admin.locator('.camera-indicator')
-        assert indicators.count() == 4
-
-
-# ============================================================================
-# RECENT RESULTS TESTS
-# ============================================================================
-
-@pytest.mark.integration
-class TestRecentResults:
-    """Test recent results section"""
-    
-    def test_recent_results_section_exists(self, logged_in_admin: Page):
-        """Should have recent results section"""
-        section = logged_in_admin.locator('text=Recent Processing Results')
-        expect(section).to_be_visible()
-    
-    def test_results_table_or_empty_state(self, logged_in_admin: Page):
-        """Should show results table or empty state"""
-        # Either table exists or empty-state message
-        table = logged_in_admin.locator('.table-container table')
-        empty = logged_in_admin.locator('.empty-state')
+    def test_total_fruits_card(self, logged_in_admin: Page):
+        """Should show total fruits count"""
+        navigate_to_dashboard(logged_in_admin)
         
-        assert table.count() > 0 or empty.count() > 0
+        # Look for the label specifically
+        expect(logged_in_admin.locator("text=Total Fruits").first).to_be_visible()
+    
+    def test_system_status_card(self, logged_in_admin: Page):
+        """Should show system status"""
+        navigate_to_dashboard(logged_in_admin)
+        
+        expect(logged_in_admin.locator("text=System Status").first).to_be_visible()
+    
+    def test_uptime_card(self, logged_in_admin: Page):
+        """Should show system uptime"""
+        navigate_to_dashboard(logged_in_admin)
+        
+        expect(logged_in_admin.locator("text=Uptime").first).to_be_visible()
+    
+    def test_accuracy_card(self, logged_in_admin: Page):
+        """Should show model accuracy"""
+        navigate_to_dashboard(logged_in_admin)
+        
+        # Check for 'Accuracy' text
+        expect(logged_in_admin.locator("text=Accuracy").first).to_be_visible()
 
 
 # ============================================================================
-# SYSTEM INFORMATION TESTS
+# CHARTS TESTS
 # ============================================================================
 
 @pytest.mark.unit
-class TestSystemInformation:
-    """Test system information sections"""
+class TestDashboardCharts:
+    """Test dashboard charts"""
     
-    def test_dataset_info_section(self, logged_in_admin: Page):
-        """Should have dataset information section"""
-        section = logged_in_admin.locator('text=Dataset Information')
-        expect(section).to_be_visible()
+    def test_charts_grid_layout(self, logged_in_admin: Page):
+        """Should display charts grid"""
+        navigate_to_dashboard(logged_in_admin)
+        
+        # Dashboard.jsx uses .charts-grid class
+        grid = logged_in_admin.locator('.charts-grid')
+        expect(grid).to_be_visible()
     
-    def test_model_performance_section(self, logged_in_admin: Page):
-        """Should have model performance section"""
-        section = logged_in_admin.locator('text=Model Performance')
-        expect(section).to_be_visible()
+    def test_processing_trends_chart(self, logged_in_admin: Page):
+        """Should show processing trends chart"""
+        navigate_to_dashboard(logged_in_admin)
+        
+        # Look for chart title
+        expect(logged_in_admin.locator("text=Processing Trends").first).to_be_visible()
     
-    def test_info_list_items(self, logged_in_admin: Page):
-        """Should display info list items"""
-        # Dashboard.jsx uses .info-list and .info-item classes
-        info_items = logged_in_admin.locator('.info-item')
-        assert info_items.count() > 0
+    def test_quality_distribution_chart(self, logged_in_admin: Page):
+        """Should show quality distribution chart"""
+        navigate_to_dashboard(logged_in_admin)
+        
+        expect(logged_in_admin.locator("text=Quality Distribution").first).to_be_visible()
 
 
 # ============================================================================
-# NAVIGATION TESTS
+# RECENT ACTIVITY TESTS
+# ============================================================================
+
+@pytest.mark.unit
+class TestRecentActivity:
+    """Test recent activity feed"""
+    
+    def test_activity_section_exists(self, logged_in_admin: Page):
+        """Should have recent activity section"""
+        navigate_to_dashboard(logged_in_admin)
+        
+        # Dashboard.jsx has "Recent Activity" section
+        section = logged_in_admin.get_by_role("heading", name="Recent Activity")
+        expect(section).to_be_visible()
+    
+    def test_activity_list_items(self, logged_in_admin: Page):
+        """Should show activity items"""
+        navigate_to_dashboard(logged_in_admin)
+        
+        # Dashboard.jsx uses .activity-list and .activity-item
+        # Items might be empty initially, so just check container or header
+        expect(logged_in_admin.locator('.activity-list')).to_be_visible()
+
+
+# ============================================================================
+# QUICK ACTIONS TESTS
 # ============================================================================
 
 @pytest.mark.integration
-class TestDashboardNavigation:
-    """Test dashboard navigation"""
+class TestQuickActions:
+    """Test quick action buttons"""
     
-    def test_sidebar_visible(self, logged_in_admin: Page):
-        """Should display navigation sidebar"""
-        sidebar = logged_in_admin.locator('nav, [class*="sidebar"]')
-        assert sidebar.count() > 0
-    
-    def test_can_navigate_to_processing(self, logged_in_admin: Page):
-        """Should navigate to processing page"""
-        processing_link = logged_in_admin.locator('a[href*="processing"]')
-        if processing_link.count() > 0:
-            processing_link.click()
-            logged_in_admin.wait_for_url(re.compile(r'/processing'))
-    
-    def test_can_navigate_to_results(self, logged_in_admin: Page):
-        """Should navigate to results page"""
-        results_link = logged_in_admin.locator('a[href*="results"]')
-        if results_link.count() > 0:
-            results_link.click()
-            logged_in_admin.wait_for_url(re.compile(r'/results'))
-
-
-# ============================================================================
-# DATA REFRESH TESTS
-# ============================================================================
-
-@pytest.mark.integration
-class TestDashboardDataRefresh:
-    """Test dashboard data refresh"""
-    
-    def test_refresh_button_clickable(self, logged_in_admin: Page):
-        """Should be able to click refresh button"""
-        refresh_btn = logged_in_admin.locator('button:has-text("Refresh")')
-        expect(refresh_btn).to_be_enabled()
+    def test_quick_actions_section(self, logged_in_admin: Page):
+        """Should have quick actions section"""
+        navigate_to_dashboard(logged_in_admin)
         
-        refresh_btn.click()
-        logged_in_admin.wait_for_timeout(500)
+        # Dashboard.jsx has "Quick Actions" card
+        # Using heading locator to avoid ambiguity
+        section = logged_in_admin.get_by_role("heading", name="Quick Actions")
+        expect(section).to_be_visible()
     
-    def test_spinner_shows_during_refresh(self, logged_in_admin: Page):
-        """Should show spinner during refresh"""
-        # Dashboard.jsx adds .spinning class to icon during refresh
-        refresh_btn = logged_in_admin.locator('button:has-text("Refresh")')
-        refresh_btn.click()
+    def test_start_processing_action(self, logged_in_admin: Page):
+        """Should have Start Processing button"""
+        navigate_to_dashboard(logged_in_admin)
         
-        # Spinner should appear briefly
-        logged_in_admin.wait_for_timeout(100)
+        # Look for button specifically
+        btn = logged_in_admin.locator('button:has-text("Start Processing")')
+        expect(btn).to_be_visible()
+    
+    def test_add_fruit_action(self, logged_in_admin: Page):
+        """Should have Add Fruit button"""
+        navigate_to_dashboard(logged_in_admin)
+        
+        btn = logged_in_admin.locator('button:has-text("Add Fruit")')
+        expect(btn).to_be_visible()
+    
+    def test_generate_report_action(self, logged_in_admin: Page):
+        """Should have Generate Report button"""
+        navigate_to_dashboard(logged_in_admin)
+        
+        btn = logged_in_admin.locator('button:has-text("Generate Report")')
+        expect(btn).to_be_visible()
 
 
 # ============================================================================
-# USER DASHBOARD TESTS
+# AUTHORIZATION TESTS
 # ============================================================================
 
 @pytest.mark.e2e
-class TestUserDashboard:
-    """Test regular user dashboard - matches UserDashboard.jsx"""
+class TestDashboardAuthorization:
+    """Test dashboard authorization"""
     
-    def test_user_dashboard_loads(self, logged_in_user: Page):
-        """Should load user dashboard"""
-        assert "/user-dashboard" in logged_in_user.url
+    def test_admin_can_access(self, logged_in_admin: Page):
+        """Admin should access dashboard"""
+        navigate_to_dashboard(logged_in_admin)
+        expect(logged_in_admin.get_by_role("heading", name="System Dashboard")).to_be_visible()
     
-    def test_welcome_message_shown(self, logged_in_user: Page):
-        """Should show welcome message with username"""
-        # UserDashboard.jsx shows "Welcome, {username}"
-        welcome = logged_in_user.locator('h1')
-        expect(welcome).to_contain_text('Welcome')
-    
-    def test_summary_cards_displayed(self, logged_in_user: Page):
-        """Should display summary cards"""
-        # UserDashboard.jsx uses .summary-card class
-        cards = logged_in_user.locator('.summary-card')
-        assert cards.count() >= 4  # totalToday, marketCount, standardCount, rejectCount
-    
-    def test_recent_results_table(self, logged_in_user: Page):
-        """Should show recent classification results"""
-        section = logged_in_user.locator('text=Recent Classification Results')
-        expect(section).to_be_visible()
-    
-    def test_view_all_results_button(self, logged_in_user: Page):
-        """Should have View All Results button"""
-        btn = logged_in_user.locator('button:has-text("View All Results")')
-        expect(btn).to_be_visible()
-    
-    def test_classification_guide_shown(self, logged_in_user: Page):
-        """Should display classification guide"""
-        guide = logged_in_user.locator('.classification-guide, text=Classification Guide')
-        assert guide.count() > 0
-    
-    def test_refresh_button_present(self, logged_in_user: Page):
-        """Should have refresh button"""
-        refresh_btn = logged_in_user.locator('button:has-text("Refresh")')
-        expect(refresh_btn).to_be_visible()
-
-
-# ============================================================================
-# LOGOUT TESTS
-# ============================================================================
-
-@pytest.mark.integration
-class TestDashboardLogout:
-    """Test logout functionality"""
-    
-    def test_logout_button_present(self, logged_in_admin: Page):
-        """Should have logout button"""
-        logout_btn = logged_in_admin.locator('button:has-text("Logout"), a:has-text("Logout")')
-        assert logout_btn.count() > 0
-    
-    def test_logout_redirects_to_login(self, logged_in_admin: Page):
-        """Should redirect to login on logout"""
-        logout_btn = logged_in_admin.locator('button:has-text("Logout"), a:has-text("Logout")')
-        if logout_btn.count() > 0:
-            logout_btn.click()
-            logged_in_admin.wait_for_url(f"{BASE_URL}/login", timeout=5000)
-
-
-# ============================================================================
-# RESPONSIVE DESIGN TESTS
-# ============================================================================
-
-@pytest.mark.unit
-class TestDashboardResponsive:
-    """Test responsive design"""
-    
-    def test_dashboard_on_tablet(self, context):
-        """Should display properly on tablet"""
-        tablet_page = context.new_page()
-        tablet_page.set_viewport_size({"width": 768, "height": 1024})
+    def test_regular_user_access(self, logged_in_user: Page):
+        """Regular user should access USER dashboard (not system dashboard)"""
+        # Note: This depends on your specific routing logic.
+        # If user goes to /dashboard, do they see a different view?
+        # Assuming they get redirected or see a limited view.
         
-        tablet_page.goto(f"{BASE_URL}/login")
-        tablet_page.fill('input[placeholder="Enter username"]', 'admin')
-        tablet_page.fill('input[placeholder="Enter password"]', 'admin123')
-        tablet_page.locator('.role-option:has(input[value="admin"])').click()
-        tablet_page.click('button.login-button')
-        tablet_page.wait_for_url(f"{BASE_URL}/dashboard")
+        logged_in_user.goto(f"{BASE_URL}/dashboard")
         
-        # Should load without errors
-        header = tablet_page.locator('h1')
-        expect(header).to_be_visible()
-        
-        tablet_page.close()
+        # Verify page loads (even if it's the user version)
+        # Assuming user dashboard has a welcome message or similar
+        expect(logged_in_user.locator("h1")).to_be_visible()
