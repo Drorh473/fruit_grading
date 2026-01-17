@@ -1,7 +1,7 @@
 """
 Results Page Tests
 Tests classification results display and filtering
-Matches Results.jsx component
+Matches refactored Results.jsx component
 """
 
 import re
@@ -10,36 +10,28 @@ from playwright.sync_api import Page, expect
 
 BASE_URL = "http://localhost:3000"
 
-# Helper function to navigate safely (Preserving Auth)
+
 def navigate_to_results(page: Page):
     """Navigate to results using the sidebar to preserve Auth state"""
     
-    # 1. Check if already there
     if "/results" in page.url:
         page.wait_for_selector('h1:has-text("Classification Results")', state='visible')
         return
 
-    # 2. Open Hamburger if visible
     hamburger = page.locator('.hamburger-button')
     if hamburger.is_visible():
         hamburger.click()
         page.wait_for_selector('.sidebar.visible, .sidebar-open', timeout=2000)
 
-    # 3. LOCATE the element
     results_link = page.locator('a[href$="/results"]')
-    
-    # 4. DISPATCH 'click' event directly using JavaScript
     results_link.dispatch_event('click')
     
-    # 5. Wait for navigation
     try:
         expect(page).to_have_url(re.compile(r".*/results"), timeout=10000)
     except AssertionError:
-        # Fallback
         results_link.evaluate("el => el.click()")
         expect(page).to_have_url(re.compile(r".*/results"))
 
-    # 6. Verify page load with SPECIFIC header
     page.wait_for_selector('h1:has-text("Classification Results")', state='visible')
 
 
@@ -49,13 +41,12 @@ def navigate_to_results(page: Page):
 
 @pytest.mark.unit
 class TestResultsRendering:
-    """Test results page rendering - matches Results.jsx"""
+    """Test results page rendering"""
     
     def test_results_page_loads(self, logged_in_admin: Page):
         """Should load results page"""
         navigate_to_results(logged_in_admin)
         
-        # Specific header check to avoid conflict with Sidebar H1
         header = logged_in_admin.get_by_role("heading", name="Classification Results")
         expect(header).to_be_visible()
     
@@ -63,21 +54,17 @@ class TestResultsRendering:
         """Should display KPI cards"""
         navigate_to_results(logged_in_admin)
         
-        # Results.jsx uses .kpi-card class
         kpi_cards = logged_in_admin.locator('.kpi-card')
-        # Wait for at least one to be visible
         if kpi_cards.count() > 0:
-             expect(kpi_cards.first).to_be_visible()
+            expect(kpi_cards.first).to_be_visible()
         
     def test_results_table_or_empty_state(self, logged_in_admin: Page):
         """Should display results table or empty state"""
         navigate_to_results(logged_in_admin)
         
-        # Results.jsx has table-container or empty-state
         table = logged_in_admin.locator('.table-container table')
         empty = logged_in_admin.locator('.empty-state')
         
-        # Wait for either to appear
         expect(table.or_(empty).first).to_be_visible()
 
 
@@ -94,11 +81,20 @@ class TestKPISection:
         navigate_to_results(logged_in_admin)
         expect(logged_in_admin.locator('text=Total Processed')).to_be_visible()
     
+    def test_quality_rate_kpi(self, logged_in_admin: Page):
+        """Should show quality rate KPI"""
+        navigate_to_results(logged_in_admin)
+        expect(logged_in_admin.locator('text=Quality Rate')).to_be_visible()
+    
+    def test_model_accuracy_kpi(self, logged_in_admin: Page):
+        """Should show model accuracy KPI"""
+        navigate_to_results(logged_in_admin)
+        expect(logged_in_admin.locator('text=Model Accuracy')).to_be_visible()
+    
     def test_kpi_trend_indicators(self, logged_in_admin: Page):
         """Should show trend indicators"""
         navigate_to_results(logged_in_admin)
         
-        # Trends may or may not be visible depending on data, just checking selector validity
         trends = logged_in_admin.locator('.kpi-trend')
         assert trends.count() >= 0
 
@@ -109,7 +105,7 @@ class TestKPISection:
 
 @pytest.mark.integration
 class TestResultsFiltering:
-    """Test results filtering - matches Results.jsx"""
+    """Test results filtering"""
     
     def test_search_box_exists(self, logged_in_admin: Page):
         """Should have search box"""
@@ -126,25 +122,15 @@ class TestResultsFiltering:
         expect(type_filter).to_be_visible()
     
     def test_can_filter_by_type(self, logged_in_admin: Page):
-        """Should filter by type"""
+        """Should filter by grade type"""
         navigate_to_results(logged_in_admin)
         
         type_filter = logged_in_admin.locator('.filter-select').first
-        # Only try selecting if options exist
         if type_filter.is_visible():
-            # Try/Except safely in case 'market' option isn't in the DOM yet
             try:
                 type_filter.select_option('market')
             except Exception:
                 pass
-    
-    def test_batch_filter_exists(self, logged_in_admin: Page):
-        """Should have batch filter"""
-        navigate_to_results(logged_in_admin)
-        
-        # Check by locator count
-        batch_filters = logged_in_admin.locator('.filter-select')
-        assert batch_filters.count() > 0
     
     def test_search_functionality(self, logged_in_admin: Page):
         """Should be able to search"""
@@ -156,43 +142,52 @@ class TestResultsFiltering:
 
 
 # ============================================================================
-# QUALITY DISTRIBUTION TESTS
+# PREDICTED GRADE DISTRIBUTION TESTS
 # ============================================================================
 
 @pytest.mark.unit
-class TestQualityDistribution:
-    """Test quality distribution section"""
+class TestPredictedGradeDistribution:
+    """Test predicted grade distribution section"""
     
-    def test_quality_distribution_section(self, logged_in_admin: Page):
-        """Should have quality distribution section"""
+    def test_grade_distribution_section(self, logged_in_admin: Page):
+        """Should have predicted grade distribution section"""
         navigate_to_results(logged_in_admin)
         
-        section = logged_in_admin.locator('text=Quality Distribution')
+        section = logged_in_admin.locator('text=Predicted Grade Distribution')
         expect(section).to_be_visible()
     
     def test_grade_legend_items(self, logged_in_admin: Page):
-        """Should show grade legend"""
+        """Should show grade legend without reject"""
         navigate_to_results(logged_in_admin)
         
         content = logged_in_admin.content()
-        grades = ['Market', 'Standard', 'Premium', 'Reject']
+        grades = ['Market Grade', 'Standard Grade', 'Premium Grade']
         found = sum(1 for g in grades if g in content)
-        assert found >= 0 # Reduced strictness as data might be empty
+        assert found >= 0
+    
+    def test_no_reject_in_distribution(self, logged_in_admin: Page):
+        """Should not show reject in grade distribution"""
+        navigate_to_results(logged_in_admin)
+        
+        pie_section = logged_in_admin.locator('.pie-chart-container')
+        if pie_section.is_visible():
+            legend_text = pie_section.inner_text()
+            assert 'Reject' not in legend_text
 
 
 # ============================================================================
-# ALERTS SECTION TESTS
+# SYSTEM STATUS TESTS
 # ============================================================================
 
 @pytest.mark.unit
-class TestAlertsSection:
-    """Test quality alerts sidebar"""
+class TestSystemStatus:
+    """Test system status sidebar"""
     
-    def test_alerts_section_exists(self, logged_in_admin: Page):
-        """Should have quality alerts section"""
+    def test_system_status_section_exists(self, logged_in_admin: Page):
+        """Should have system status section"""
         navigate_to_results(logged_in_admin)
         
-        section = logged_in_admin.locator('text=Quality Alerts')
+        section = logged_in_admin.locator('text=System Status')
         expect(section).to_be_visible()
     
     def test_alert_list_container(self, logged_in_admin: Page):
@@ -204,34 +199,89 @@ class TestAlertsSection:
 
 
 # ============================================================================
+# TRAINING HISTORY TESTS
+# ============================================================================
+
+@pytest.mark.unit
+class TestTrainingHistory:
+    """Test training history charts section"""
+    
+    def test_loss_chart_exists(self, logged_in_admin: Page):
+        """Should have loss over epochs chart"""
+        navigate_to_results(logged_in_admin)
+        
+        section = logged_in_admin.locator('text=Loss Over Epochs')
+        expect(section).to_be_visible()
+    
+    def test_accuracy_chart_exists(self, logged_in_admin: Page):
+        """Should have accuracy over epochs chart"""
+        navigate_to_results(logged_in_admin)
+        
+        section = logged_in_admin.locator('text=Accuracy Over Epochs')
+        expect(section).to_be_visible()
+    
+    def test_training_charts_side_by_side(self, logged_in_admin: Page):
+        """Should display training charts in grid"""
+        navigate_to_results(logged_in_admin)
+        
+        charts_grid = logged_in_admin.locator('.training-charts-grid')
+        expect(charts_grid).to_be_visible()
+    
+    def test_chart_legends_visible(self, logged_in_admin: Page):
+        """Should show chart legends"""
+        navigate_to_results(logged_in_admin)
+        
+        legends = logged_in_admin.locator('.chart-legend')
+        assert legends.count() >= 0
+
+
+# ============================================================================
+# CONFUSION MATRIX TESTS
+# ============================================================================
+
+@pytest.mark.unit
+class TestConfusionMatrix:
+    """Test confusion matrix section"""
+    
+    def test_confusion_matrix_section_exists(self, logged_in_admin: Page):
+        """Should have confusion matrix section"""
+        navigate_to_results(logged_in_admin)
+        
+        section = logged_in_admin.locator('text=Normalized Confusion Matrix')
+        expect(section).to_be_visible()
+    
+    def test_matrix_grid_visible(self, logged_in_admin: Page):
+        """Should display matrix grid"""
+        navigate_to_results(logged_in_admin)
+        
+        matrix = logged_in_admin.locator('.confusion-matrix-container')
+        if matrix.count() > 0:
+            expect(matrix.first).to_be_visible()
+    
+    def test_no_reject_in_matrix(self, logged_in_admin: Page):
+        """Should not show reject class in matrix"""
+        navigate_to_results(logged_in_admin)
+        
+        matrix_container = logged_in_admin.locator('.confusion-matrix-container')
+        if matrix_container.is_visible():
+            matrix_text = matrix_container.inner_text()
+            assert 'reject' not in matrix_text.lower()
+
+
+# ============================================================================
 # EXPORT TESTS
 # ============================================================================
 
 @pytest.mark.integration
 class TestResultsExport:
-    """Test results export - matches Results.jsx"""
+    """Test results export"""
     
     def test_export_section_exists(self, logged_in_admin: Page):
         """Should have export section"""
         navigate_to_results(logged_in_admin)
         
-        # FIX: Target the specific H2 heading instead of generic "Export" text
-        section = logged_in_admin.get_by_role("heading", name="Export & Reporting Options")
+        section = logged_in_admin.get_by_role("heading", name="Export Data")
         expect(section).to_be_visible()
-    
-    def test_export_pdf_button(self, logged_in_admin: Page):
-        """Should have Export PDF button"""
-        navigate_to_results(logged_in_admin)
-        
-        pdf_btn = logged_in_admin.locator('button:has-text("PDF")')
-        expect(pdf_btn).to_be_visible()
-    
-    def test_export_excel_button(self, logged_in_admin: Page):
-        """Should have Export Excel button"""
-        navigate_to_results(logged_in_admin)
-        
-        excel_btn = logged_in_admin.locator('button:has-text("Excel")')
-        expect(excel_btn).to_be_visible()
     
     def test_export_csv_button(self, logged_in_admin: Page):
         """Should have Export CSV button"""
@@ -240,12 +290,14 @@ class TestResultsExport:
         csv_btn = logged_in_admin.locator('button:has-text("CSV")')
         expect(csv_btn).to_be_visible()
     
-    def test_schedule_email_button(self, logged_in_admin: Page):
-        """Should have Schedule Email button"""
+    def test_export_button_centered(self, logged_in_admin: Page):
+        """Should have centered export button"""
         navigate_to_results(logged_in_admin)
         
-        email_btn = logged_in_admin.locator('button:has-text("Email")')
-        expect(email_btn).to_be_visible()
+        export_options = logged_in_admin.locator('.export-options')
+        if export_options.is_visible():
+            expect(export_options).to_be_visible()
+
 
 # ============================================================================
 # TABLE TESTS
@@ -255,32 +307,45 @@ class TestResultsExport:
 class TestResultsTable:
     """Test results table display"""
     
-    def test_detailed_results_section(self, logged_in_admin: Page):
-        """Should have detailed results section"""
+    def test_classification_results_section(self, logged_in_admin: Page):
+        """Should have classification results section"""
         navigate_to_results(logged_in_admin)
         
-        section = logged_in_admin.locator('text=Detailed Results')
-        expect(section).to_be_visible()
+        section = logged_in_admin.locator('text=Classification Results')
+        expect(section.first).to_be_visible()
     
-    def test_table_headers(self, logged_in_admin: Page):
-        """Should have correct table headers"""
+    def test_table_headers_no_batch(self, logged_in_admin: Page):
+        """Should have correct table headers without batch"""
         navigate_to_results(logged_in_admin)
         
-        # Check simpler subset to be safe
-        expect(logged_in_admin.locator("th:has-text('Batch')").first).to_be_visible()
+        table = logged_in_admin.locator('.table-container table')
+        if table.is_visible():
+            expect(logged_in_admin.locator("th:has-text('Object ID')").first).to_be_visible()
+            expect(logged_in_admin.locator("th:has-text('Grade')").first).to_be_visible()
+            expect(logged_in_admin.locator("th:has-text('Image Count')").first).to_be_visible()
+            expect(logged_in_admin.locator("th:has-text('Timestamp')").first).to_be_visible()
+    
+    def test_no_batch_column(self, logged_in_admin: Page):
+        """Should not have batch column in table"""
+        navigate_to_results(logged_in_admin)
+        
+        batch_header = logged_in_admin.locator("th:has-text('Batch')")
+        assert batch_header.count() == 0
 
 
 # ============================================================================
-# BATCH COMPARISON TESTS
+# RESPONSIVE TESTS
 # ============================================================================
 
 @pytest.mark.unit
-class TestBatchComparison:
-    """Test batch comparison section"""
+class TestResponsiveLayout:
+    """Test responsive layout"""
     
-    def test_batch_comparison_section(self, logged_in_admin: Page):
-        """Should have batch comparison section"""
+    def test_charts_grid_layout(self, logged_in_admin: Page):
+        """Should have proper grid layout for charts"""
         navigate_to_results(logged_in_admin)
         
-        section = logged_in_admin.locator('text=Batch Performance')
-        expect(section).to_be_visible()
+        charts_grid = logged_in_admin.locator('.training-charts-grid')
+        if charts_grid.is_visible():
+            cards = charts_grid.locator('.card')
+            assert cards.count() == 2

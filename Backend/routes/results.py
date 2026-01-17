@@ -2,18 +2,39 @@
 Results Routes
 Endpoints for viewing and exporting classification results
 """
-from flask import Blueprint, jsonify, request
+import os
+import json
+from flask import Blueprint, jsonify, request, Response
 from datetime import datetime, timedelta
 from collections import Counter
+from pathlib import Path
+from dotenv import load_dotenv
 from utils.utils import get_collection
 
+# Load environment
+env_path = Path('.') / '.env'
+load_dotenv(dotenv_path=env_path)
+MODEL_DIR = os.getenv('MODEL_DIR', 'saved_models')
+
 results_bp = Blueprint('results', __name__)
+
+
+def load_dashboard_metadata():
+    """Load dashboard metadata from saved model directory"""
+    metadata_path = os.path.join(MODEL_DIR, 'dashboard_metadata.json')
+    if not os.path.exists(metadata_path):
+        return None
+    try:
+        with open(metadata_path, 'r') as f:
+            return json.load(f)
+    except Exception as e:
+        print(f"Error loading dashboard metadata: {e}")
+        return None
 
 
 @results_bp.route('/list', methods=['GET'])
 def get_results_list():
     """Get results list with filtering and pagination"""
-
     try:
         try:
             limit = int(request.args.get('limit', 100))
@@ -28,13 +49,10 @@ def get_results_list():
             }), 400
         collection = get_collection('images')
         
-        # Get query parameters
-
         search = request.args.get('search', '')
         fruit_type = request.args.get('type', 'all')
         batch = request.args.get('batch', 'all')
         
-        # Build query
         query = {}
         if search:
             query['object_id'] = {'$regex': search, '$options': 'i'}
@@ -43,7 +61,6 @@ def get_results_list():
         if batch != 'all':
             query['batch_id'] = batch
         
-        # Aggregate to get unique objects
         pipeline = [
             {'$match': query},
             {'$sort': {'timestamp': -1}},
@@ -57,15 +74,11 @@ def get_results_list():
             }}
         ]
         
-        # Get results
         results = list(collection.aggregate(pipeline))
-        
-        # Sort and paginate
         results.sort(key=lambda x: x['timestamp'], reverse=True)
         total = len(results)
         paginated = results[offset:offset + limit]
         
-        # Format results
         formatted_results = []
         for r in paginated:
             formatted_results.append({
@@ -99,7 +112,6 @@ def get_kpis():
     try:
         collection = get_collection('images')
         
-        # Get unique objects
         pipeline = [
             {'$group': {
                 '_id': '$object_id',
@@ -112,27 +124,23 @@ def get_kpis():
         
         total_processed = len(objects)
         
-        # Quality rate (non-reject)
         quality_count = sum(1 for obj in objects if obj['fruit_type'] != 'reject')
         quality_rate = round((quality_count / total_processed * 100) if total_processed > 0 else 0, 1)
         
-        # Processing speed (objects per hour) - estimate based on recent data
         now = datetime.now()
         recent_objects = [obj for obj in objects if hasattr(obj['timestamp'], 'timestamp') or isinstance(obj['timestamp'], datetime)]
         if recent_objects:
-            hours = 24  # Last 24 hours
+            hours = 24
             recent_count = sum(1 for obj in recent_objects if (now - obj['timestamp']).total_seconds() < hours * 3600)
             processing_speed = round(recent_count / hours, 1)
         else:
             processing_speed = 0
         
-        # Calculate trends by comparing today vs yesterday
         yesterday_start = now - timedelta(days=1)
         yesterday_end = now
         day_before_start = now - timedelta(days=2)
         day_before_end = now - timedelta(days=1)
         
-        # Get yesterday's data
         yesterday_pipeline = [
             {'$match': {
                 'timestamp': {
@@ -147,7 +155,6 @@ def get_kpis():
         ]
         yesterday_objects = list(collection.aggregate(yesterday_pipeline))
         
-        # Get day before yesterday's data
         day_before_pipeline = [
             {'$match': {
                 'timestamp': {
@@ -162,10 +169,8 @@ def get_kpis():
         ]
         day_before_objects = list(collection.aggregate(day_before_pipeline))
         
-        # Calculate trends
         trends = {}
         
-        # Total Processed trend
         yesterday_total = len(yesterday_objects)
         day_before_total = len(day_before_objects)
         if day_before_total > 0:
@@ -174,7 +179,6 @@ def get_kpis():
         else:
             trends['totalProcessed'] = None
         
-        # Quality Rate trend
         yesterday_quality = sum(1 for obj in yesterday_objects if obj['fruit_type'] != 'reject')
         yesterday_quality_rate = (yesterday_quality / yesterday_total * 100) if yesterday_total > 0 else 0
         
@@ -187,7 +191,6 @@ def get_kpis():
         else:
             trends['qualityRate'] = None
         
-        # Processing Speed trend (objects per hour)
         yesterday_speed = round(yesterday_total / 24, 1) if yesterday_total > 0 else 0
         day_before_speed = round(day_before_total / 24, 1) if day_before_total > 0 else 0
         
@@ -216,11 +219,10 @@ def get_kpis():
 
 @results_bp.route('/quality-distribution', methods=['GET'])
 def get_quality_distribution():
-    """Get quality distribution statistics"""
+    """Get quality distribution statistics (excluding reject)"""
     try:
         collection = get_collection('images')
         
-        # Get unique objects with their types
         pipeline = [
             {'$group': {
                 '_id': '$object_id',
@@ -229,12 +231,11 @@ def get_quality_distribution():
         ]
         objects = list(collection.aggregate(pipeline))
         
-        # Count by type
         type_counts = Counter(obj['fruit_type'] for obj in objects)
-        total = len(objects)
+        total = sum(type_counts.get(t, 0) for t in ['market', 'standard', 'premium'])
         
         distribution = {}
-        for quality_type in ['market', 'standard', 'premium', 'reject']:
+        for quality_type in ['market', 'standard', 'premium']:
             count = type_counts.get(quality_type, 0)
             percentage = round((count / total * 100) if total > 0 else 0, 1)
             distribution[quality_type] = {
@@ -249,8 +250,7 @@ def get_quality_distribution():
         return jsonify({
             'market': {'count': 0, 'percentage': 0},
             'standard': {'count': 0, 'percentage': 0},
-            'premium': {'count': 0, 'percentage': 0},
-            'reject': {'count': 0, 'percentage': 0}
+            'premium': {'count': 0, 'percentage': 0}
         }), 200
 
 
@@ -260,7 +260,6 @@ def get_quality_alerts():
     try:
         collection = get_collection('images')
         
-        # Get recent objects (last hour)
         now = datetime.now()
         one_hour_ago = now - timedelta(hours=1)
         
@@ -276,7 +275,6 @@ def get_quality_alerts():
         
         alerts = []
         
-        # Check for high reject rate
         recent_objects = [obj for obj in objects if isinstance(obj['timestamp'], datetime) and obj['timestamp'] > one_hour_ago]
         if recent_objects:
             reject_rate = sum(1 for obj in recent_objects if obj['fruit_type'] == 'reject') / len(recent_objects)
@@ -288,7 +286,6 @@ def get_quality_alerts():
                     'message': f'Reject rate at {reject_rate*100:.1f}% in the last hour'
                 })
         
-        # Add success message if no alerts
         if not alerts:
             alerts.append({
                 'id': 'all_good',
@@ -310,7 +307,6 @@ def get_batches():
     try:
         collection = get_collection('images')
         batches = collection.distinct('batch_id')
-        # Filter out None/null values and sort
         batches = sorted([b for b in batches if b is not None])
         return jsonify(batches), 200
         
@@ -319,79 +315,114 @@ def get_batches():
         return jsonify([]), 200
 
 
-@results_bp.route('/hourly-trend', methods=['GET'])
-def get_hourly_trend():
-    """Get hourly processing trend"""
+@results_bp.route('/training-history', methods=['GET'])
+def get_training_history():
+    """Get training history from saved model metadata"""
     try:
-        hours = int(request.args.get('hours', 24))
-        collection = get_collection('images')
+        metadata = load_dashboard_metadata()
         
-        # Get objects grouped by hour
-        now = datetime.now()
-        trend_data = []
+        if not metadata or 'training_history' not in metadata:
+            return jsonify({
+                'train_loss': [],
+                'train_accuracy': [],
+                'val_loss': [],
+                'val_accuracy': []
+            }), 200
         
-        for i in range(hours):
-            hour_start = now - timedelta(hours=hours-i)
-            hour_end = hour_start + timedelta(hours=1)
-            
-            pipeline = [
-                {'$match': {
-                    'timestamp': {
-                        '$gte': hour_start,
-                        '$lt': hour_end
-                    }
-                }},
-                {'$group': {
-                    '_id': '$object_id',
-                    'fruit_type': {'$first': '$fruit_type'}
-                }}
-            ]
-            
-            objects = list(collection.aggregate(pipeline))
-            processed = len(objects)
-            quality_count = sum(1 for obj in objects if obj['fruit_type'] != 'reject')
-            quality_rate = round((quality_count / processed * 100) if processed > 0 else 0, 1)
-            
-            trend_data.append({
-                'hour': hour_start.strftime('%H:00'),
-                'processed': processed,
-                'qualityRate': quality_rate
-            })
+        history = metadata['training_history']
         
-        return jsonify(trend_data), 200
+        return jsonify({
+            'train_loss': history.get('train_loss', []),
+            'train_accuracy': history.get('train_accuracy', []),
+            'val_loss': history.get('val_loss', []),
+            'val_accuracy': history.get('val_accuracy', [])
+        }), 200
         
     except Exception as e:
-        print(f"Error in get_hourly_trend: {e}")
-        return jsonify([]), 200
+        print(f"Error in get_training_history: {e}")
+        return jsonify({
+            'train_loss': [],
+            'train_accuracy': [],
+            'val_loss': [],
+            'val_accuracy': []
+        }), 200
 
 
 @results_bp.route('/confusion-matrix', methods=['GET'])
 def get_confusion_matrix():
-    """Get confusion matrix data (mock for now)"""
+    """Get confusion matrix data from saved model metadata"""
     try:
-        # This would require actual prediction vs ground truth data
-        # For now, return a placeholder structure
+        metadata = load_dashboard_metadata()
+        
+        if not metadata:
+            return jsonify({
+                'classes': [],
+                'matrix': [],
+                'normalized': [],
+                'metrics': {}
+            }), 200
+        
+        # Get confusion matrix from metadata
+        cm = metadata.get('confusion_matrix')
+        label_mapping = metadata.get('label_mapping', {})
+        
+        if not cm or not label_mapping:
+            return jsonify({
+                'classes': [],
+                'matrix': [],
+                'normalized': [],
+                'metrics': {}
+            }), 200
+        
+        # Get class names sorted by index (excluding reject)
+        classes = [name for name, idx in sorted(label_mapping.items(), key=lambda x: x[1]) 
+                   if name.lower() != 'reject']
+        
+        # Filter out reject from matrix
+        reject_idx = None
+        for name, idx in label_mapping.items():
+            if name.lower() == 'reject':
+                reject_idx = idx
+                break
+        
+        matrix = cm
+        if reject_idx is not None:
+            matrix = [row[:reject_idx] + row[reject_idx+1:] for i, row in enumerate(cm) if i != reject_idx]
+        
+        # Calculate normalized matrix
+        normalized = []
+        for row in matrix:
+            row_sum = sum(row)
+            if row_sum > 0:
+                normalized.append([round(val / row_sum, 4) for val in row])
+            else:
+                normalized.append([0.0] * len(row))
+        
+        # Get metrics from metadata or calculate
+        perf = metadata.get('performance', {})
+        accuracy = perf.get('test_accuracy', 0)
+        
         return jsonify({
-            'classes': ['market', 'standard', 'premium', 'reject'],
-            'matrix': [
-                [45, 3, 1, 1],  # market
-                [2, 38, 2, 0],  # standard
-                [1, 2, 35, 1],  # premium
-                [0, 1, 0, 18]   # reject
-            ],
+            'classes': classes,
+            'matrix': matrix,
+            'normalized': normalized,
             'metrics': {
-                'accuracy': 0.91,
-                'precision': {'market': 0.94, 'standard': 0.86, 'premium': 0.92, 'reject': 0.90},
-                'recall': {'market': 0.90, 'standard': 0.90, 'premium': 0.90, 'reject': 0.95}
+                'accuracy': accuracy
             }
         }), 200
         
     except Exception as e:
         print(f"Error in get_confusion_matrix: {e}")
-        return jsonify({'classes': [], 'matrix': [], 'metrics': {}}), 200
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'classes': [],
+            'matrix': [],
+            'normalized': [],
+            'metrics': {}
+        }), 200
 
 
-# Keep existing endpoints for backward compatibility
 @results_bp.route('/all', methods=['GET'])
 def get_all_results():
     """Legacy endpoint - redirects to /list"""
@@ -404,17 +435,13 @@ def get_result_details(object_id):
     try:
         collection = get_collection('images')
         
-        # Find all images for this object
         images = list(collection.find({'object_id': object_id}))
         
-        # If no images found, return 404
         if not images:
             return jsonify({'error': 'Result not found'}), 404
         
-        # Get first image for basic info
         first_image = images[0]
         
-        # Organize images by camera
         images_by_camera = {}
         for img in images:
             camera_id = img.get('camera_id', 0)
@@ -425,7 +452,6 @@ def get_result_details(object_id):
                 'timestamp': str(img.get('timestamp', ''))
             }
         
-        # Build response
         result = {
             'object_id': object_id,
             'fruit_type': first_image.get('fruit_type', 'unknown'),
@@ -445,7 +471,6 @@ def get_result_details(object_id):
         return jsonify({'error': str(e)}), 500
 
 
-
 @results_bp.route('/stats', methods=['GET'])
 def get_results_stats():
     """Get overall statistics"""
@@ -462,11 +487,9 @@ def get_results_stats():
         return jsonify({
             'totalObjects': unique_objects,
             'totalImages': total_images,
-            # ADD THESE FIELDS:
             'marketCount': next((r['count'] for r in type_counts if r['_id'] == 'market'), 0),
             'standardCount': next((r['count'] for r in type_counts if r['_id'] == 'standard'), 0),
-            'premiumCount': next((r['count'] for r in type_counts if r['_id'] == 'premium'), 0),
-            'rejectCount': next((r['count'] for r in type_counts if r['_id'] == 'reject'), 0)
+            'premiumCount': next((r['count'] for r in type_counts if r['_id'] == 'premium'), 0)
         }), 200
     except Exception as e:
         print(f"Error in get_results_stats: {e}")
@@ -475,22 +498,19 @@ def get_results_stats():
             'totalImages': 0,
             'marketCount': 0,
             'standardCount': 0,
-            'premiumCount': 0,
-            'rejectCount': 0
+            'premiumCount': 0
         }), 200
+
 
 @results_bp.route('/export', methods=['GET'])
 def export_results():
     """Export results as CSV"""
     try:
-        from flask import Response
         import io
         import csv
         
-        # Use get_collection instead of current_app.mongo_client
         collection = get_collection('images')
         
-        # Aggregate results
         pipeline = [
             {'$sort': {'timestamp': -1}},
             {'$group': {
@@ -506,26 +526,20 @@ def export_results():
         
         results = list(collection.aggregate(pipeline))
         
-        # Create CSV in memory
         output = io.StringIO()
         writer = csv.writer(output)
         
-        # Write header
-        writer.writerow(['Object ID', 'Fruit Type', 'Timestamp', 
-                        'Confidence', 'Batch ID', 'Image Count'])
+        writer.writerow(['Object ID', 'Grade', 'Timestamp', 'Batch ID', 'Image Count'])
         
-        # Write data
         for result in results:
             writer.writerow([
                 result.get('_id', ''),
                 result.get('fruit_type', ''),
                 str(result.get('timestamp', '')),
-                result.get('confidence', ''),
                 result.get('batch_id', ''),
                 result.get('image_count', 0)
             ])
         
-        # Create response
         output.seek(0)
         return Response(
             output.getvalue(),

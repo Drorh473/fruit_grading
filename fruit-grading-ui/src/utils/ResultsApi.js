@@ -22,7 +22,7 @@ async function apiFetch(endpoint, options = {}) {
     if (!response.ok) {
       const error = await response.json();
       throw new Error(
-        error.message || `HTTP error! status: ${response.status}`
+        error.message || `HTTP error! status: ${response.status}`,
       );
     }
 
@@ -40,7 +40,7 @@ async function apiFetch(endpoint, options = {}) {
 
 /**
  * Get all results with filtering
- * @param {Object} filters - { search, type, batch, confidence, limit, offset }
+ * @param {Object} filters - { search, type, batch, limit, offset }
  * @returns {Promise<Object>} { results: [...], total, limit, offset }
  */
 export async function getResultsList(filters = {}) {
@@ -51,8 +51,6 @@ export async function getResultsList(filters = {}) {
     params.append("type", filters.type);
   if (filters.batch && filters.batch !== "all")
     params.append("batch", filters.batch);
-  if (filters.confidence && filters.confidence !== "all")
-    params.append("confidence", filters.confidence);
   if (filters.limit) params.append("limit", filters.limit);
   if (filters.offset) params.append("offset", filters.offset);
 
@@ -64,7 +62,7 @@ export async function getResultsList(filters = {}) {
 
 /**
  * Get KPI metrics
- * @returns {Promise<Object>} { totalProcessed, qualityRate, avgConfidence, processingSpeed, trends }
+ * @returns {Promise<Object>} { totalProcessed, qualityRate, processingSpeed, trends }
  */
 export async function getKPIs() {
   return apiFetch("/results/kpis");
@@ -87,24 +85,11 @@ export async function getQualityAlerts() {
 }
 
 /**
- * Get hourly processing trend
- * @param {number} hours - Number of hours to fetch (default 24)
- * @returns {Promise<Array>} Array of { hour, processed, qualityRate }
+ * Get training history from model metadata
+ * @returns {Promise<Object>} { train_loss, train_accuracy, val_loss, val_accuracy }
  */
-export async function getHourlyTrend(hours = 24) {
-  return apiFetch(`/results/hourly-trend?hours=${hours}`);
-}
-
-/**
- * Get batch performance comparison
- * @param {string} batchId - Specific batch to compare
- * @returns {Promise<Object>} { currentBatch, historicalAvg, metrics }
- */
-export async function getBatchComparison(batchId) {
-  const endpoint = batchId
-    ? `/results/batch-comparison?batchId=${batchId}`
-    : "/results/batch-comparison";
-  return apiFetch(endpoint);
+export async function getTrainingHistory() {
+  return apiFetch("/results/training-history");
 }
 
 /**
@@ -117,7 +102,7 @@ export async function getBatches() {
 
 /**
  * Get confusion matrix data
- * @returns {Promise<Object>} { classes: [...], matrix: [[...]], metrics: {...} }
+ * @returns {Promise<Object>} { classes, matrix, normalized, metrics }
  */
 export async function getConfusionMatrix() {
   return apiFetch("/results/confusion-matrix");
@@ -125,64 +110,10 @@ export async function getConfusionMatrix() {
 
 /**
  * Export results as CSV
- * @param {Object} filters - { search, type, batch, confidence }
  * @returns {Promise<string>} CSV string
  */
-export async function exportResultsCSV(filters = {}) {
-  return apiFetch("/results/export/csv", {
-    method: "POST",
-    body: JSON.stringify({ filters }),
-  });
-}
-
-/**
- * Export results as PDF report
- * @param {Object} options - Report options
- * @returns {Promise<Blob>} PDF blob
- */
-export async function exportResultsPDF(options = {}) {
-  const response = await fetch(`${API_BASE_URL}/results/export/pdf`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(options),
-  });
-
-  if (!response.ok) {
-    throw new Error(`PDF export failed: ${response.status}`);
-  }
-
-  return await response.blob();
-}
-
-/**
- * Export results as Excel with charts
- * @param {Object} options - Export options
- * @returns {Promise<Blob>} Excel blob
- */
-export async function exportResultsExcel(options = {}) {
-  const response = await fetch(`${API_BASE_URL}/results/export/excel`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(options),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Excel export failed: ${response.status}`);
-  }
-
-  return await response.blob();
-}
-
-/**
- * Schedule email report
- * @param {Object} config - { email, frequency, includeCharts }
- * @returns {Promise<Object>} Confirmation response
- */
-export async function scheduleEmailReport(config) {
-  return apiFetch("/results/schedule-report", {
-    method: "POST",
-    body: JSON.stringify(config),
-  });
+export async function exportResultsCSV() {
+  return apiFetch("/results/export");
 }
 
 /**
@@ -219,20 +150,15 @@ export async function checkHealth() {
   return apiFetch("/health");
 }
 
-// Export all functions as default object as well for flexibility
 export default {
   getResultsList,
   getKPIs,
   getQualityDistribution,
   getQualityAlerts,
-  getHourlyTrend,
-  getBatchComparison,
+  getTrainingHistory,
   getBatches,
   getConfusionMatrix,
   exportResultsCSV,
-  exportResultsPDF,
-  exportResultsExcel,
-  scheduleEmailReport,
   downloadBlob,
   downloadCSV,
   checkHealth,
