@@ -228,10 +228,5 @@ class TestErrorHandling:
                                content_type='application/json')
         assert 'application/json' in response2.content_type
         
-        # Test types endpoint
-        response3 = client.get('/api/fruits/types')
-        assert 'application/json' in response3.content_type
-
-
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

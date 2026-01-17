@@ -6,6 +6,7 @@
 /* Add spacing between all cards */
 .processing > .card {
   margin-bottom: var(--spacing-lg);
+  overflow: visible !important;
 }
 
 .processing > .grid {
@@ -179,12 +180,15 @@
   display: flex;
   flex-direction: column;
   gap: var(--spacing-lg);
+  overflow: visible !important;
 }
 
 .config-select-item {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-sm);
+  position: relative;
+  overflow: visible !important;
 }
 
 .config-label {
@@ -255,7 +259,7 @@
   border-radius: 6px;
   max-height: 200px;
   overflow-y: auto;
-  z-index: 100;
+  z-index: 1000;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
@@ -379,12 +383,15 @@
   display: flex;
   flex-direction: column;
   gap: var(--spacing-lg);
+  overflow: visible !important;
 }
 
 .config-select-item {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-sm);
+  position: relative;
+  overflow: visible !important;
 }
 
 .config-label {
@@ -454,7 +461,7 @@
   border: 1px solid var(--accent-primary);
   border-radius: 6px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-  z-index: 100;
+  z-index: 1000;
   animation: slideDown 0.2s ease;
 }
 

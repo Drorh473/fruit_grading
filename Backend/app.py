@@ -146,7 +146,7 @@ def main():
     print(f"Debug: {not args.no_debug}")
     print(f"URL: http://localhost:{args.port}\n")
     
-    app.run(host=args.host, port=args.port, debug=not args.no_debug)
+    app.run(host=args.host, port=args.port, debug=not args.no_debug ,use_reloader=False)
 
 
 if __name__ == '__main__':

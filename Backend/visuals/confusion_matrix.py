@@ -56,10 +56,8 @@ def plot_confusion_matrix(y_true, y_pred, label_mapping, save_path=None):
     if save_path:
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
-        print(f"✓ Confusion matrix saved to {save_path}")
-    
-    plt.show()
-    
+        print(f" Confusion matrix saved to {save_path}")
+    plt.close()
     return cm
 
 
@@ -111,10 +109,8 @@ def plot_normalized_confusion_matrix(y_true, y_pred, label_mapping, save_path=No
     if save_path:
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
-        print(f"✓ Normalized confusion matrix saved to {save_path}")
-    
-    plt.show()
-    
+        print(f" Normalized confusion matrix saved to {save_path}")
+    plt.close()
     return cm_normalized
 
 
@@ -286,12 +282,12 @@ def generate_full_confusion_matrix_report(results, save_dir=None):
             'probabilities': probabilities
         }
         
-        print("✓ Confusion matrix report generation complete!\n")
+        print(" Confusion matrix report generation complete!\n")
         
         return report
         
     except Exception as e:
-        print(f"\n✗ Confusion matrix report generation failed: {e}")
+        print(f"\n Confusion matrix report generation failed: {e}")
         import traceback
         traceback.print_exc()
         return None

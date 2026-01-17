@@ -20,12 +20,11 @@ try:
         extract_features, train_classifier,
         generate_confusion_matrix
     )
-    print("Successfully imported build_model functions")
-    
 except ImportError as e:
     print(f"ERROR: Could not import build_model functions: {e}")
     print(f"PROJECT_ROOT: {PROJECT_ROOT}")
-    print(f"sys.path: {sys.path}")
+    import traceback
+    traceback.print_exc()
     # Set to None to prevent crashes
     run_tests = None
     setup_database = None
@@ -38,6 +37,12 @@ except ImportError as e:
 def run_pipeline_background(config):
     """Background task for running pipeline"""
     try:
+        # Validate imports before starting
+        if run_tests is None:
+            pipeline_state.update_state(status='failed', running=False)
+            pipeline_state.add_log("Pipeline failed: build_model functions not imported. Check that processes/build_model.py exists and its imports are valid.", 'error')
+            return
+        
         pipeline_state.update_state(status='running', progress=0, running=True)
         pipeline_state.add_log("Pipeline started", 'info')
         

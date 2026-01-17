@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   FiPlay,
   FiSquare,
@@ -22,6 +22,7 @@ const Processing = ({ setProcessingStats }) => {
   const [openDropdown, setOpenDropdown] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
+  const dropdownRef = useRef(null);
 
   // Training configuration state
   const [config, setConfig] = useState({
@@ -56,7 +57,7 @@ const Processing = ({ setProcessingStats }) => {
   // Calculate progress based on completed steps only
   const calculateProgress = (stepsArray) => {
     const completedCount = stepsArray.filter(
-      (step) => step.status === "completed"
+      (step) => step.status === "completed",
     ).length;
     return Math.round((completedCount / stepsArray.length) * 100);
   };
@@ -74,6 +75,23 @@ const Processing = ({ setProcessingStats }) => {
     }
     return () => clearInterval(interval);
   }, [isProcessing]);
+
+  // Click outside to close dropdown
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setOpenDropdown(null);
+      }
+    };
+
+    if (openDropdown) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [openDropdown]);
 
   const loadConfig = async () => {
     try {
@@ -362,7 +380,7 @@ const Processing = ({ setProcessingStats }) => {
       </div>
 
       {/* Configuration */}
-      <div className="grid grid-2">
+      <div className="grid grid-2" ref={dropdownRef}>
         <div className="card">
           <div className="card-header">
             <h2 className="card-title">Training Configuration</h2>

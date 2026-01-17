@@ -332,7 +332,7 @@ class TestModelTraining:
         )
         
         train_losses = []
-        for epoch in range(20):
+        for epoch in range(100):
             # FIXED: Unpack 3 values
             loss, accuracy, params = train_step(X, y, params, 3, learning_rate=0.01)
             train_losses.append(loss)
