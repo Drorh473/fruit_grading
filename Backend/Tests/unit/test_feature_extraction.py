@@ -19,21 +19,28 @@ from cnn.pre_trained_feature_map import (
 )
 
 
+# Cache the model at module level to avoid repeated downloads during tests
+@pytest.fixture(scope="module")
+def cached_model():
+    """Load model once for all tests in this module to avoid timeout from repeated downloads"""
+    return load_model()
+
+
 class TestLoadModel:
     """Test cases for model loading"""
     
-    def test_load_model_returns_correct_components(self):
+    def test_load_model_returns_correct_components(self, cached_model):
         """Test that load_model returns model, feature_extractor, and device"""
-        model, feature_extractor, device = load_model()
+        model, feature_extractor, device = cached_model
         
         assert model is not None
         assert feature_extractor is not None
         assert device is not None
         assert str(device) in ['cuda', 'cpu']
     
-    def test_feature_extractor_has_no_classifier(self):
+    def test_feature_extractor_has_no_classifier(self, cached_model):
         """Test that feature_extractor excludes the final classification layer"""
-        model, feature_extractor, _ = load_model()
+        model, feature_extractor, _ = cached_model
         
         # Feature extractor should have fewer layers than full model
         num_model_children = len(list(model.children()))
@@ -41,9 +48,9 @@ class TestLoadModel:
         
         assert num_extractor_children < num_model_children
     
-    def test_model_device_consistency(self):
+    def test_model_device_consistency(self, cached_model):
         """Test that model is on the correct device"""
-        model, feature_extractor, device = load_model()
+        model, feature_extractor, device = cached_model
         
         # Check that model parameters are on the specified device
         model_device = next(model.parameters()).device
