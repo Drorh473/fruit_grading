@@ -30,6 +30,7 @@ const Processing = ({ setProcessingStats }) => {
     learningRate: 0.001,
     lambdaReg: 0.01,
     batchSize: 32,
+    pcaComponents: 0,
   });
 
   // Common values for each parameter
@@ -39,6 +40,7 @@ const Processing = ({ setProcessingStats }) => {
     learningRate: [0.0001, 0.0005, 0.001, 0.005, 0.01, 0.05, 0.1],
     lambdaReg: [0, 0.001, 0.01, 0.05, 0.1, 0.5, 1.0],
     batchSize: [8, 16, 32, 64, 128, 256],
+    pcaComponents: [0, 8, 16, 32, 64, 128, 256, 512],
   };
 
   // Updated steps - Testing is now Step 1
@@ -69,7 +71,6 @@ const Processing = ({ setProcessingStats }) => {
   useEffect(() => {
     let interval;
     if (isProcessing) {
-      // Poll for status updates every 10 seconds while processing
       interval = setInterval(updateStatus, 10000);
     }
     return () => clearInterval(interval);
@@ -84,6 +85,7 @@ const Processing = ({ setProcessingStats }) => {
         learningRate: data.learningRate || 0.001,
         lambdaReg: data.lambdaReg || 0.01,
         batchSize: data.batchSize || 32,
+        pcaComponents: data.pcaComponents || 0,
       });
     } catch (err) {
       console.error("Failed to load config:", err);
@@ -115,11 +117,8 @@ const Processing = ({ setProcessingStats }) => {
 
       setStatus(statusData);
       setLogs(logsData);
-
-      // Update steps based on status
       updateStepsFromStatus(statusData);
 
-      // Check if pipeline completed or failed
       if (statusData.status === "completed" || statusData.status === "failed") {
         setIsProcessing(false);
 
@@ -174,10 +173,9 @@ const Processing = ({ setProcessingStats }) => {
     try {
       setError(null);
       setLogs([]);
-      setSteps(defaultSteps); // Reset steps
+      setSteps(defaultSteps);
       setOpenDropdown(null);
 
-      // Start pipeline with current config - skipTests is now false by default
       const response = await startPipeline({
         skipTests: false,
         hiddenDim: config.hiddenDim,
@@ -185,11 +183,11 @@ const Processing = ({ setProcessingStats }) => {
         learningRate: config.learningRate,
         lambdaReg: config.lambdaReg,
         batchSize: config.batchSize,
+        pcaComponents: config.pcaComponents,
       });
 
       if (response.success) {
         setIsProcessing(true);
-        // Status will be updated by the polling interval
       } else {
         setError(response.message || "Failed to start pipeline");
       }
@@ -204,11 +202,7 @@ const Processing = ({ setProcessingStats }) => {
       await stopPipeline();
       setIsProcessing(false);
       setError(null);
-
-      // Reset steps to default pending state
       setSteps(defaultSteps);
-
-      // Add a log entry
       setLogs((prev) => [
         ...prev,
         {
@@ -226,6 +220,8 @@ const Processing = ({ setProcessingStats }) => {
   const handleRefresh = async () => {
     setLoading(true);
     setError(null);
+    setSteps(defaultSteps);
+    setLogs([]);
     await Promise.all([loadConfig(), checkStatus()]);
     setLoading(false);
   };
@@ -237,7 +233,6 @@ const Processing = ({ setProcessingStats }) => {
     return "step-pending";
   };
 
-  // Get display progress - only shows completed steps
   const displayProgress = calculateProgress(steps);
 
   if (loading) {
@@ -296,7 +291,6 @@ const Processing = ({ setProcessingStats }) => {
         </div>
       )}
 
-      {/* Progress Overview - Uses completed steps only */}
       <div className="card">
         <div className="card-header">
           <h2 className="card-title">Pipeline Progress</h2>
@@ -315,7 +309,6 @@ const Processing = ({ setProcessingStats }) => {
         )}
       </div>
 
-      {/* Pipeline Steps */}
       <div className="card">
         <div className="card-header">
           <h2 className="card-title">Pipeline Steps</h2>
@@ -334,7 +327,6 @@ const Processing = ({ setProcessingStats }) => {
         </div>
       </div>
 
-      {/* Processing Logs */}
       <div className="card">
         <div className="card-header">
           <h2 className="card-title">Processing Logs</h2>
@@ -364,9 +356,8 @@ const Processing = ({ setProcessingStats }) => {
         </div>
       </div>
 
-      {/* Configuration */}
       <div className="grid grid-2">
-        <div className="card">
+        <div className="card config-card">
           <div className="card-header">
             <h2 className="card-title">Training Configuration</h2>
           </div>
@@ -546,6 +537,50 @@ const Processing = ({ setProcessingStats }) => {
                         onClick={() => handleConfigChange("batchSize", value)}
                       >
                         {value}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* PCA Components */}
+            <div className="config-select-item">
+              <label className="config-label">
+                PCA Components (0 = disabled)
+              </label>
+              <div className="select-dropdown">
+                <button
+                  className={`select-button ${
+                    openDropdown === "pcaComponents" ? "open" : ""
+                  }`}
+                  onClick={() => toggleDropdown("pcaComponents")}
+                  disabled={isProcessing}
+                >
+                  <span className="select-value">
+                    {config.pcaComponents === 0
+                      ? "Disabled"
+                      : config.pcaComponents}
+                  </span>
+                  <FiChevronDown
+                    className={`chevron ${
+                      openDropdown === "pcaComponents" ? "rotate" : ""
+                    }`}
+                  />
+                </button>
+                {openDropdown === "pcaComponents" && (
+                  <div className="select-options">
+                    {presets.pcaComponents.map((value) => (
+                      <button
+                        key={value}
+                        className={`select-option ${
+                          config.pcaComponents === value ? "active" : ""
+                        }`}
+                        onClick={() =>
+                          handleConfigChange("pcaComponents", value)
+                        }
+                      >
+                        {value === 0 ? "Disabled" : value}
                       </button>
                     ))}
                   </div>
