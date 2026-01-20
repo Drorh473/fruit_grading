@@ -32,6 +32,68 @@ def load_dashboard_metadata():
         return None
 
 
+@results_bp.route('/test-predictions', methods=['GET'])
+def get_test_predictions():
+    """Get model predictions for test set objects"""
+    try:
+        metadata = load_dashboard_metadata()
+        
+        if not metadata or 'test_predictions' not in metadata:
+            return jsonify({
+                'predictions': [],
+                'total': 0,
+                'accuracy': 0,
+                'timestamp': None
+            }), 200
+        
+        predictions = metadata.get('test_predictions', [])
+        
+        # Apply filters
+        filter_actual = request.args.get('actual', 'all')
+        filter_predicted = request.args.get('predicted', 'all')
+        filter_correct = request.args.get('correct', 'all')
+        search = request.args.get('search', '')
+        
+        filtered = predictions
+        
+        if search:
+            filtered = [p for p in filtered if search.lower() in p['object_id'].lower()]
+        
+        if filter_actual != 'all':
+            filtered = [p for p in filtered if p['actual_label'] == filter_actual]
+        
+        if filter_predicted != 'all':
+            filtered = [p for p in filtered if p['predicted_label'] == filter_predicted]
+        
+        if filter_correct == 'correct':
+            filtered = [p for p in filtered if p['correct']]
+        elif filter_correct == 'incorrect':
+            filtered = [p for p in filtered if not p['correct']]
+        
+        # Calculate accuracy for filtered results
+        correct_count = sum(1 for p in filtered if p['correct'])
+        accuracy = (correct_count / len(filtered) * 100) if filtered else 0
+        
+        return jsonify({
+            'predictions': filtered,
+            'total': len(filtered),
+            'correct_count': correct_count,
+            'accuracy': round(accuracy, 2),
+            'timestamp': metadata.get('timestamp')
+        }), 200
+        
+    except Exception as e:
+        print(f"Error in get_test_predictions: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'predictions': [],
+            'total': 0,
+            'accuracy': 0,
+            'error': str(e)
+        }), 500
+
+
 @results_bp.route('/list', methods=['GET'])
 def get_results_list():
     """Get results list with filtering and pagination"""
@@ -362,7 +424,6 @@ def get_confusion_matrix():
                 'metrics': {}
             }), 200
         
-        # Get confusion matrix from metadata
         cm = metadata.get('confusion_matrix')
         label_mapping = metadata.get('label_mapping', {})
         
@@ -374,11 +435,9 @@ def get_confusion_matrix():
                 'metrics': {}
             }), 200
         
-        # Get class names sorted by index (excluding reject)
         classes = [name for name, idx in sorted(label_mapping.items(), key=lambda x: x[1]) 
                    if name.lower() != 'reject']
         
-        # Filter out reject from matrix
         reject_idx = None
         for name, idx in label_mapping.items():
             if name.lower() == 'reject':
@@ -389,7 +448,6 @@ def get_confusion_matrix():
         if reject_idx is not None:
             matrix = [row[:reject_idx] + row[reject_idx+1:] for i, row in enumerate(cm) if i != reject_idx]
         
-        # Calculate normalized matrix
         normalized = []
         for row in matrix:
             row_sum = sum(row)
@@ -398,7 +456,6 @@ def get_confusion_matrix():
             else:
                 normalized.append([0.0] * len(row))
         
-        # Get metrics from metadata or calculate
         perf = metadata.get('performance', {})
         accuracy = perf.get('test_accuracy', 0)
         

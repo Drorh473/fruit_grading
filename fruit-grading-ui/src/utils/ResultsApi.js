@@ -39,6 +39,28 @@ async function apiFetch(endpoint, options = {}) {
 }
 
 /**
+ * Get test set predictions from model
+ * @param {Object} filters - { search, actual, predicted, correct }
+ * @returns {Promise<Object>} { predictions, total, accuracy, timestamp }
+ */
+export async function getTestPredictions(filters = {}) {
+  const params = new URLSearchParams();
+
+  if (filters.search) params.append("search", filters.search);
+  if (filters.actual && filters.actual !== "all")
+    params.append("actual", filters.actual);
+  if (filters.predicted && filters.predicted !== "all")
+    params.append("predicted", filters.predicted);
+  if (filters.correct && filters.correct !== "all")
+    params.append("correct", filters.correct);
+
+  const queryString = params.toString();
+  const endpoint = `/results/test-predictions${queryString ? `?${queryString}` : ""}`;
+
+  return apiFetch(endpoint);
+}
+
+/**
  * Get all results with filtering
  * @param {Object} filters - { search, type, batch, limit, offset }
  * @returns {Promise<Object>} { results: [...], total, limit, offset }
@@ -151,6 +173,7 @@ export async function checkHealth() {
 }
 
 export default {
+  getTestPredictions,
   getResultsList,
   getKPIs,
   getQualityDistribution,

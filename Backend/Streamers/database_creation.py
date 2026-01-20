@@ -13,7 +13,9 @@ from bson.objectid import ObjectId
 from datetime import datetime, timedelta
 
 # Load environment variables
-env_path = Path('.') / '.env'
+env_path = Path(__file__).parent.parent / '.env'
+if not env_path.exists():
+    env_path = Path('.') / '.env'
 load_dotenv(dotenv_path=env_path)
 
 # Get MongoDB connection string from .env
@@ -55,37 +57,37 @@ def collect_images(dataset_path=ORIGINAL_DATASET_PATH):
         print(f"Warning: Dataset path does not exist: {dataset_path}")
         return []
     
-    # Get fruit types
+    # Get categories (market/standard/premium)
     try:
-        fruit_types = [d for d in os.listdir(dataset_path) 
+        categories = [d for d in os.listdir(dataset_path) 
                       if os.path.isdir(os.path.join(dataset_path, d))]
     except (FileNotFoundError, PermissionError) as e:
         print(f"Error accessing dataset path: {e}")
         return []
     
-    for fruit_type in fruit_types:
-        fruit_dir = os.path.join(dataset_path, fruit_type)
+    for category in categories:
+        category_dir = os.path.join(dataset_path, category)
         
-        # Generate timestamp for this fruit type
+        # Generate timestamp for this category
         sequence_start = datetime.now()
         frame_duration = timedelta(seconds=1.0/FPS)
         
         # Find all object directories
         object_dirs = []
-        for item in os.listdir(fruit_dir):
-            if os.path.isdir(os.path.join(fruit_dir, item)) and item.startswith("obj"):
+        for item in os.listdir(category_dir):
+            if os.path.isdir(os.path.join(category_dir, item)) and item.startswith("obj"):
                 object_dirs.append(item)
         
         if not object_dirs:
-            print(f"No object directories found for {fruit_type}, skipping")
+            print(f"No object directories found for {category}, skipping")
             continue
             
-        print(f"Found {len(object_dirs)} objects for {fruit_type}")
+        print(f"Found {len(object_dirs)} objects for {category}")
         
         # Process each object directory
         frame_count = 0
         for obj_id in object_dirs:
-            obj_dir = os.path.join(fruit_dir, obj_id)
+            obj_dir = os.path.join(category_dir, obj_id)
             
             # Find all angle directories inside object directory
             angle_dirs = []
@@ -118,16 +120,15 @@ def collect_images(dataset_path=ORIGINAL_DATASET_PATH):
                     # Create image metadata
                     img_data = {
                         "path": img_path,
-                        "fruit_type": fruit_type,
-                        "object_id": obj_id,
+                        "fruit_type": category,
+                        "object_id": f"{obj_id}_{category}",
                         "camera_id": camera_id,
                         "timestamp": timestamp,
                         "frame_number": frame_count,
                         "width": width,
                         "height": height,
                         "color": 3,
-                        "set_type": "",
-                        "category": ""
+                        "set_type": ""
                     }
                     
                     image_data.append(img_data)
@@ -155,7 +156,7 @@ def store_in_database(image_data, db_name, collection_name):
     return db_name, collection_name
 
 def split_data(db_name, collection_name, training_percentage=66, testing_percentage=34):
-    """Split data into training and testing sets (66/34 split)"""
+    """Split data into training and testing sets with stratified sampling by fruit_type"""
     start_time = time.time()
     
     # Verify percentages
@@ -167,44 +168,57 @@ def split_data(db_name, collection_name, training_percentage=66, testing_percent
     db = client[db_name]
     collection = db[collection_name]
     
-    # Group by fruit_type and object_id to ensure object-level split
-    groups = {}
-    
     # Get all documents
-    all_docs = list(collection.find({}, {"_id": 1, "fruit_type": 1, "object_id": 1, "camera_id": 1}))
+    all_docs = list(collection.find({}, {"_id": 1, "fruit_type": 1, "object_id": 1}))
     
-    # Group documents by fruit_type and object_id
+    # Group by fruit_type first, then by object_id within each fruit_type
+    fruit_type_objects = {}
     for doc in all_docs:
-        group_key = f"{doc['fruit_type']}_{doc['object_id']}_{doc['camera_id']}"
-        if group_key not in groups:
-            groups[group_key] = []
-        groups[group_key].append(doc["_id"])
+        fruit_type = doc.get('fruit_type', 'unknown')
+        obj_id = doc['object_id']
+        
+        if fruit_type not in fruit_type_objects:
+            fruit_type_objects[fruit_type] = {}
+        if obj_id not in fruit_type_objects[fruit_type]:
+            fruit_type_objects[fruit_type][obj_id] = []
+        fruit_type_objects[fruit_type][obj_id].append(doc["_id"])
     
-    # Shuffle the group keys to randomize the split
-    group_keys = list(groups.keys())
-    random.shuffle(group_keys)
+    # Print object counts per fruit_type
+    print("\nObjects per fruit_type:")
+    for ft, objs in fruit_type_objects.items():
+        print(f"  {ft}: {len(objs)} objects")
     
-    # Calculate split point for groups
-    training_groups_count = int(len(group_keys) * (training_percentage / 100))
-    
-    # Assign groups to training or testing
     training_ids = []
     testing_ids = []
     
-    for i, key in enumerate(group_keys):
-        if i < training_groups_count:
-            training_ids.extend(groups[key])
-        else:
-            testing_ids.extend(groups[key])
+    # Stratified split within each fruit_type
+    print("\nSplitting:")
+    for fruit_type, ft_objects in fruit_type_objects.items():
+        obj_ids = list(ft_objects.keys())
+        random.shuffle(obj_ids)
+        
+        split_point = max(1, int(len(obj_ids) * (training_percentage / 100)))
+        
+        train_objs = obj_ids[:split_point]
+        test_objs = obj_ids[split_point:]
+        
+        train_images = sum(len(ft_objects[oid]) for oid in train_objs)
+        test_images = sum(len(ft_objects[oid]) for oid in test_objs)
+        
+        for obj_id in train_objs:
+            training_ids.extend(ft_objects[obj_id])
+        for obj_id in test_objs:
+            testing_ids.extend(ft_objects[obj_id])
+        
+        print(f"  {fruit_type}: {len(train_objs)} train objs ({train_images} imgs), {len(test_objs)} test objs ({test_images} imgs)")
     
-    # Update database for training set
+    # Update database
     if training_ids:
         collection.update_many(
             {"_id": {"$in": training_ids}},
             {"$set": {"set_type": "training"}}
         )
     
-    # Update database for testing set
     if testing_ids:
         collection.update_many(
             {"_id": {"$in": testing_ids}},
@@ -216,8 +230,8 @@ def split_data(db_name, collection_name, training_percentage=66, testing_percent
     testing_count = collection.count_documents({"set_type": "testing"})
     
     print("Data split results:")
-    print(f"  training: {training_count} images ({training_percentage}%)")
-    print(f"  testing: {testing_count} images ({testing_percentage}%)")
+    print(f"  Training: {training_count} images ({training_percentage}%)")
+    print(f"  Testing: {testing_count} images ({testing_percentage}%)")
     print(f"Split completed in {time.time() - start_time:.2f} seconds")
     
     return db_name, collection_name
@@ -394,12 +408,12 @@ def print_summary(db_name, collection_name):
     db = client[db_name]
     collection = db[collection_name]
     
-    # Count by fruit type
-    fruit_pipeline = [
+    # Count by fruit_type
+    fruit_type_pipeline = [
         {"$group": {"_id": "$fruit_type", "count": {"$sum": 1}}},
-        {"$sort": {"count": -1}}
+        {"$sort": {"_id": 1}}
     ]
-    fruit_counts = list(collection.aggregate(fruit_pipeline))
+    fruit_type_counts = list(collection.aggregate(fruit_type_pipeline))
     
     # Count by camera_id
     camera_pipeline = [
@@ -415,11 +429,18 @@ def print_summary(db_name, collection_name):
     ]
     set_type_counts = list(collection.aggregate(set_type_pipeline))
     
+    # Count by fruit_type and set_type (stratified view)
+    stratified_pipeline = [
+        {"$group": {"_id": {"fruit_type": "$fruit_type", "set_type": "$set_type"}, "count": {"$sum": 1}}},
+        {"$sort": {"_id.fruit_type": 1, "_id.set_type": 1}}
+    ]
+    stratified_counts = list(collection.aggregate(stratified_pipeline))
+    
     print("\nDatabase Summary:")
     print("=================")
     
     print("\nFruit Types:")
-    for item in fruit_counts:
+    for item in fruit_type_counts:
         print(f"  {item['_id']}: {item['count']} images")
     
     print("\nCamera Distribution:")
@@ -429,6 +450,12 @@ def print_summary(db_name, collection_name):
     print("\nData Splits:")
     for item in set_type_counts:
         print(f"  {item['_id']}: {item['count']} images")
+    
+    print("\nStratified Split (Fruit Type x Set):")
+    for item in stratified_counts:
+        ft = item['_id']['fruit_type']
+        set_t = item['_id']['set_type']
+        print(f"  {ft} - {set_t}: {item['count']} images")
     
     client.close()
 

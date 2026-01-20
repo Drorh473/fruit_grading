@@ -102,7 +102,6 @@ body.sidebar-open .main-content {
   border-radius: 8px;
   padding: var(--spacing-lg);
   transition: all var(--transition-normal);
-  overflow: visible;
 }
 
 .card:hover {
@@ -228,6 +227,33 @@ body.sidebar-open .main-content {
   100% {
     transform: rotate(360deg);
   }
+}
+
+/* Global Loading and Error Containers */
+.loading-container,
+.error-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  text-align: center;
+  gap: var(--spacing-md);
+}
+
+.error-container h2 {
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.error-container p {
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.loading-container p {
+  color: var(--text-secondary);
+  margin: 0;
 }
 
 /* Progress Bar */

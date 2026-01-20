@@ -35,7 +35,7 @@ const Processing = ({ setProcessingStats }) => {
 
   // Common values for each parameter
   const presets = {
-    hiddenDim: [16, 32, 64, 128, 256, 512, 1024],
+    hiddenDim: [4, 8, 16, 32, 64, 128, 256],
     epochs: [10, 25, 50, 100, 200, 500, 1000],
     learningRate: [0.0001, 0.0005, 0.001, 0.005, 0.01, 0.05, 0.1],
     lambdaReg: [0, 0.001, 0.01, 0.05, 0.1, 0.5, 1.0],

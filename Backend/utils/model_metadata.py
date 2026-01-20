@@ -1,7 +1,3 @@
-"""
-Dashboard Metadata Management
-Saves and loads model training results and dataset information for dashboards
-"""
 import os
 import json
 import pickle
@@ -42,8 +38,7 @@ def save_dashboard_metadata(results, train_features, test_features, params, labe
     feature_dim = train_features[first_key]['features'].shape[0]
     
     # Count images per object (assuming 4 cameras, multiple frames)
-    # This is an estimate based on your 4-camera setup
-    total_images = (training_count + testing_count) * 4  # 4 cameras per object
+    total_images = (training_count + testing_count) * 4
     
     # Calculate class distribution
     class_distribution = {}
@@ -68,7 +63,6 @@ def save_dashboard_metadata(results, train_features, test_features, params, labe
         class_names = [name for name, idx in sorted(label_mapping.items(), key=lambda x: x[1])]
         
         for i, class_name in enumerate(class_names):
-            # Calculate precision, recall, f1-score for each class
             true_positives = cm[i, i]
             false_positives = cm[:, i].sum() - true_positives
             false_negatives = cm[i, :].sum() - true_positives
@@ -83,6 +77,9 @@ def save_dashboard_metadata(results, train_features, test_features, params, labe
                 'f1_score': float(f1),
                 'support': int(cm[i, :].sum())
             }
+    
+    # Generate per-object predictions for test set
+    test_predictions = generate_test_predictions(results, test_features, label_mapping)
     
     # Build comprehensive metadata
     metadata = {
@@ -120,17 +117,19 @@ def save_dashboard_metadata(results, train_features, test_features, params, labe
         },
         'per_class_performance': per_class_metrics,
         'label_mapping': label_mapping,
-        'confusion_matrix': confusion_matrix.tolist() if confusion_matrix is not None else None
+        'confusion_matrix': confusion_matrix.tolist() if confusion_matrix is not None else None,
+        'test_predictions': test_predictions
     }
     
-    # Save as JSON for easy loading
+    # Save as JSON
     metadata_path = os.path.join(MODEL_DIR, 'dashboard_metadata.json')
     with open(metadata_path, 'w') as f:
         json.dump(metadata, f, indent=2)
     
     print(f"\n Dashboard metadata saved to {metadata_path}")
+    print(f"   Saved {len(test_predictions)} test predictions")
     
-    # Also save a pickle version for backward compatibility
+    # Also save pickle version
     pickle_path = os.path.join(MODEL_DIR, 'dashboard_metadata.pkl')
     with open(pickle_path, 'wb') as f:
         pickle.dump(metadata, f)
@@ -138,14 +137,63 @@ def save_dashboard_metadata(results, train_features, test_features, params, labe
     return metadata_path
 
 
-def load_dashboard_metadata():
+def generate_test_predictions(results, test_features, label_mapping):
     """
-    Load the latest dashboard metadata
+    Generate per-object predictions for the test set
+    
+    Args:
+        results: Training results containing X_test, y_test, params
+        test_features: Test feature dictionary with object_id keys
+        label_mapping: Dictionary mapping fruit types to labels
     
     Returns:
-        metadata: Dictionary with all dashboard information
-        or None if no metadata exists
+        List of prediction dictionaries
     """
+    from cnn.fully_connected_layer import forward_pass
+    
+    params = results.get('params')
+    if params is None:
+        return []
+    
+    # Reverse label mapping for class names
+    idx_to_class = {v: k for k, v in label_mapping.items()}
+    
+    predictions = []
+    
+    for object_id, data in test_features.items():
+        if isinstance(data, dict):
+            features = data['features']
+            true_label = data['label']
+            fruit_type = data.get('fruit_type', idx_to_class.get(true_label, 'unknown'))
+        else:
+            features = data
+            fruit_type = object_id.split('_')[0]
+            true_label = label_mapping.get(fruit_type, 0)
+        
+        # Forward pass for prediction
+        X = features.reshape(1, -1).astype(np.float32)
+        probs, _ = forward_pass(X, params)
+        
+        predicted_label = int(np.argmax(probs[0]))
+        confidence = float(np.max(probs[0]))
+        
+        predictions.append({
+            'object_id': object_id,
+            'actual_label': idx_to_class.get(true_label, 'unknown'),
+            'predicted_label': idx_to_class.get(predicted_label, 'unknown'),
+            'confidence': round(confidence, 4),
+            'correct': predicted_label == true_label,
+            'probabilities': {
+                idx_to_class.get(i, f'class_{i}'): round(float(probs[0][i]), 4)
+                for i in range(len(probs[0]))
+            }
+        })
+    
+    return predictions
+
+
+def load_dashboard_metadata():
+    """Load the latest dashboard metadata"""
     metadata_path = os.path.join(MODEL_DIR, 'dashboard_metadata.json')
     
     if not os.path.exists(metadata_path):
@@ -165,13 +213,7 @@ def load_dashboard_metadata():
 
 
 def get_latest_model_info():
-    """
-    Get formatted information about the latest trained model
-    Useful for quick dashboard queries
-    
-    Returns:
-        Dictionary with key model information or None
-    """
+    """Get formatted information about the latest trained model"""
     metadata = load_dashboard_metadata()
     if not metadata:
         return None
@@ -186,12 +228,7 @@ def get_latest_model_info():
 
 
 def format_for_admin_dashboard():
-    """
-    Format metadata specifically for admin dashboard API
-    
-    Returns:
-        Dictionary formatted for admin dashboard or None
-    """
+    """Format metadata specifically for admin dashboard API"""
     metadata = load_dashboard_metadata()
     if not metadata:
         return None
@@ -200,7 +237,7 @@ def format_for_admin_dashboard():
         'system_status': {
             'database': 'connected',
             'model': 'loaded',
-            'cameras': [True, True, True, True]  # Assuming 4 cameras active
+            'cameras': [True, True, True, True]
         },
         'processing_stats': {
             'totalProcessed': metadata['dataset_info']['total_objects'],
@@ -225,17 +262,11 @@ def format_for_admin_dashboard():
 
 
 def format_for_user_dashboard():
-    """
-    Format metadata specifically for user/operator dashboard API
-    
-    Returns:
-        Dictionary formatted for user dashboard or None
-    """
+    """Format metadata specifically for user/operator dashboard API"""
     metadata = load_dashboard_metadata()
     if not metadata:
         return None
     
-    # Extract class counts from distribution
     class_dist = metadata['dataset_info']['class_distribution']
     
     return {
@@ -244,7 +275,7 @@ def format_for_user_dashboard():
             'marketCount': class_dist.get('market', {}).get('total', 0),
             'standardCount': class_dist.get('standard', {}).get('total', 0),
             'premiumCount': class_dist.get('premium', {}).get('total', 0),
-            'rejectCount': 0  # Add logic if you track rejects separately
+            'rejectCount': 0
         },
         'model_accuracy': metadata['performance']['test_accuracy'],
         'last_update': metadata['timestamp']
@@ -252,24 +283,23 @@ def format_for_user_dashboard():
 
 
 if __name__ == "__main__":
-    # Test loading
     print("\n=== Testing Dashboard Metadata ===\n")
     
     metadata = load_dashboard_metadata()
     if metadata:
-        print("\n✓ Successfully loaded metadata")
+        print("\n Successfully loaded metadata")
         print(f"  Model accuracy: {metadata['performance']['test_accuracy']*100:.2f}%")
         print(f"  Training samples: {metadata['dataset_info']['training_count']}")
         print(f"  Testing samples: {metadata['dataset_info']['testing_count']}")
         
-        print("\n=== Admin Dashboard Format ===")
-        admin_data = format_for_admin_dashboard()
-        if admin_data:
-            print(json.dumps(admin_data, indent=2))
+        # Show test predictions
+        predictions = metadata.get('test_predictions', [])
+        print(f"  Test predictions: {len(predictions)}")
         
-        print("\n=== User Dashboard Format ===")
-        user_data = format_for_user_dashboard()
-        if user_data:
-            print(json.dumps(user_data, indent=2))
+        if predictions:
+            print("\n=== Sample Predictions ===")
+            for pred in predictions[:3]:
+                status = "CORRECT" if pred['correct'] else "WRONG"
+                print(f"  {pred['object_id']}: {pred['actual_label']} -> {pred['predicted_label']} ({pred['confidence']:.2%}) [{status}]")
     else:
-        print("✗ No metadata available. Run build_model.py first.")
+        print(" No metadata available. Run build_model.py first.")

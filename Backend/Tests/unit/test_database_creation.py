@@ -153,8 +153,6 @@ class TestDataSplitting:
     def test_split_data_basic(self, test_collection, sample_image_documents):
         """Test basic data splitting"""
         test_collection.insert_many(sample_image_documents)
-        
-        # Split 60/40
         split_data(TestConfig.TEST_DB_NAME, TestConfig.TEST_COLLECTION_NAME, 60, 40)
         
         training_count = test_collection.count_documents({"set_type": "training"})
