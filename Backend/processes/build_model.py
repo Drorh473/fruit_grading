@@ -3,6 +3,7 @@ import sys
 import numpy as np
 from pathlib import Path
 from dotenv import load_dotenv
+from sklearn.decomposition import PCA
 
 sys.path.insert(0, str(Path(__file__).parent)) 
 # Import pipeline components
@@ -44,7 +45,7 @@ def run_tests():
     if not os.path.exists(test_script):
         print(f"Error: Test script not found at {test_script}")
         print("Tests failed - test file missing")
-        return False  # Changed from True to False
+        return False 
     
     try:
         result = subprocess.run(
@@ -124,7 +125,8 @@ def extract_features(train_gen, test_gen):
         return False
 
 def train_classifier(train_features, test_features, 
-                    hidden_dim=32, epochs=100, learning_rate=0.001, lambda_reg=0.01):
+                    hidden_dim=32, epochs=100, learning_rate=0.001, lambda_reg=0.01,
+                    pca_components=100):
     """
     Step 4: Train fully connected classifier with L2 regularization
     
@@ -135,6 +137,7 @@ def train_classifier(train_features, test_features,
         epochs: Number of training epochs
         learning_rate: Learning rate
         lambda_reg: L2 regularization strength
+        pca_components: Number of PCA components (None to disable PCA)
     
     Returns:
         params: Trained parameters
@@ -186,6 +189,22 @@ def train_classifier(train_features, test_features,
         X_test = np.array(X_test_list, dtype=np.float32)
         y_test = np.array(y_test_list, dtype=np.int64)
         
+        # Apply PCA if enabled
+        pca = None
+        original_dim = X_train.shape[1]
+        if pca_components is not None and pca_components > 0:
+            # Limit components to min of requested, samples, or features
+            max_components = min(pca_components, X_train.shape[0], X_train.shape[1])
+            print(f"\nApplying PCA: {original_dim:,} -> {max_components} features")
+            
+            pca = PCA(n_components=max_components)
+            X_train = pca.fit_transform(X_train)
+            X_test = pca.transform(X_test)
+            
+            # Show variance explained
+            variance_explained = np.sum(pca.explained_variance_ratio_) * 100
+            print(f"  Variance retained: {variance_explained:.1f}%")
+        
         # Get dimensions
         input_dim = X_train.shape[1]
         num_classes = len(label_mapping)
@@ -194,7 +213,7 @@ def train_classifier(train_features, test_features,
         print(f"  Testing samples: {len(X_test)}")
         print(f"  Feature dimension: {input_dim:,}")
         print(f"  Number of classes: {num_classes}")
-        print(f"  L2 Regularization: λ = {lambda_reg}")
+        print(f"  L2 Regularization: Î» = {lambda_reg}")
         
         # Check label distribution
         print(f"\nTraining label distribution:")
@@ -240,7 +259,7 @@ def train_classifier(train_features, test_features,
         # Save model
         os.makedirs(MODEL_DIR, exist_ok=True)
         model_path = os.path.join(MODEL_DIR, 'fruit_classifier.pkl')
-        save_model(params, history, input_dim, hidden_dim, num_classes, model_path)
+        save_model(params, history, input_dim, hidden_dim, num_classes, model_path, pca=pca)
         
         results = {
             'train_loss': train_loss,
@@ -262,6 +281,7 @@ def train_classifier(train_features, test_features,
         import traceback
         traceback.print_exc()
         return None, None
+    
 def generate_confusion_matrix(results):
     """
     Step 5 (Optional): Generate confusion matrix from training results
@@ -294,7 +314,8 @@ def generate_confusion_matrix(results):
 
 
 def run_full_pipeline(skip_tests=False, 
-                     hidden_dim=256, epochs=100, learning_rate=0.001, lambda_reg = 0.01):
+                     hidden_dim=256, epochs=100, learning_rate=0.001, lambda_reg = 0.01,
+                     pca_components=100):
     # Step 0: Run tests (optional)
     if not skip_tests:
         test_success = run_tests()
@@ -351,7 +372,8 @@ def run_full_pipeline(skip_tests=False,
         hidden_dim=hidden_dim,
         epochs=epochs,
         learning_rate=learning_rate,
-        lambda_reg=lambda_reg
+        lambda_reg=lambda_reg,
+        pca_components=pca_components
     )
     
     if params is None:
@@ -416,13 +438,15 @@ def run_full_pipeline(skip_tests=False,
     print("\n" + "="*60 + "\n")
     
     return True
+
 def main():
         run_full_pipeline(
         skip_tests=True,       
         hidden_dim=16,       
-        epochs=100,           
-        learning_rate=0.0005,
-        lambda_reg=0.001   
+        epochs=200,           
+        learning_rate=0.001,
+        lambda_reg=0.1,
+        pca_components=200
     )
 if __name__ == "__main__":
     main()

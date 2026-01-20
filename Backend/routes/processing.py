@@ -20,11 +20,12 @@ try:
         extract_features, train_classifier,
         generate_confusion_matrix
     )
+    print("Successfully imported build_model functions")
+    
 except ImportError as e:
     print(f"ERROR: Could not import build_model functions: {e}")
     print(f"PROJECT_ROOT: {PROJECT_ROOT}")
-    import traceback
-    traceback.print_exc()
+    print(f"sys.path: {sys.path}")
     # Set to None to prevent crashes
     run_tests = None
     setup_database = None
@@ -37,12 +38,6 @@ except ImportError as e:
 def run_pipeline_background(config):
     """Background task for running pipeline"""
     try:
-        # Validate imports before starting
-        if run_tests is None:
-            pipeline_state.update_state(status='failed', running=False)
-            pipeline_state.add_log("Pipeline failed: build_model functions not imported. Check that processes/build_model.py exists and its imports are valid.", 'error')
-            return
-        
         pipeline_state.update_state(status='running', progress=0, running=True)
         pipeline_state.add_log("Pipeline started", 'info')
         
@@ -59,6 +54,7 @@ def run_pipeline_background(config):
         epochs = config.get('epochs', 100)
         learning_rate = config.get('learningRate', 0.0005)
         lambda_reg = config.get('lambdaReg', 0.001)
+        pca_components = config.get('pcaComponents', 200)
         
         train_gen = None
         test_gen = None
@@ -150,7 +146,8 @@ def run_pipeline_background(config):
                 hidden_dim=hidden_dim,
                 epochs=epochs,
                 learning_rate=learning_rate,
-                lambda_reg=lambda_reg
+                lambda_reg=lambda_reg,
+                pca_components=pca_components
             )
             
             if params is None or results is None:
@@ -349,7 +346,8 @@ def get_pipeline_config():
             'epochs': 100,
             'learningRate': 0.0005,
             'lambdaReg': 0.001,
-            'batchSize': 32
+            'batchSize': 32,
+            'pcaComponents': 20
         }), 200
 
 
@@ -371,6 +369,8 @@ def update_pipeline_config():
             updates['lambdaReg'] = config['lambdaReg']
         if 'batchSize' in config:
             updates['batchSize'] = config['batchSize']
+        if 'pcaComponents' in config:
+            updates['pcaComponents'] = config['pcaComponents']
         
         pipeline_state.update_config(**updates)
         

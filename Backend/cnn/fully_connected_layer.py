@@ -421,7 +421,7 @@ def train(X_train, y_train, X_val, y_val, input_dim, hidden_dim, num_classes,
 
 
 # Save/Load Functions
-def save_model(params, history, input_dim, hidden_dim, num_classes, filepath):
+def save_model(params, history, input_dim, hidden_dim, num_classes, filepath, pca=None):
     """
     Save model parameters to file
     
@@ -432,6 +432,7 @@ def save_model(params, history, input_dim, hidden_dim, num_classes, filepath):
         hidden_dim: Hidden dimension
         num_classes: Number of classes
         filepath: Path to save the model
+        pca: Fitted PCA object (optional)
     """
     os.makedirs(os.path.dirname(filepath), exist_ok=True)
     model_dict = {
@@ -439,7 +440,8 @@ def save_model(params, history, input_dim, hidden_dim, num_classes, filepath):
         'history': history,
         'input_dim': input_dim,
         'hidden_dim': hidden_dim,
-        'num_classes': num_classes
+        'num_classes': num_classes,
+        'pca': pca
     }
     with open(filepath, 'wb') as f:
         pickle.dump(model_dict, f)
@@ -465,7 +467,8 @@ def load_model(filepath):
         'input_dim': model_dict['input_dim'],
         'hidden_dim': model_dict['hidden_dim'],
         'num_classes': model_dict['num_classes'],
-        'history': model_dict['history']
+        'history': model_dict['history'],
+        'pca': model_dict.get('pca', None)
     }
     
     print(f"Model loaded from {filepath}")
