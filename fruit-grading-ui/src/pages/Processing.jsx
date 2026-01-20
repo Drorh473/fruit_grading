@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import {
   FiPlay,
   FiSquare,
@@ -22,7 +22,6 @@ const Processing = ({ setProcessingStats }) => {
   const [openDropdown, setOpenDropdown] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
-  const dropdownRef = useRef(null);
 
   // Training configuration state
   const [config, setConfig] = useState({
@@ -75,23 +74,6 @@ const Processing = ({ setProcessingStats }) => {
     }
     return () => clearInterval(interval);
   }, [isProcessing]);
-
-  // Click outside to close dropdown
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setOpenDropdown(null);
-      }
-    };
-
-    if (openDropdown) {
-      document.addEventListener("mousedown", handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [openDropdown]);
 
   const loadConfig = async () => {
     try {
@@ -222,6 +204,9 @@ const Processing = ({ setProcessingStats }) => {
       await stopPipeline();
       setIsProcessing(false);
       setError(null);
+
+      // Reset steps to default pending state
+      setSteps(defaultSteps);
 
       // Add a log entry
       setLogs((prev) => [
@@ -380,7 +365,7 @@ const Processing = ({ setProcessingStats }) => {
       </div>
 
       {/* Configuration */}
-      <div className="grid grid-2" ref={dropdownRef}>
+      <div className="grid grid-2">
         <div className="card">
           <div className="card-header">
             <h2 className="card-title">Training Configuration</h2>
