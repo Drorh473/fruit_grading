@@ -54,7 +54,8 @@ def run_pipeline_background(config):
         epochs = config.get('epochs', 100)
         learning_rate = config.get('learningRate', 0.0005)
         lambda_reg = config.get('lambdaReg', 0.001)
-        pca_components = config.get('pcaComponents', 200)
+        pca_components = config.get('pcaComponents', 20)
+        dropout_rate = config.get('dropoutRate', 0.2)
         
         train_gen = None
         test_gen = None
@@ -147,7 +148,8 @@ def run_pipeline_background(config):
                 epochs=epochs,
                 learning_rate=learning_rate,
                 lambda_reg=lambda_reg,
-                pca_components=pca_components
+                pca_components=pca_components,
+                dropout_rate=dropout_rate
             )
             
             if params is None or results is None:
@@ -193,13 +195,24 @@ def run_pipeline_background(config):
                 # Get confusion matrix
                 cm = results.get('confusion_matrix', None)
                 
+                # Get actual feature dimension from params (after PCA)
+                actual_feature_dim = params['W1'].shape[0]
+                
+                # Create feature info with correct dimensions
+                train_count = len(train_features)
+                test_count = len(test_features)
+                
                 save_dashboard_metadata(
                     results=results,
-                    train_features=train_features,
-                    test_features=test_features,
+                    train_count=train_count,
+                    test_count=test_count,
+                    feature_dim=actual_feature_dim,
                     params=params,
                     label_mapping=label_mapping,
-                    confusion_matrix=cm
+                    confusion_matrix=cm,
+                    train_features=train_features,
+                    test_features=test_features,
+                    avg_confidence=results.get('avg_confidence')
                 )
                 
                 pipeline_state.add_log("Dashboard metadata saved successfully", 'success')
@@ -240,12 +253,23 @@ def start_pipeline():
                 'success': False,
                 'error': 'Pipeline already running'
             }), 400
-        
+
         config = request.get_json() or {}
-        
+
         # Reset pipeline state
         pipeline_state.reset_pipeline()
-        
+
+        # Save config to pipeline_state so it persists when navigating away
+        pipeline_state.update_config(
+            hiddenDim=config.get('hiddenDim', 16),
+            epochs=config.get('epochs', 100),
+            learningRate=config.get('learningRate', 0.0005),
+            lambdaReg=config.get('lambdaReg', 0.001),
+            batchSize=config.get('batchSize', 32),
+            pcaComponents=config.get('pcaComponents', 20),
+            dropoutRate=config.get('dropoutRate', 0.2)
+        )
+
         # Start pipeline in background thread
         thread = threading.Thread(
             target=run_pipeline_background,
@@ -347,7 +371,8 @@ def get_pipeline_config():
             'learningRate': 0.0005,
             'lambdaReg': 0.001,
             'batchSize': 32,
-            'pcaComponents': 20
+            'pcaComponents': 20,
+            'dropoutRate': 0.2
         }), 200
 
 
@@ -371,6 +396,8 @@ def update_pipeline_config():
             updates['batchSize'] = config['batchSize']
         if 'pcaComponents' in config:
             updates['pcaComponents'] = config['pcaComponents']
+        if 'dropoutRate' in config:
+            updates['dropoutRate'] = config['dropoutRate']
         
         pipeline_state.update_config(**updates)
         

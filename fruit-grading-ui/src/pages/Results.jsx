@@ -15,6 +15,7 @@ import {
   getKPIs,
   getQualityDistribution,
   getQualityAlerts,
+  getConfusionMatrix,
   exportResultsCSV,
   downloadCSV,
 } from "../utils/ResultsApi";
@@ -30,6 +31,8 @@ const Results = () => {
   const [kpis, setKpis] = useState(null);
   const [qualityDist, setQualityDist] = useState(null);
   const [alerts, setAlerts] = useState([]);
+  const [confusionMatrix, setConfusionMatrix] = useState(null);
+  const [showNormalized, setShowNormalized] = useState(false);
 
   // Filter states
   const [searchTerm, setSearchTerm] = useState("");
@@ -57,7 +60,7 @@ const Results = () => {
     setError(null);
 
     try {
-      const [kpisData, qualityData, alertsData] = await Promise.all([
+      const [kpisData, qualityData, alertsData, cmData] = await Promise.all([
         getKPIs().catch((err) => {
           console.error("KPIs fetch failed:", err);
           return null;
@@ -70,11 +73,16 @@ const Results = () => {
           console.error("Alerts fetch failed:", err);
           return [];
         }),
+        getConfusionMatrix().catch((err) => {
+          console.error("Confusion matrix fetch failed:", err);
+          return null;
+        }),
       ]);
 
       setKpis(kpisData);
       setQualityDist(qualityData);
       setAlerts(alertsData);
+      setConfusionMatrix(cmData);
 
       await fetchPredictions();
     } catch (err) {
@@ -201,23 +209,23 @@ const Results = () => {
 
           <div className="kpi-card">
             <div className="kpi-header">
-              <span className="kpi-label">Quality Rate</span>
+              <span className="kpi-label">Avg Confidence</span>
             </div>
-            <div className="kpi-value">{kpis.qualityRate || 0}%</div>
-            {kpis.trends?.qualityRate && (
+            <div className="kpi-value">{kpis.avgConfidence || 0}%</div>
+            {kpis.trends?.avgConfidence && (
               <div
                 className={`kpi-trend ${
-                  kpis.trends.qualityRate.startsWith("+")
+                  kpis.trends.avgConfidence.startsWith("+")
                     ? "trend-up"
                     : "trend-down"
                 }`}
               >
-                {kpis.trends.qualityRate.startsWith("+") ? (
+                {kpis.trends.avgConfidence.startsWith("+") ? (
                   <FiTrendingUp />
                 ) : (
                   <FiTrendingDown />
                 )}
-                {kpis.trends.qualityRate} vs yesterday
+                {kpis.trends.avgConfidence} vs yesterday
               </div>
             )}
           </div>
@@ -331,6 +339,112 @@ const Results = () => {
           </div>
         </div>
       </div>
+
+      {/* Confusion Matrix */}
+      {confusionMatrix && confusionMatrix.matrix && confusionMatrix.matrix.length > 0 && (
+        <div className="card confusion-matrix-card">
+          <div className="card-header cm-card-header">
+            <div>
+              <h2 className="card-title">Confusion Matrix</h2>
+              <p className="card-subtitle">
+                {showNormalized ? "Normalized (row percentages)" : "Raw counts"}
+              </p>
+            </div>
+            <div style={{ display: "flex", flexDirection: "row", gap: "8px" }}>
+              <button
+                className={`btn btn-sm ${!showNormalized ? "btn-primary" : "btn-secondary"}`}
+                onClick={() => setShowNormalized(false)}
+              >
+                Raw
+              </button>
+              <button
+                className={`btn btn-sm ${showNormalized ? "btn-primary" : "btn-secondary"}`}
+                onClick={() => setShowNormalized(true)}
+              >
+                Normalized
+              </button>
+            </div>
+          </div>
+          <div className="confusion-matrix-container">
+            <table className="confusion-matrix-table">
+              <thead>
+                <tr>
+                  <th className="cm-corner">
+                    <div className="cm-corner-label">
+                      <span className="cm-actual-label">Actual</span>
+                      <span className="cm-predicted-label">Predicted</span>
+                    </div>
+                  </th>
+                  {confusionMatrix.classes.map((cls) => (
+                    <th key={cls} className="cm-header">
+                      {cls}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {confusionMatrix.classes.map((actualClass, i) => (
+                  <tr key={actualClass}>
+                    <th className="cm-row-header">{actualClass}</th>
+                    {(showNormalized ? confusionMatrix.normalized : confusionMatrix.matrix)[i].map(
+                      (value, j) => {
+                        const isCorrect = i === j;
+                        const displayValue = showNormalized
+                          ? `${(value * 100).toFixed(1)}%`
+                          : value;
+                        const intensity = showNormalized ? value : value / Math.max(...confusionMatrix.matrix.flat());
+                        return (
+                          <td
+                            key={j}
+                            className={`cm-cell ${isCorrect ? "cm-diagonal" : ""}`}
+                            style={{
+                              backgroundColor: isCorrect
+                                ? `rgba(46, 204, 113, ${0.2 + intensity * 0.6})`
+                                : value > 0
+                                  ? `rgba(231, 76, 60, ${0.1 + intensity * 0.4})`
+                                  : "transparent",
+                            }}
+                          >
+                            {displayValue}
+                          </td>
+                        );
+                      }
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {confusionMatrix.metrics && confusionMatrix.metrics.per_class && (
+            <div className="cm-metrics">
+              <h3 className="cm-metrics-title">Per-Class Metrics</h3>
+              <div className="cm-metrics-grid">
+                {Object.entries(confusionMatrix.metrics.per_class).map(([cls, metrics]) => (
+                  <div key={cls} className="cm-metric-card">
+                    <div className="cm-metric-header">{cls}</div>
+                    <div className="cm-metric-row">
+                      <span>Precision:</span>
+                      <span>{(metrics.precision * 100).toFixed(1)}%</span>
+                    </div>
+                    <div className="cm-metric-row">
+                      <span>Recall:</span>
+                      <span>{(metrics.recall * 100).toFixed(1)}%</span>
+                    </div>
+                    <div className="cm-metric-row">
+                      <span>F1 Score:</span>
+                      <span>{(metrics.f1 * 100).toFixed(1)}%</span>
+                    </div>
+                    <div className="cm-metric-row">
+                      <span>Support:</span>
+                      <span>{metrics.support}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Test Predictions Table */}
       <div className="card">

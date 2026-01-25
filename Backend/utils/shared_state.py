@@ -25,7 +25,9 @@ class PipelineState:
                 'epochs': 100,
                 'learningRate': 0.0005,
                 'lambdaReg': 0.001,
-                'batchSize': 32
+                'batchSize': 32,
+                'pcaComponents': 20,
+                'dropoutRate': 0.2
             },
             'results': None,
             'pipeline_thread': None

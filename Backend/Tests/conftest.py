@@ -67,7 +67,11 @@ def app():
     app.config['MODEL_DIR'] = '/tmp/test_models'
     
     try:
-        app.mongo_client = MongoClient(app.config['MONGO_CONNECTION_STRING'])
+        app.mongo_client = MongoClient(
+            app.config['MONGO_CONNECTION_STRING'],
+            serverSelectionTimeoutMS=5000,
+            connectTimeoutMS=5000
+        )
         app.mongo_client.server_info()
         print(f"[Test] MongoDB connected to TEST database: {app.config['DB_NAME']}")
     except Exception as e:
@@ -122,10 +126,23 @@ def client(app):
 def mongo_client():
     """Provide MongoDB client for testing"""
     ensure_test_environment()
-    
+
     connection_string = TestConfig.MONGO_CONNECTION_STRING
-    client = MongoClient(connection_string)
-    
+    # Use shorter timeout for faster failure detection
+    client = MongoClient(
+        connection_string,
+        serverSelectionTimeoutMS=5000,  # 5 second timeout
+        connectTimeoutMS=5000
+    )
+
+    # Verify connection immediately
+    try:
+        client.admin.command('ping')
+        print(f"[Test] MongoDB connected successfully")
+    except Exception as e:
+        print(f"[Test] MongoDB connection failed: {e}")
+        raise
+
     yield client
     
     # Session cleanup: drop entire test database
@@ -198,19 +215,21 @@ def sample_image_metadata():
 def sample_image_documents():
     """Provide multiple sample image documents for testing"""
     camera_angles = TestConfig.CAMERA_ANGLES
-    return [
-        {
-            'fruit_type': 'market',
-            'object_id': 'obj0001',
-            'camera_id': i,
-            'camera_angle': camera_angles[i],
-            'set_type': 'train',
-            'file_path': f'/test/path/image_{i}.jpg',
-            'file_name': f'image_{i}.jpg',
-            'timestamp': '2024-01-01 12:00:00'
-        }
-        for i in range(4)
-    ]
+    # Create documents for multiple objects (3 objects with 4 cameras each = 12 images)
+    documents = []
+    for obj_num in range(3):  # 3 different objects
+        for cam_id in range(4):  # 4 cameras per object
+            documents.append({
+                'fruit_type': 'market',
+                'object_id': f'obj{obj_num:04d}',  # obj0000, obj0001, obj0002
+                'camera_id': cam_id,
+                'camera_angle': camera_angles[cam_id],
+                'set_type': 'train',
+                'file_path': f'/test/path/obj{obj_num:04d}_cam{cam_id}.jpg',
+                'file_name': f'obj{obj_num:04d}_cam{cam_id}.jpg',
+                'timestamp': '2024-01-01 12:00:00'
+            })
+    return documents
 
 
 @pytest.fixture
@@ -288,17 +307,32 @@ def temp_test_dir(tmp_path):
 @pytest.fixture(autouse=True)
 def reset_pipeline_state():
     """Reset pipeline state before each test"""
+    import time
     try:
         from Backend.utils.shared_state import pipeline_state
+        # Wait for any running pipeline to finish
+        max_wait = 5  # seconds
+        wait_interval = 0.1
+        waited = 0
+        while pipeline_state.is_running() and waited < max_wait:
+            time.sleep(wait_interval)
+            waited += wait_interval
         pipeline_state.reset_pipeline()
     except (ImportError, AttributeError):
         pass
-    
+
     yield
-    
+
     # Cleanup after test
     try:
         from Backend.utils.shared_state import pipeline_state
+        # Wait for any running pipeline to finish
+        max_wait = 5  # seconds
+        wait_interval = 0.1
+        waited = 0
+        while pipeline_state.is_running() and waited < max_wait:
+            time.sleep(wait_interval)
+            waited += wait_interval
         pipeline_state.reset_pipeline()
     except (ImportError, AttributeError):
         pass

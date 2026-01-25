@@ -5,11 +5,13 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
-PROJECT_DIR = Path(os.getcwd()).absolute()
+# Use __file__ to get reliable path regardless of cwd
+PROJECT_DIR = Path(__file__).parent.parent.absolute()
 if str(PROJECT_DIR) not in sys.path:
     sys.path.insert(0, str(PROJECT_DIR))
 
-env_path = Path('.') / '.env.test'
+# Load .env.test from Tests directory (where this file is located)
+env_path = Path(__file__).parent / '.env.test'
 load_dotenv(dotenv_path=env_path)
 
 class TestPhase:
@@ -34,8 +36,8 @@ class TestPhase:
         print(f"{'='*70}\n")
         start_time = time.time()
         
-        # Build pytest command
-        cmd = ['pytest', '-q']
+        # Build pytest command using python -m pytest for reliable execution
+        cmd = [sys.executable, '-m', 'pytest', '-q']
         cmd.extend(self.test_paths)
         cmd.extend([
             '--tb=line',  # One line per failure
@@ -43,19 +45,28 @@ class TestPhase:
             '-p', 'no:cov',  # No coverage
             '--maxfail=999',  # Continue through all failures
         ])
-        
+
         try:
+            # Create environment with settings to prevent hanging on Windows
+            env = os.environ.copy()
+            env['TQDM_DISABLE'] = '1'
+            env['PYTHONUNBUFFERED'] = '1'  # Prevent buffering issues
+
             result = subprocess.run(
                 cmd,
-                capture_output=True,
+                cwd=PROJECT_DIR,
+                stdin=subprocess.DEVNULL,  # Don't wait for input
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,  # Combine stderr with stdout
                 text=True,
-                timeout=120
+                timeout=120,
+                env=env
             )
             
             self.duration = time.time() - start_time
             
-            # Get output
-            output = result.stdout + result.stderr
+            # Get output (stderr is merged with stdout)
+            output = result.stdout or ''
             
             # Debug: Always show pytest output
             if output.strip():
@@ -77,9 +88,9 @@ class TestPhase:
                 if self.failures > 0 or self.errors > 0:
                     self._print_failures(output)
                 
-                # 70% pass rate required
+                # 75% pass rate required
                 success_ratio = (self.tests_run - self.failures - self.errors) / self.tests_run
-                self.passed = (success_ratio >= 0.7)
+                self.passed = (success_ratio >= 0.75)
             else:
                 print("No tests run")
                 self.passed = False

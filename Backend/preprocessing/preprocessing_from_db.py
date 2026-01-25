@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 import pymongo
 import time
 from bson.objectid import ObjectId
+import random
 
 # Load environment variables
 env_path = Path('.') / '.env'
@@ -81,8 +82,91 @@ def custom_preprocessing(image, save_path=None):
     
     # Normalize to [0,1] range for the neural network
     enhanced = enhanced.astype(np.float32) / 255.0
-    
+
     return enhanced
+
+
+def apply_augmentation(image):
+    """
+    Apply random augmentations to an image for data augmentation.
+    This function applies a combination of transformations to increase dataset diversity.
+
+    Args:
+        image: Input image (numpy array, RGB, uint8 or float32)
+
+    Returns:
+        augmented: Augmented image in the same format as input
+    """
+    # Convert to uint8 if needed for OpenCV operations
+    is_float = image.dtype == np.float32 and image.max() <= 1.0
+    if is_float:
+        image = (image * 255).astype(np.uint8)
+
+    augmented = image.copy()
+    h, w = augmented.shape[:2]
+
+    # 1. Random Rotation (-30 to +30 degrees) - MORE AGGRESSIVE
+    if random.random() > 0.5:
+        angle = random.uniform(-30, 30)  # Doubled range
+        center = (w // 2, h // 2)
+        rotation_matrix = cv2.getRotationMatrix2D(center, angle, 1.0)
+        augmented = cv2.warpAffine(augmented, rotation_matrix, (w, h),
+                                   borderMode=cv2.BORDER_REFLECT)
+
+    # 2. Random Horizontal Flip
+    if random.random() > 0.5:
+        augmented = cv2.flip(augmented, 1)
+
+    # 3. Random Vertical Flip (less common for fruits, but can help)
+    if random.random() > 0.7:
+        augmented = cv2.flip(augmented, 0)
+
+    # 4. Random Brightness Adjustment - MORE AGGRESSIVE
+    if random.random() > 0.5:
+        brightness_factor = random.uniform(0.5, 1.5)  # Wider range
+        augmented = np.clip(augmented.astype(np.float32) * brightness_factor, 0, 255).astype(np.uint8)
+
+    # 5. Random Contrast Adjustment - MORE AGGRESSIVE
+    if random.random() > 0.5:
+        contrast_factor = random.uniform(0.6, 1.4)  # Wider range
+        mean = np.mean(augmented, axis=(0, 1), keepdims=True)
+        augmented = np.clip((augmented - mean) * contrast_factor + mean, 0, 255).astype(np.uint8)
+
+    # 6. Random Gaussian Noise
+    if random.random() > 0.6:
+        noise = np.random.normal(0, random.uniform(5, 15), augmented.shape)
+        augmented = np.clip(augmented.astype(np.float32) + noise, 0, 255).astype(np.uint8)
+
+    # 7. Random Color Jitter (Hue, Saturation adjustments) - MORE AGGRESSIVE
+    if random.random() > 0.5:
+        hsv = cv2.cvtColor(augmented, cv2.COLOR_RGB2HSV).astype(np.float32)
+
+        # Adjust hue - WIDER RANGE
+        hsv[:, :, 0] = np.clip(hsv[:, :, 0] + random.uniform(-20, 20), 0, 179)
+
+        # Adjust saturation - WIDER RANGE
+        hsv[:, :, 1] = np.clip(hsv[:, :, 1] * random.uniform(0.6, 1.4), 0, 255)
+
+        # Adjust value - WIDER RANGE
+        hsv[:, :, 2] = np.clip(hsv[:, :, 2] * random.uniform(0.8, 1.2), 0, 255)
+
+        augmented = cv2.cvtColor(hsv.astype(np.uint8), cv2.COLOR_HSV2RGB)
+
+    # 8. Random Slight Zoom (crop and resize)
+    if random.random() > 0.6:
+        zoom_factor = random.uniform(0.85, 0.95)
+        new_h, new_w = int(h * zoom_factor), int(w * zoom_factor)
+        y1 = random.randint(0, h - new_h)
+        x1 = random.randint(0, w - new_w)
+        cropped = augmented[y1:y1+new_h, x1:x1+new_w]
+        augmented = cv2.resize(cropped, (w, h))
+
+    # Convert back to float32 [0,1] if input was float
+    if is_float:
+        augmented = augmented.astype(np.float32) / 255.0
+
+    return augmented
+
 
 def process_image(image_path, output_dir, metadata):
     """Process a single image and save the preprocessed version"""
@@ -282,75 +366,91 @@ def load_dataset_split_by_camera(db_name=os.getenv('DB_NAME'), collection_name="
             sequenceofcamera[camera_id].append(image.get('path'))
     return sequenceofcamera
 
-def set_generator(image_paths, metadata_dict):
+def set_generator(image_paths, metadata_dict, augment=False, augment_multiplier=3):
     """
     Create a batch generator for the given image paths
     Args:
         image_paths: List of image paths
         metadata_dict: Dictionary mapping paths to metadata
+        augment: Whether to apply data augmentation (default False)
+        augment_multiplier: How many augmented versions per image (default 3)
     Returns:
         batch_generator: Generator function
         metadata: Empty dict
-        count: Number of images
+        count: Number of images (multiplied by augment_multiplier if augmenting)
     """
-    
+
     if not image_paths:
         print(f"No images provided")
         return None, {}, 0
-    
-    print(f"Creating generator for {len(image_paths)} images")
+
+    effective_count = len(image_paths) * augment_multiplier if augment else len(image_paths)
+    print(f"Creating generator for {len(image_paths)} images" +
+          (f" (x{augment_multiplier} augmentation = {effective_count} total)" if augment else ""))
 
     # Function to generate batches
     def batch_generator():
 
         # Create indices for the paths
-        indices = list(range(len(image_paths)))
-        
+        if augment:
+            # Create expanded indices: each image gets augment_multiplier versions
+            # Format: (image_index, augmentation_version)
+            indices = [(i, aug_idx) for i in range(len(image_paths))
+                      for aug_idx in range(augment_multiplier)]
+        else:
+            # Just image indices
+            indices = [(i, 0) for i in range(len(image_paths))]
+
         # Shuffle
         np.random.shuffle(indices)
-        
+
         # Calculate number of batches
-        num_batches = (len(image_paths) + BATCH_SIZE - 1) // BATCH_SIZE
+        effective_count = len(indices)
+        num_batches = (effective_count + BATCH_SIZE - 1) // BATCH_SIZE
 
         # Generate batches
         for batch_idx in range(num_batches):
             start_idx = batch_idx * BATCH_SIZE
-            end_idx = min(start_idx + BATCH_SIZE, len(image_paths))
+            end_idx = min(start_idx + BATCH_SIZE, effective_count)
             batch_indices = indices[start_idx:end_idx]
-            
+
             # Collect valid images
             batch_images = []
             batch_metadata = []
-            
+
             files_not_found = 0
             files_failed_load = 0
-            
-            for idx in batch_indices:
-                img_path = image_paths[idx]
-                
+
+            for img_idx, aug_version in batch_indices:
+                img_path = image_paths[img_idx]
+
                 # Check if file exists
                 if not os.path.exists(img_path):
                     files_not_found += 1
                     if files_not_found <= 3:  # Show first 3
                         print(f"[Generator] File not found: {img_path}")
                     continue
-                
+
                 try:
                     # Load the image
                     img = cv2.imread(img_path)
-                    
+
                     if img is None:
                         files_failed_load += 1
                         if files_failed_load <= 3:
                             print(f"[Generator] Failed to load: {img_path}")
                         continue
-                    
+
                     # Resize to standardized size
                     img = cv2.resize(img, IMAGE_SIZE)
-                    
+
                     # Convert to RGB (OpenCV loads as BGR)
                     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-                    
+
+                    # Apply augmentation if enabled and not the original version (aug_version=0)
+                    if augment and aug_version > 0:
+                        img = apply_augmentation(img)
+
                     # Add to batch lists
                     batch_images.append(img)
                     img_data_dict = metadata_dict.get(img_path, {})
@@ -374,10 +474,10 @@ def set_generator(image_paths, metadata_dict):
             yield batch_x, batch_y
 
     # Add metadata to the generator function
-    batch_generator.samples = len(image_paths)
-    batch_generator.num_batches = (len(image_paths) + BATCH_SIZE - 1) // BATCH_SIZE
-    
-    return batch_generator, {}, len(image_paths)
+    batch_generator.samples = effective_count
+    batch_generator.num_batches = (effective_count + BATCH_SIZE - 1) // BATCH_SIZE
+
+    return batch_generator, {}, effective_count
 
 def load_dataset_with_preprocessing():
     """
@@ -435,13 +535,17 @@ def load_dataset_with_preprocessing():
     
     # Create generators
     print("\nCreating generators...")
-    train_gen, _, train_count = set_generator(training_paths, metadata_dict)
-    test_gen, _, test_count = set_generator(testing_paths, metadata_dict)
-    
+    # Training generator WITH augmentation (5x multiplier for more diversity)
+    train_gen, _, train_count = set_generator(training_paths, metadata_dict,
+                                              augment=True, augment_multiplier=5)
+    # Testing generator WITHOUT augmentation
+    test_gen, _, test_count = set_generator(testing_paths, metadata_dict,
+                                            augment=False)
+
     # Print summary
     print("\nDatasets summary:")
-    print(f"  Training: {train_count} images")
-    print(f"  Testing: {test_count} images")
-    
+    print(f"  Training: {train_count} images (with augmentation)")
+    print(f"  Testing: {test_count} images (no augmentation)")
+
     # Return generators
     return train_gen, test_gen

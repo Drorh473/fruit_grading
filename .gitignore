@@ -1,13 +1,19 @@
 DataSets/
 gitignore.
-.env
 .vscode/
-
+.claude/
 saved_models/
 *.pkl
 *.pth
 *.h5
 *.weights
+__pycache__/
+*.pyc
+*.pyo
+.env
+.env.test
+.DS_Store
+
 
 # Confusion matrices and visualizations
 confusion_matrix.png

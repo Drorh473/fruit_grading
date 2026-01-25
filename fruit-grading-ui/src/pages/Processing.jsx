@@ -31,16 +31,18 @@ const Processing = ({ setProcessingStats }) => {
     lambdaReg: 0.01,
     batchSize: 32,
     pcaComponents: 0,
+    dropoutRate: 0.2,
   });
 
   // Common values for each parameter
   const presets = {
     hiddenDim: [4, 8, 16, 32, 64, 128, 256],
-    epochs: [10, 25, 50, 100, 200, 500, 1000],
+    epochs: [100, 200, 300, 400, 500, 750, 1000],
     learningRate: [0.0001, 0.0005, 0.001, 0.005, 0.01, 0.05, 0.1],
     lambdaReg: [0, 0.001, 0.01, 0.05, 0.1, 0.5, 1.0],
     batchSize: [8, 16, 32, 64, 128, 256],
     pcaComponents: [0, 8, 16, 32, 64, 128, 256, 512],
+    dropoutRate: [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7],
   };
 
   // Updated steps - Testing is now Step 1
@@ -86,6 +88,7 @@ const Processing = ({ setProcessingStats }) => {
         lambdaReg: data.lambdaReg || 0.01,
         batchSize: data.batchSize || 32,
         pcaComponents: data.pcaComponents || 0,
+        dropoutRate: data.dropoutRate ?? 0.2,
       });
     } catch (err) {
       console.error("Failed to load config:", err);
@@ -184,6 +187,7 @@ const Processing = ({ setProcessingStats }) => {
         lambdaReg: config.lambdaReg,
         batchSize: config.batchSize,
         pcaComponents: config.pcaComponents,
+        dropoutRate: config.dropoutRate,
       });
 
       if (response.success) {
@@ -581,6 +585,42 @@ const Processing = ({ setProcessingStats }) => {
                         }
                       >
                         {value === 0 ? "Disabled" : value}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Dropout Rate */}
+            <div className="config-select-item">
+              <label className="config-label">Dropout Rate</label>
+              <div className="select-dropdown">
+                <button
+                  className={`select-button ${
+                    openDropdown === "dropoutRate" ? "open" : ""
+                  }`}
+                  onClick={() => toggleDropdown("dropoutRate")}
+                  disabled={isProcessing}
+                >
+                  <span className="select-value">{config.dropoutRate}</span>
+                  <FiChevronDown
+                    className={`chevron ${
+                      openDropdown === "dropoutRate" ? "rotate" : ""
+                    }`}
+                  />
+                </button>
+                {openDropdown === "dropoutRate" && (
+                  <div className="select-options">
+                    {presets.dropoutRate.map((value) => (
+                      <button
+                        key={value}
+                        className={`select-option ${
+                          config.dropoutRate === value ? "active" : ""
+                        }`}
+                        onClick={() => handleConfigChange("dropoutRate", value)}
+                      >
+                        {value}
                       </button>
                     ))}
                   </div>

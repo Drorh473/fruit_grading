@@ -186,10 +186,28 @@ class TestConfusionMatrix:
         """Test normalized matrix has valid percentage values"""
         response = client.get('/api/results/confusion-matrix')
         data = json.loads(response.data)
-        
+
         for row in data['normalized']:
             for value in row:
                 assert 0 <= value <= 1
+
+    def test_per_class_metrics(self, client):
+        """Test per-class metrics are present and valid"""
+        response = client.get('/api/results/confusion-matrix')
+        data = json.loads(response.data)
+
+        if data['metrics'] and 'per_class' in data['metrics']:
+            per_class = data['metrics']['per_class']
+            for class_name, metrics in per_class.items():
+                assert 'precision' in metrics
+                assert 'recall' in metrics
+                assert 'f1' in metrics
+                assert 'support' in metrics
+
+                assert 0 <= metrics['precision'] <= 1
+                assert 0 <= metrics['recall'] <= 1
+                assert 0 <= metrics['f1'] <= 1
+                assert metrics['support'] >= 0
 
 
 class TestResultsStats:
