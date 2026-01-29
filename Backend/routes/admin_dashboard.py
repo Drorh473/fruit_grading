@@ -48,9 +48,8 @@ def get_system_status():
 
 @admin_dashboard_bp.route('/processing-stats', methods=['GET'])
 def get_processing_stats():
-    """Get processing statistics - uses dashboard_metadata"""
+    """Get processing statistics from dashboard_metadata"""
     try:
-        # Try to load from dashboard_metadata
         metadata = load_dashboard_metadata()
         if metadata:
             return jsonify({
@@ -58,20 +57,14 @@ def get_processing_stats():
                 'accuracy': metadata['performance']['test_accuracy'],
                 'lastUpdate': metadata['timestamp']
             }), 200
-        
-        # Fallback to old method
-        collection = get_collection('images')
-        total_processed = collection.count_documents({})
-        
-        results = pipeline_state.get_results()
-        accuracy = results.get('test_accuracy', 0.0) if results else 0.0
-        
+
+        # Fallback if no metadata
         return jsonify({
-            'totalProcessed': total_processed,
-            'accuracy': accuracy,
-            'lastUpdate': datetime.now().isoformat()
+            'totalProcessed': 0,
+            'accuracy': 0.0,
+            'lastUpdate': None
         }), 200
-        
+
     except Exception as e:
         print(f"Error in get_processing_stats: {e}")
         return jsonify({
@@ -121,9 +114,8 @@ def get_recent_results():
 
 @admin_dashboard_bp.route('/dataset-info', methods=['GET'])
 def get_dataset_info():
-    """Get dataset information - uses dashboard_metadata"""
+    """Get dataset information from dashboard_metadata"""
     try:
-        # Try to load from dashboard_metadata
         metadata = load_dashboard_metadata()
         if metadata:
             dataset_info = metadata['dataset_info']
@@ -133,27 +125,22 @@ def get_dataset_info():
                 'totalImages': dataset_info['total_images'],
                 'featureDim': dataset_info['feature_dim']
             }), 200
-        
-        # Fallback to database query
-        collection = get_collection('images')
-        train_count = collection.count_documents({'set_type': 'train'})
-        test_count = collection.count_documents({'set_type': 'test'})
-        total_images = collection.count_documents({})
-        
+
+        # Fallback if no metadata
         return jsonify({
-            'trainingCount': train_count,
-            'testingCount': test_count,
-            'totalImages': total_images,
-            'featureDim': 200704
+            'trainingCount': 0,
+            'testingCount': 0,
+            'totalImages': 0,
+            'featureDim': 0
         }), 200
-        
+
     except Exception as e:
         print(f"Error in get_dataset_info: {e}")
         return jsonify({
             'trainingCount': 0,
             'testingCount': 0,
             'totalImages': 0,
-            'featureDim': 200704
+            'featureDim': 0
         }), 200
 
 
@@ -268,19 +255,19 @@ def get_confusion_matrix():
 def get_full_dashboard_data():
     """
     Get all dashboard data in one call (NEW ENDPOINT)
-    Optimized for dashboard initialization
+    All data comes from dashboard_metadata.json
     """
     try:
         admin_data = format_for_admin_dashboard()
         if admin_data:
             return jsonify(admin_data), 200
-        
+
         # Return empty structure if no metadata
         return jsonify({
             'system_status': {
-                'database': 'unknown',
+                'database': 'connected' if check_db_connection() else 'disconnected',
                 'model': 'not_trained',
-                'cameras': [False, False, False, False]
+                'cameras': [True, True, True, True]
             },
             'processing_stats': {
                 'totalProcessed': 0,
@@ -300,7 +287,7 @@ def get_full_dashboard_data():
                 'classes': 0
             }
         }), 200
-        
+
     except Exception as e:
         print(f"Error in get_full_dashboard_data: {e}")
         return jsonify({'error': str(e)}), 500

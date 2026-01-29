@@ -10,6 +10,9 @@ load_dotenv(dotenv_path=env_path)
 
 MODEL_DIR = os.getenv('MODEL_DIR', 'saved_models')
 
+# Classifier model cache - loaded once, reused for all requests
+_CLASSIFIER_CACHE = {}
+
 
 def initialize_parameters(input_dim, hidden_dim, num_classes):
     """Initialize network parameters with He initialization"""
@@ -320,7 +323,7 @@ def train_from_generator(train_generator, val_generator, input_dim=None, hidden_
     return params, history
 
 
-def save_model(params, history, input_dim, hidden_dim, num_classes, filepath, pca=None):
+def save_model(params, history, input_dim, hidden_dim, num_classes, filepath, pca=None, scaler=None):
     """Save model parameters to file"""
     os.makedirs(os.path.dirname(filepath), exist_ok=True)
     model_dict = {
@@ -329,7 +332,8 @@ def save_model(params, history, input_dim, hidden_dim, num_classes, filepath, pc
         'input_dim': input_dim,
         'hidden_dim': hidden_dim,
         'num_classes': num_classes,
-        'pca': pca
+        'pca': pca,
+        'scaler': scaler
     }
     with open(filepath, 'wb') as f:
         pickle.dump(model_dict, f)
@@ -337,18 +341,30 @@ def save_model(params, history, input_dim, hidden_dim, num_classes, filepath, pc
 
 
 def load_model(filepath):
-    """Load model parameters from file"""
+    """Load model parameters from file (cached after first load)"""
+    # Return cached model if available
+    if filepath in _CLASSIFIER_CACHE:
+        return _CLASSIFIER_CACHE[filepath]['params'], _CLASSIFIER_CACHE[filepath]['model_info']
+
+    print(f"Loading classifier model from {filepath} (first time only)...")
+
     with open(filepath, 'rb') as f:
         model_dict = pickle.load(f)
-    
+
     params = model_dict['params']
     model_info = {
         'input_dim': model_dict['input_dim'],
         'hidden_dim': model_dict['hidden_dim'],
         'num_classes': model_dict['num_classes'],
         'history': model_dict['history'],
-        'pca': model_dict.get('pca', None)
+        'pca': model_dict.get('pca', None),
+        'scaler': model_dict.get('scaler', None)
     }
-    
-    print(f"Model loaded from {filepath}")
+
+    # Cache the model
+    _CLASSIFIER_CACHE[filepath] = {
+        'params': params,
+        'model_info': model_info
+    }
+
     return params, model_info

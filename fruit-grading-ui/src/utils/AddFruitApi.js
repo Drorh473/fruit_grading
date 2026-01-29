@@ -1,6 +1,6 @@
 /**
  * API for Add Fruit
- * Handles fruit folder validation and processing
+ * Handles fruit folder upload and processing
  */
 
 const API_BASE_URL =
@@ -9,11 +9,12 @@ const API_BASE_URL =
 async function apiFetch(endpoint, options = {}) {
   try {
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      ...options,
+      // Note: We DO NOT set Content-Type for FormData;
+      // the browser sets it automatically with the boundary
       headers: {
-        "Content-Type": "application/json",
         ...options.headers,
       },
-      ...options,
     });
 
     if (!response.ok) {
@@ -34,53 +35,57 @@ async function apiFetch(endpoint, options = {}) {
 }
 
 /**
- * Validate folder structure
- * @param {string} folderPath - Path to fruit folder
- * @returns {Promise<Object>} { valid, message, details: { anglesFound, totalImages } }
+ * Validate folder structure (Now strictly Client-Side helper, or optional server check)
+ * Since we are uploading, we usually validate in the browser first.
  */
 export async function validateFolder(folderPath) {
+  // Legacy support if needed, otherwise unused in new upload flow
   return apiFetch("/fruit/validate", {
     method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ folderPath }),
   });
 }
 
 /**
- * Process new fruit folder (complete pipeline)
- * @param {string} folderPath - Path to fruit folder
- * @param {Object} options - { runTests: boolean }
- * @returns {Promise<Object>} { objectId, predictedType, confidence, imagesProcessed, processingTime }
+ * Upload and Process fruit dataset
+ * Sends actual files to the backend
+ * @param {Array<File>} files - List of file objects
+ * @returns {Promise<Object>} Result data
  */
-export async function processFruit(folderPath, options = {}) {
-  return apiFetch("/fruit/process", {
+export async function uploadAndProcessFruit(files) {
+  const formData = new FormData();
+
+  // Append all files to the form data
+  Array.from(files).forEach((file) => {
+    // We send the relative path so backend can reconstruct folders (angle_0, etc.)
+    // For input[type=file], use webkitRelativePath.
+    // For DnD, we ensure the 'path' property is set on the file object manually.
+    const path = file.webkitRelativePath || file.path || file.name;
+    formData.append("dataset", file, path);
+  });
+
+  return apiFetch("/fruit/upload-process", {
     method: "POST",
-    body: JSON.stringify({ folderPath, ...options }),
+    body: formData,
+    // No Content-Type header! Browser adds it for FormData
   });
 }
 
-/**
- * Get processing status for fruit
- * @param {string} objectId - Object ID being processed
- * @returns {Promise<Object>} { status, currentStep, progress, steps }
- */
 export async function getFruitProcessingStatus(objectId) {
   return apiFetch(`/fruit/status/${objectId}`);
 }
 
-/**
- * Cancel fruit processing
- * @param {string} objectId - Object ID to cancel
- * @returns {Promise<Object>} Status response
- */
 export async function cancelFruitProcessing(objectId) {
   return apiFetch(`/fruit/cancel/${objectId}`, {
     method: "POST",
+    headers: { "Content-Type": "application/json" },
   });
 }
 
 export default {
   validateFolder,
-  processFruit,
+  uploadAndProcessFruit,
   getFruitProcessingStatus,
   cancelFruitProcessing,
 };

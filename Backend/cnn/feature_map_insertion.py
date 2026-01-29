@@ -21,32 +21,15 @@ load_dotenv(dotenv_path=env_path)
 
 def extract_and_fuse_features(generator):
     """Extract features from generator, flatten, pool temporally, and fuse multi-view."""
-    print("\nExtracting features...")
     features = extract_features_from_generator(generator, 'inference')
-    
-    print("Flattening features...")
     flattened = flatten_features(features)
-    
-    print("Temporal pooling...")
     pooled = temporal_pooling(flattened)
-    
-    print("Multi-view fusion...")
     fused = multi_view_fusion(pooled)
-    
     return fused
 
 
 def get_feature_vector(fused_features, object_id):
-    """
-    Get feature vector for specific object ID.
-    
-    Args:
-        fused_features: Dictionary with format {key: {'features': np.array, 'label': int, 'fruit_type': str}}
-        object_id: Object ID to search for
-        
-    Returns:
-        Feature vector (numpy array) or None if not found
-    """
+
     for key in fused_features.keys():
         if object_id in key:
             return fused_features[key]['features']  # Return just the features array

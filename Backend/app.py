@@ -21,17 +21,26 @@ if str(PROJECT_ROOT) not in sys.path:
 from Tests.test_main import TestOrchestrator
 
 
+def preload_models():
+    try:
+        # Preload CNN feature extractor (ShuffleNetV2)
+        from cnn.pre_trained_feature_map import load_model as load_cnn
+        load_cnn()
+
+        # Preload classifier model
+        from cnn.fully_connected_layer import load_model as load_classifier
+        import os
+        model_path = os.path.join(os.getenv('MODEL_DIR', 'saved_models'), 'fruit_classifier.pkl')
+        if os.path.exists(model_path):
+            load_classifier(model_path)
+        else:
+            print(f"Classifier model not found at {model_path} (will load on first use)")
+    except Exception as e:
+        print(f"Warning: Model preloading failed: {e}")
+        print("Models will load on first request.\n")
+
+
 def run_tests(mode='full', verbose=True):
-    """
-    Run test suite before server startup
-    
-    Args:
-        mode: 'full', 'critical', or phase number (1-5)
-        verbose: Output verbosity
-    
-    Returns:
-        bool: True if tests passed
-    """
     orchestrator = TestOrchestrator()
     if mode == 'critical':
         print("\nRunning critical tests only...")
@@ -97,7 +106,8 @@ def create_app():
     @app.teardown_appcontext
     def close_db(error):
         g.pop('db', None)
-    
+    preload_models()
+
     return app
 
 

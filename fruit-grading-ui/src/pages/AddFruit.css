@@ -2,7 +2,9 @@
   padding: var(--spacing-xl);
   max-width: 1200px;
   margin: 0 auto;
+  position: relative; /* Needed for drag overlay positioning */
 }
+
 /* Add spacing between cards */
 .add-fruit .card {
   margin-bottom: var(--spacing-xl);
@@ -76,6 +78,34 @@
   margin-bottom: 0;
 }
 
+/* Browse Button Styling */
+.btn-browse {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  white-space: nowrap;
+  background-color: var(--bg-light); /* Adjust based on your theme variables */
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  cursor: pointer;
+  padding: 0 var(--spacing-lg); /* Match input height */
+  height: 42px; /* Ensure this matches your input-field height */
+  border-radius: var(--radius-md, 4px);
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.btn-browse:hover {
+  background-color: var(--bg-medium);
+  border-color: var(--accent-primary);
+}
+
+.btn-browse:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 /* Validation Result */
 .validation-result {
   display: flex;
@@ -135,19 +165,42 @@
   padding: var(--spacing-xl) 0;
 }
 
+/* Centered Add Fruit Button Container */
+.add-fruit-action-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  margin-top: var(--spacing-xl);
+  margin-bottom: var(--spacing-xl);
+}
+
 .btn-large {
   padding: var(--spacing-md) var(--spacing-xl);
   font-size: 1rem;
   min-width: 200px;
 }
 
+/* Ensure content inside button is centered */
+.btn-add-fruit {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: var(--spacing-sm);
+  text-align: center;
+}
+
 .spinner-small {
   border: 2px solid rgba(255, 255, 255, 0.3);
   border-top: 2px solid white;
   border-radius: 50%;
-  width: 16px;
-  height: 16px;
-  animation: spin 1s linear infinite;
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  min-height: 18px;
+  flex-shrink: 0;
+  animation: spin 0.8s linear infinite;
+  display: inline-block;
 }
 
 .processing-note {
@@ -365,7 +418,7 @@
 }
 
 .info-box li::before {
-  content: "â€¢";
+  content: "•";
   position: absolute;
   left: 0;
   color: var(--accent-primary);
@@ -384,6 +437,124 @@
   }
 
   .result-actions {
+    flex-direction: column;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Simple Result Card */
+.result-card-simple {
+  background: var(--bg-dark);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: var(--spacing-xl);
+  margin-bottom: var(--spacing-xl);
+}
+
+.result-header {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-xl);
+  padding-bottom: var(--spacing-lg);
+  border-bottom: 1px solid var(--border);
+}
+
+.result-success-icon {
+  font-size: 2.5rem;
+  color: var(--success);
+  flex-shrink: 0;
+}
+
+.result-header h2 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.result-object-id {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin: 0.25rem 0 0 0;
+  font-family: monospace;
+}
+
+.result-details {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-xl);
+}
+
+.result-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--spacing-sm) 0;
+}
+
+.result-label {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.result-value {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.result-type {
+  padding: 0.25rem 0.75rem;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.result-type.type-market {
+  background: rgba(39, 174, 96, 0.15);
+  color: var(--success);
+}
+
+.result-type.type-standard {
+  background: rgba(52, 152, 219, 0.15);
+  color: var(--info);
+}
+
+.result-type.type-premium {
+  background: rgba(155, 89, 182, 0.15);
+  color: #9b59b6;
+}
+
+.result-type.type-reject {
+  background: rgba(231, 76, 60, 0.15);
+  color: var(--error);
+}
+
+.result-actions-simple {
+  display: flex;
+  gap: var(--spacing-md);
+  padding-top: var(--spacing-lg);
+  border-top: 1px solid var(--border);
+}
+
+.result-actions-simple .btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-sm);
+}
+
+@media (max-width: 480px) {
+  .result-actions-simple {
     flex-direction: column;
   }
 }

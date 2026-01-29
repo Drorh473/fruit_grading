@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import {
   FiDownload,
   FiFilter,
@@ -8,6 +9,7 @@ import {
   FiTrendingUp,
   FiTrendingDown,
   FiAlertCircle,
+  FiRefreshCw,
 } from "react-icons/fi";
 import "./Results.css";
 import {
@@ -21,6 +23,8 @@ import {
 } from "../utils/ResultsApi";
 
 const Results = () => {
+  const location = useLocation();
+
   // Data states
   const [predictions, setPredictions] = useState([]);
   const [predictionStats, setPredictionStats] = useState({
@@ -44,16 +48,32 @@ const Results = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [exporting, setExporting] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   // Fetch all data on mount
   useEffect(() => {
     fetchAllData();
   }, []);
 
+  // Handle refresh when navigating from AddFruit
+  useEffect(() => {
+    if (location.state?.refresh) {
+      fetchAllData();
+      // Clear the state to prevent re-fetching on subsequent renders
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state]);
+
   // Re-fetch predictions when filters change
   useEffect(() => {
     fetchPredictions();
   }, [searchTerm, filterActual, filterPredicted, filterCorrect]);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await fetchAllData();
+    setRefreshing(false);
+  };
 
   const fetchAllData = async () => {
     setLoading(true);
@@ -164,6 +184,14 @@ const Results = () => {
           <h1>Classification Results</h1>
           <p className="page-subtitle">Model predictions on test set objects</p>
         </div>
+        <button
+          className="btn btn-secondary"
+          onClick={handleRefresh}
+          disabled={refreshing}
+        >
+          <FiRefreshCw className={refreshing ? "spin" : ""} />
+          {refreshing ? "Refreshing..." : "Refresh"}
+        </button>
       </div>
 
       {/* KPI Cards */}

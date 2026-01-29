@@ -93,76 +93,54 @@ def get_results_list():
 
 @results_bp.route('/kpis', methods=['GET'])
 def get_kpis():
-    """Get KPIs from model metadata"""
+    """Get KPIs from model metadata - all data from dashboard_metadata.json"""
     try:
-        collection = get_collection('images')
-        
-        # Get total processed from database
-        pipeline = [{'$group': {'_id': '$object_id'}}]
-        objects = list(collection.aggregate(pipeline))
-        total_processed = len(objects)
-        
-        # Load model metadata for accuracy and confidence
+        # Load model metadata for all KPI values
         metadata = load_model_metadata()
-        
+
         if metadata:
+            dataset_info = metadata.get('dataset_info', {})
             performance = metadata.get('performance', {})
+
+            # Get total processed from metadata
+            total_processed = dataset_info.get('total_objects', 0)
+
+            # Get accuracy
             test_accuracy = performance.get('test_accuracy', 0)
             model_accuracy = round(test_accuracy * 100, 1)
-            
+
             # Get avg_confidence from metadata
             avg_conf = performance.get('avg_confidence')
             if avg_conf is not None:
                 avg_confidence = round(avg_conf * 100 if avg_conf <= 1 else avg_conf, 1)
             else:
                 avg_confidence = 0
-            
+
             # Get correct/total from confusion matrix
             cm = metadata.get('confusion_matrix', [])
             if cm:
                 correct_count = sum(cm[i][i] for i in range(len(cm)))
                 total_with_labels = sum(sum(row) for row in cm)
             else:
-                testing_count = metadata.get('dataset_info', {}).get('testing_count', 0)
+                testing_count = dataset_info.get('testing_count', 0)
                 correct_count = int(test_accuracy * testing_count)
                 total_with_labels = testing_count
         else:
+            total_processed = 0
             model_accuracy = 0
             avg_confidence = 0
             correct_count = 0
             total_with_labels = 0
-        
-        # Calculate trends
-        now = datetime.now()
-        yesterday_start = now - timedelta(days=1)
-        day_before_start = now - timedelta(days=2)
-        
-        yesterday_pipeline = [
-            {'$match': {'timestamp': {'$gte': yesterday_start, '$lt': now}}},
-            {'$group': {'_id': '$object_id'}}
-        ]
-        yesterday_total = len(list(collection.aggregate(yesterday_pipeline)))
-        
-        day_before_pipeline = [
-            {'$match': {'timestamp': {'$gte': day_before_start, '$lt': yesterday_start}}},
-            {'$group': {'_id': '$object_id'}}
-        ]
-        day_before_total = len(list(collection.aggregate(day_before_pipeline)))
-        
-        trends = {}
-        if day_before_total > 0:
-            total_change = ((yesterday_total - day_before_total) / day_before_total) * 100
-            trends['totalProcessed'] = f"{'+' if total_change >= 0 else ''}{total_change:.1f}%"
-        
+
         return jsonify({
             'totalProcessed': total_processed,
             'modelAccuracy': model_accuracy,
             'avgConfidence': avg_confidence,
             'correctCount': correct_count,
             'totalWithLabels': total_with_labels,
-            'trends': trends
+            'trends': {}
         }), 200
-        
+
     except Exception as e:
         print(f"Error in get_kpis: {e}")
         return jsonify({
@@ -177,28 +155,31 @@ def get_kpis():
 
 @results_bp.route('/quality-distribution', methods=['GET'])
 def get_quality_distribution():
-    """Get quality distribution statistics"""
+    """Get quality distribution statistics from metadata"""
     try:
-        collection = get_collection('images')
-        
-        pipeline = [
-            {'$group': {
-                '_id': '$object_id',
-                'fruit_type': {'$first': '$fruit_type'}
-            }}
-        ]
-        objects = list(collection.aggregate(pipeline))
-        type_counts = Counter(obj['fruit_type'] for obj in objects)
-        total = len(objects)
-        
-        distribution = {}
-        for quality_type in ['market', 'standard', 'premium', 'reject']:
-            count = type_counts.get(quality_type, 0)
-            percentage = round((count / total * 100) if total > 0 else 0, 1)
-            distribution[quality_type] = {'count': count, 'percentage': percentage}
-        
-        return jsonify(distribution), 200
-        
+        metadata = load_model_metadata()
+
+        if metadata:
+            class_dist = metadata.get('dataset_info', {}).get('class_distribution', {})
+            total_objects = metadata.get('dataset_info', {}).get('total_objects', 0)
+
+            distribution = {}
+            for quality_type in ['market', 'standard', 'premium', 'reject']:
+                type_data = class_dist.get(quality_type, {})
+                count = type_data.get('total', 0)
+                percentage = round((count / total_objects * 100) if total_objects > 0 else 0, 1)
+                distribution[quality_type] = {'count': count, 'percentage': percentage}
+
+            return jsonify(distribution), 200
+
+        # Fallback if no metadata
+        return jsonify({
+            'market': {'count': 0, 'percentage': 0},
+            'standard': {'count': 0, 'percentage': 0},
+            'premium': {'count': 0, 'percentage': 0},
+            'reject': {'count': 0, 'percentage': 0}
+        }), 200
+
     except Exception as e:
         print(f"Error in get_quality_distribution: {e}")
         return jsonify({

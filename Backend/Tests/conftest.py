@@ -80,7 +80,7 @@ def app():
     
     # Try to import and register blueprints (with error handling)
     blueprint_imports = [
-        ('routes.add_fruit', 'add_fruit_bp', '/api/fruits'),
+        ('routes.add_fruit', 'add_fruit_bp', '/api/fruit'),
         ('routes.camera_monitor', 'cameras_bp', '/api/cameras'),
         ('routes.processing', 'processing_bp', '/api/pipeline'),
         ('routes.results', 'results_bp', '/api/results'),
