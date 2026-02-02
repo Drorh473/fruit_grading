@@ -69,9 +69,9 @@ class TestPreprocessedToFeatures:
         
         assert 'apple_obj001' in fused
         assert len(fused) == 1
-        
-        # Final feature should be concatenation of all cameras
-        expected_dim = TestConfig.FEATURE_DIM * TestConfig.NUM_OF_CAMERAS
+
+        # Final feature dimension stays same after average pooling (not concatenation)
+        expected_dim = TestConfig.FEATURE_DIM
         fused_features = fused['apple_obj001']['features']
         assert fused_features.shape[0] == expected_dim
     

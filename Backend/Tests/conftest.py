@@ -306,33 +306,17 @@ def temp_test_dir(tmp_path):
 
 @pytest.fixture(autouse=True)
 def reset_pipeline_state():
-    """Reset pipeline state before each test"""
-    import time
+    """Reset pipeline state before and after each test."""
     try:
-        from Backend.utils.shared_state import pipeline_state
-        # Wait for any running pipeline to finish
-        max_wait = 5  # seconds
-        wait_interval = 0.1
-        waited = 0
-        while pipeline_state.is_running() and waited < max_wait:
-            time.sleep(wait_interval)
-            waited += wait_interval
+        from utils.shared_state import pipeline_state
         pipeline_state.reset_pipeline()
     except (ImportError, AttributeError):
         pass
 
     yield
 
-    # Cleanup after test
     try:
-        from Backend.utils.shared_state import pipeline_state
-        # Wait for any running pipeline to finish
-        max_wait = 5  # seconds
-        wait_interval = 0.1
-        waited = 0
-        while pipeline_state.is_running() and waited < max_wait:
-            time.sleep(wait_interval)
-            waited += wait_interval
+        from utils.shared_state import pipeline_state
         pipeline_state.reset_pipeline()
     except (ImportError, AttributeError):
         pass

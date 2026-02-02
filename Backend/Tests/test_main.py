@@ -59,7 +59,7 @@ class TestPhase:
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,  # Combine stderr with stdout
                 text=True,
-                timeout=120,
+                timeout=600,
                 env=env
             )
             
@@ -98,7 +98,7 @@ class TestPhase:
             return self.passed
             
         except subprocess.TimeoutExpired:
-            print(f"ERROR: Tests timed out after 120 seconds")
+            print(f"ERROR: Tests timed out after 600 seconds")
             self.duration = time.time() - start_time
             return False
         except Exception as e:

@@ -93,23 +93,27 @@ class TestKPIs:
     def test_get_kpis(self, client):
         """Test getting KPIs"""
         response = client.get('/api/results/kpis')
-        
+
         assert response.status_code == 200
         data = json.loads(response.data)
-        
+
         assert 'totalProcessed' in data
-        assert 'qualityRate' in data
-        assert 'processingSpeed' in data
+        assert 'modelAccuracy' in data
+        assert 'avgConfidence' in data
+        assert 'correctCount' in data
+        assert 'totalWithLabels' in data
         assert 'trends' in data
-        
+
         assert isinstance(data['totalProcessed'], int)
-        assert isinstance(data['qualityRate'], (int, float))
-        assert isinstance(data['processingSpeed'], (int, float))
+        assert isinstance(data['modelAccuracy'], (int, float))
+        assert isinstance(data['avgConfidence'], (int, float))
+        assert isinstance(data['correctCount'], int)
+        assert isinstance(data['totalWithLabels'], int)
         assert isinstance(data['trends'], dict)
-        
+
         assert data['totalProcessed'] >= 0
-        assert 0 <= data['qualityRate'] <= 100
-        assert data['processingSpeed'] >= 0
+        assert 0 <= data['modelAccuracy'] <= 100
+        assert 0 <= data['avgConfidence'] <= 100
 
 
 class TestQualityAlerts:
@@ -261,13 +265,13 @@ class TestResultsExport:
     def test_export_csv_structure(self, client):
         """Test CSV export has correct structure"""
         response = client.get('/api/results/export')
-        
+
         csv_content = response.data.decode('utf-8')
         lines = csv_content.split('\n')
-        
+
         if len(lines) > 0:
             header = lines[0]
-            assert 'Grade' in header or 'grade' in header.lower()
+            assert 'Fruit Type' in header or 'fruit type' in header.lower()
             assert 'Timestamp' in header or 'timestamp' in header.lower()
 
 
@@ -289,11 +293,11 @@ class TestResultsIntegration:
         """Test consistency between confusion matrix and KPIs"""
         kpis_response = client.get('/api/results/kpis')
         kpis_data = json.loads(kpis_response.data)
-        
+
         cm_response = client.get('/api/results/confusion-matrix')
         cm_data = json.loads(cm_response.data)
-        
-        assert 0 <= kpis_data['qualityRate'] <= 100
+
+        assert 0 <= kpis_data['modelAccuracy'] <= 100
         if cm_data['metrics']:
             assert 'accuracy' in cm_data['metrics']
 

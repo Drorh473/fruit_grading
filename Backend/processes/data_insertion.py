@@ -32,6 +32,7 @@ from cnn.feature_map_insertion import (
 )
 
 from cnn.fully_connected_layer import load_model, predict
+from cnn.fine_tune_classifier import predict_multiple_images, clear_model_cache
 
 env_path = Path('.') / '.env'
 load_dotenv(dotenv_path=env_path)
@@ -125,19 +126,42 @@ def get_next_object_id(db_name, collection_name, predicted_type):
     return f"obj_{next_num}_{predicted_type}"
 
 
+def run_classification_model_fine_tuned(image_paths):
+    """
+    Run fine-tuned model on image paths and return prediction.
+    Uses multi-view fusion for better accuracy.
+    """
+    fine_tuned_model_path = os.path.join(MODEL_DIR, 'fruit_classifier_finetuned.pth')
+
+    if not os.path.exists(fine_tuned_model_path):
+        raise FileNotFoundError(f"Fine-tuned model not found at {fine_tuned_model_path}")
+
+    try:
+        predicted_type, confidence = predict_multiple_images(image_paths, fine_tuned_model_path)
+
+        if predicted_type is None:
+            raise ValueError("Prediction returned None - no valid images")
+
+        return predicted_type, float(confidence)
+
+    except Exception as e:
+        print(f"Fine-tuned Model Execution Failed: {e}")
+        raise e
+
+
 def run_classification_model(feature_vector):
-    """Run trained model on feature vector and return prediction."""
+    """Run trained model on feature vector and return prediction (legacy approach)."""
     label_mapping = {'market': 0, 'standard': 1, 'premium': 2}
     reverse_mapping = {v: k for k, v in label_mapping.items()}
-    
+
     model_path = os.path.join(MODEL_DIR, 'fruit_classifier.pkl')
     if not os.path.exists(model_path):
         raise FileNotFoundError(f"Critical Error: Model file not found at {model_path}")
-    
+
     try:
         # Load the trained model and metadata
         params, model_info = load_model(model_path)
-        
+
         # Prepare input
         X = feature_vector.astype(np.float32)
         if X.ndim == 1:
@@ -165,13 +189,13 @@ def run_classification_model(feature_vector):
 
         # 3. Make prediction
         predictions, probabilities = predict(X, params)
-        
+
         predicted_class = predictions[0]
         confidence = probabilities[0, predicted_class]
         predicted_type = reverse_mapping.get(predicted_class, 'unknown')
-        
+
         return predicted_type, float(confidence)
-        
+
     except Exception as e:
         print(f"Model Execution Failed: {e}")
         raise e
@@ -251,29 +275,48 @@ def process_new_fruit_folder(folder_path, db_name=None, collection_name="images"
     try:
         valid_imgs = [d for d in image_docs if 'processed_path' in d]
         image_paths = [d['processed_path'] for d in valid_imgs]
-        metadata_dict = {
-            d['processed_path']: {
-                'camera_id': d['camera_id'],
-                'timestamp': d['timestamp'],
-                'object_id': temp_object_id
-            } for d in valid_imgs
-        }
 
-        from preprocessing.preprocessing_from_db import set_generator
-        generator, _, count = set_generator(image_paths, metadata_dict)
-
-        if count == 0:
-            print("Error: No valid images for generator.")
+        if len(image_paths) == 0:
+            print("Error: No valid images for classification.")
             return None
 
-        fused_features = extract_and_fuse_features(generator)
-        feature_vector = get_feature_vector(fused_features, temp_object_id)
+        # Check which model is available
+        fine_tuned_model_path = os.path.join(MODEL_DIR, 'fruit_classifier_finetuned.pth')
+        legacy_model_path = os.path.join(MODEL_DIR, 'fruit_classifier.pkl')
 
-        if feature_vector is None:
-            print("Feature extraction returned None.")
-            return None
+        if os.path.exists(fine_tuned_model_path):
+            # Use fine-tuned model (preferred)
+            print("  Using fine-tuned ShuffleNet model")
+            predicted_type, confidence = run_classification_model_fine_tuned(image_paths)
+        elif os.path.exists(legacy_model_path):
+            # Fall back to legacy feature extraction + small NN
+            print("  Using legacy feature extraction model")
+            metadata_dict = {
+                d['processed_path']: {
+                    'camera_id': d['camera_id'],
+                    'timestamp': d['timestamp'],
+                    'object_id': temp_object_id
+                } for d in valid_imgs
+            }
 
-        predicted_type, confidence = run_classification_model(feature_vector)
+            from preprocessing.preprocessing_from_db import set_generator
+            generator, _, count = set_generator(image_paths, metadata_dict)
+
+            if count == 0:
+                print("Error: No valid images for generator.")
+                return None
+
+            fused_features = extract_and_fuse_features(generator)
+            feature_vector = get_feature_vector(fused_features, temp_object_id)
+
+            if feature_vector is None:
+                print("Feature extraction returned None.")
+                return None
+
+            predicted_type, confidence = run_classification_model(feature_vector)
+        else:
+            raise FileNotFoundError("No trained model found. Please run build_model.py first.")
+
         print(f"  Result: {predicted_type} ({confidence:.2%})")
 
     except Exception as e:

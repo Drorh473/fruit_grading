@@ -264,72 +264,72 @@ class TestTemporalPooling:
 class TestMultiViewFusion:
     """Test cases for multi-view fusion"""
     def test_fusion_multiple_cameras(self):
-        """Test fusion concatenates features from multiple cameras"""
+        """Test fusion average-pools features from multiple cameras"""
         pooled = {
-            'apple_obj001_0': {'features': np.array([1, 2, 3]), 'label': 0, 'fruit_type': 'apple'},
-            'apple_obj001_1': {'features': np.array([4, 5, 6]), 'label': 0, 'fruit_type': 'apple'},
-            'apple_obj001_2': {'features': np.array([7, 8, 9]), 'label': 0, 'fruit_type': 'apple'}
+            'apple_obj001_0': {'features': np.array([1., 2., 3.]), 'label': 0, 'fruit_type': 'apple'},
+            'apple_obj001_1': {'features': np.array([4., 5., 6.]), 'label': 0, 'fruit_type': 'apple'},
+            'apple_obj001_2': {'features': np.array([7., 8., 9.]), 'label': 0, 'fruit_type': 'apple'}
         }
-        
+
         fused = multi_view_fusion(pooled, target_views=3)
-        
-        # Should concatenate all camera views
+
+        # Should average-pool all camera views
         assert 'apple_obj001' in fused
-        expected = np.array([1, 2, 3, 4, 5, 6, 7, 8, 9])
-        #Access the 'features' key
+        # Average of [1,2,3], [4,5,6], [7,8,9] = [4,5,6]
+        expected = np.array([4., 5., 6.])
         np.testing.assert_array_equal(fused['apple_obj001']['features'], expected)
-    
+
     def test_fusion_multiple_objects(self):
         """Test fusion with multiple objects"""
         pooled = {
-            'apple_obj001_0': {'features': np.array([1, 2]), 'label': 0, 'fruit_type': 'apple'},
-            'apple_obj001_1': {'features': np.array([3, 4]), 'label': 0, 'fruit_type': 'apple'},
-            'banana_obj002_0': {'features': np.array([5, 6]), 'label': 1, 'fruit_type': 'banana'},
-            'banana_obj002_1': {'features': np.array([7, 8]), 'label': 1, 'fruit_type': 'banana'}
+            'apple_obj001_0': {'features': np.array([1., 2.]), 'label': 0, 'fruit_type': 'apple'},
+            'apple_obj001_1': {'features': np.array([3., 4.]), 'label': 0, 'fruit_type': 'apple'},
+            'banana_obj002_0': {'features': np.array([5., 6.]), 'label': 1, 'fruit_type': 'banana'},
+            'banana_obj002_1': {'features': np.array([7., 8.]), 'label': 1, 'fruit_type': 'banana'}
         }
-        
+
         fused = multi_view_fusion(pooled, target_views=2)
-        
+
         # Should have 2 objects
         assert len(fused) == 2
         assert 'apple_obj001' in fused
         assert 'banana_obj002' in fused
-        
-        #Access the 'features' key
-        np.testing.assert_array_equal(fused['apple_obj001']['features'], np.array([1, 2, 3, 4]))
-        np.testing.assert_array_equal(fused['banana_obj002']['features'], np.array([5, 6, 7, 8]))
-    
+
+        # Average of [1,2] and [3,4] = [2,3]
+        np.testing.assert_array_equal(fused['apple_obj001']['features'], np.array([2., 3.]))
+        # Average of [5,6] and [7,8] = [6,7]
+        np.testing.assert_array_equal(fused['banana_obj002']['features'], np.array([6., 7.]))
+
     def test_fusion_correct_dimensions(self):
         """Test that fusion produces correct feature dimensions"""
         pooled = {
             f'apple_obj001_{i}': {'features': np.random.rand(1024), 'label': 0, 'fruit_type': 'apple'}
             for i in range(4)
         }
-        
+
         fused = multi_view_fusion(pooled, target_views=4)
-        
-        # Should concatenate to 4096 dimensions (4 * 1024)
-        # Access the 'features' key
-        assert fused['apple_obj001']['features'].shape[0] == 4096
+
+        # Average pooling keeps same dimension (1024)
+        assert fused['apple_obj001']['features'].shape[0] == 1024
     
     def test_multi_view_fusion_empty(self):
         """Test multi-view fusion with empty input"""
         fused = multi_view_fusion({})
         assert len(fused) == 0
     
-    def test_fusion_with_padding(self):
-        """Test fusion pads missing cameras with zeros"""
+    def test_fusion_with_fewer_views(self):
+        """Test fusion handles fewer views than target (averages available views)"""
         pooled = {
-            'obj001_0': {'features': np.array([1, 2]), 'label': 0, 'fruit_type': 'test'},
-            'obj001_1': {'features': np.array([3, 4]), 'label': 0, 'fruit_type': 'test'}
+            'obj001_0': {'features': np.array([1., 2.]), 'label': 0, 'fruit_type': 'test'},
+            'obj001_1': {'features': np.array([3., 4.]), 'label': 0, 'fruit_type': 'test'}
             # Only 2 cameras, but target is 4
         }
-        
+
         fused = multi_view_fusion(pooled, target_views=4)
-        
-        # Should pad with zeros
-        # Access the 'features' key
-        expected = np.array([1, 2, 3, 4, 0, 0, 0, 0])
+
+        # With average pooling, only available views are averaged (no zero padding)
+        # Average of [1,2] and [3,4] = [2,3]
+        expected = np.array([2., 3.])
         np.testing.assert_array_equal(fused['obj001']['features'], expected)
     
     def test_fusion_preserves_labels(self):

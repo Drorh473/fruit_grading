@@ -61,7 +61,7 @@ def user_credentials():
     }
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def base_url():
     """Base URL for the frontend application"""
     return BASE_URL

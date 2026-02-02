@@ -136,12 +136,14 @@ class TestExtractFeatures(unittest.TestCase):
         """Test feature extraction handles failures"""
         mock_train_gen = self.create_mock_generator()
         mock_test_gen = self.create_mock_generator()
-        
+
         mock_process.side_effect = Exception("Feature extraction error")
-        
-        result = extract_features(mock_train_gen, mock_test_gen)
-        
-        self.assertFalse(result)
+
+        train_features, test_features = extract_features(mock_train_gen, mock_test_gen)
+
+        # On failure, both should be None
+        self.assertIsNone(train_features)
+        self.assertIsNone(test_features)
 
 
 class TestTrainClassifier(unittest.TestCase):
@@ -235,18 +237,20 @@ class TestTrainClassifier(unittest.TestCase):
     
     def test_train_classifier_feature_dimensions(self):
         """Test classifier handles correct input dimensions"""
+        # Disable PCA to test raw feature dimensions
         params, results = train_classifier(
             self.train_features,
             self.test_features,
             hidden_dim=16,
             epochs=5,
-            learning_rate=0.01
+            learning_rate=0.01,
+            pca_components=None  # Disable PCA
         )
-        
-        # W1 should be (4096, hidden_dim)
+
+        # W1 should be (4096, hidden_dim) when PCA is disabled
         self.assertEqual(params['W1'].shape[0], 4096)
         self.assertEqual(params['W1'].shape[1], 16)
-        
+
         # W2 should be (hidden_dim, 3)
         self.assertEqual(params['W2'].shape[0], 16)
         self.assertEqual(params['W2'].shape[1], 3)
@@ -443,19 +447,20 @@ class TestPipelineDataValidation(unittest.TestCase):
             'standard_obj002': {'features': np.random.rand(100).astype(np.float32), 'label': 1},
             'premium_obj003': {'features': np.random.rand(100).astype(np.float32), 'label': 2}
         }
-        
+
         test_features = {
             'market_obj004': {'features': np.random.rand(100).astype(np.float32), 'label': 0}
         }
-        
+
         params, results = train_classifier(
             train_features,
             test_features,
             hidden_dim=16,
             epochs=5,
-            learning_rate=0.01
+            learning_rate=0.01,
+            pca_components=None  # Disable PCA to test raw dimensions
         )
-        
+
         # All feature vectors should have same dimension
         self.assertEqual(params['W1'].shape[0], 100)
 

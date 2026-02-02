@@ -259,16 +259,14 @@ def start_pipeline():
         # Reset pipeline state
         pipeline_state.reset_pipeline()
 
-        # Save config to pipeline_state so it persists when navigating away
-        pipeline_state.update_config(
-            hiddenDim=config.get('hiddenDim', 16),
-            epochs=config.get('epochs', 100),
-            learningRate=config.get('learningRate', 0.0005),
-            lambdaReg=config.get('lambdaReg', 0.001),
-            batchSize=config.get('batchSize', 32),
-            pcaComponents=config.get('pcaComponents', 20),
-            dropoutRate=config.get('dropoutRate', 0.2)
-        )
+        # Only update config values that are explicitly provided in the request
+        # This preserves any previously set config values
+        config_updates = {}
+        for key in ['hiddenDim', 'epochs', 'learningRate', 'lambdaReg', 'batchSize', 'pcaComponents', 'dropoutRate']:
+            if key in config:
+                config_updates[key] = config[key]
+        if config_updates:
+            pipeline_state.update_config(**config_updates)
 
         # Start pipeline in background thread
         thread = threading.Thread(
