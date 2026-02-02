@@ -27,7 +27,6 @@ def get_settings():
         return jsonify(settings), 200
         
     except Exception as e:
-        print(f"Error in get_settings: {e}")
         return jsonify({'error': str(e)}), 500
 
 
@@ -37,13 +36,9 @@ def update_settings():
     try:
         settings = request.get_json()
         
-        # In production, update .env file or configuration storage
-        # For now, just return the updated settings
-        
         return jsonify(settings), 200
         
     except Exception as e:
-        print(f"Error in update_settings: {e}")
         return jsonify({'error': str(e)}), 500
 
 
@@ -89,21 +84,14 @@ def get_settings_status():
         db_status = 'connected' if check_db_connection() else 'disconnected'
         state = pipeline_state.get_state()
         
-        # Get number of cameras from config
         num_cameras = current_app.config.get('NUM_OF_CAMERAS', 4)
-        
-        # For now, mock all cameras as operational (True)
-        # In production, integrate with actual camera status checking
         camera_statuses = [True] * num_cameras
-        
-        # Check if model exists on disk
+
         model_dir = current_app.config.get('MODEL_DIR', 'saved_models')
         model_status = 'not_trained'
-        
-        # Check for runtime results first
+
         if state['results']:
             model_status = 'loaded'
-        # Check for saved model files
         elif os.path.exists(model_dir):
             model_files = [f for f in os.listdir(model_dir) 
                           if f.endswith('.pth') or f.endswith('.pkl')]
@@ -118,7 +106,6 @@ def get_settings_status():
         }), 200
         
     except Exception as e:
-        print(f"Error in get_settings_status: {e}")
         return jsonify({
             'database': 'disconnected',
             'model': 'unknown',
@@ -140,7 +127,6 @@ def get_dataset_paths():
         return jsonify(paths), 200
         
     except Exception as e:
-        print(f"Error in get_dataset_paths: {e}")
         return jsonify({'error': str(e)}), 500
 
 
@@ -150,11 +136,7 @@ def update_dataset_paths():
     try:
         paths = request.get_json()
         
-        # In production, update .env file
-        # For now, just return the paths
-        
         return jsonify(paths), 200
-        
+
     except Exception as e:
-        print(f"Error in update_dataset_paths: {e}")
         return jsonify({'error': str(e)}), 500

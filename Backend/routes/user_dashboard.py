@@ -1,8 +1,4 @@
-"""
-User Dashboard Routes (Operator Role) - UPDATED VERSION
-Endpoints for operator dashboard and recent results
-Now uses dashboard_metadata.json from last model build
-"""
+"""User Dashboard Routes for operator dashboard and recent results."""
 from flask import Blueprint, jsonify
 from datetime import datetime, timedelta
 from utils.utils import get_collection
@@ -12,20 +8,14 @@ user_dashboard_bp = Blueprint('user_dashboard', __name__)
 
 @user_dashboard_bp.route('/dashboard-stats', methods=['GET'])
 def get_dashboard_stats():
-    """
-    Get summary statistics for user dashboard
-    Uses dashboard_metadata if available, falls back to database
-    """
+    """Get summary statistics for user dashboard."""
     try:
-        # Try to load from dashboard_metadata first
         metadata = load_dashboard_metadata()
         if metadata:
-            # Use the formatted data for user dashboard
             user_data = format_for_user_dashboard()
             if user_data and 'stats' in user_data:
                 return jsonify(user_data['stats']), 200
-        
-        # Fallback to database query (original logic)
+
         collection = get_collection('images')
         
         # Get today's date range
@@ -50,7 +40,6 @@ def get_dashboard_stats():
         return jsonify(stats), 200
         
     except Exception as e:
-        print(f"Error in get_dashboard_stats: {e}")
         return jsonify({
             'totalToday': 0,
             'marketCount': 0,
@@ -81,7 +70,6 @@ def get_recent_results():
         
         results = list(collection.aggregate(pipeline))
         
-        # Format results for frontend
         formatted_results = []
         for result in results:
             formatted_results.append({
@@ -94,16 +82,12 @@ def get_recent_results():
         return jsonify(formatted_results), 200
         
     except Exception as e:
-        print(f"Error in get_recent_results: {e}")
         return jsonify([]), 200
 
 
 @user_dashboard_bp.route('/model-info', methods=['GET'])
 def get_model_info():
-    """
-    Get basic model information for operator display (NEW ENDPOINT)
-    Shows model accuracy and last training time
-    """
+    """Get basic model information for operator display."""
     try:
         metadata = load_dashboard_metadata()
         if metadata:
@@ -120,7 +104,6 @@ def get_model_info():
         }), 200
         
     except Exception as e:
-        print(f"Error in get_model_info: {e}")
         return jsonify({
             'accuracy': 0.0,
             'lastTrained': None,

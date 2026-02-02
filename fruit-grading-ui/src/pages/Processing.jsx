@@ -23,7 +23,6 @@ const Processing = ({ setProcessingStats }) => {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Training configuration state
   const [config, setConfig] = useState({
     hiddenDim: 256,
     epochs: 100,
@@ -34,7 +33,6 @@ const Processing = ({ setProcessingStats }) => {
     dropoutRate: 0.2,
   });
 
-  // Common values for each parameter
   const presets = {
     hiddenDim: [4, 8, 16, 32, 64, 128, 256],
     epochs: [100, 200, 300, 400, 500, 750, 1000],
@@ -45,7 +43,6 @@ const Processing = ({ setProcessingStats }) => {
     dropoutRate: [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7],
   };
 
-  // Updated steps - Testing is now Step 1
   const defaultSteps = [
     { id: 1, name: "Testing", status: "pending" },
     { id: 2, name: "Database Setup", status: "pending" },
@@ -57,7 +54,6 @@ const Processing = ({ setProcessingStats }) => {
 
   const [steps, setSteps] = useState(defaultSteps);
 
-  // Calculate progress based on completed steps only
   const calculateProgress = (stepsArray) => {
     const completedCount = stepsArray.filter(
       (step) => step.status === "completed",
@@ -91,7 +87,6 @@ const Processing = ({ setProcessingStats }) => {
         dropoutRate: data.dropoutRate ?? 0.2,
       });
     } catch (err) {
-      console.error("Failed to load config:", err);
       setError("Failed to load configuration");
     } finally {
       setLoading(false);
@@ -107,7 +102,7 @@ const Processing = ({ setProcessingStats }) => {
         updateStepsFromStatus(statusData);
       }
     } catch (err) {
-      console.error("Failed to check status:", err);
+      // Silent fail for status check
     }
   };
 
@@ -138,7 +133,6 @@ const Processing = ({ setProcessingStats }) => {
         }
       }
     } catch (err) {
-      console.error("Failed to update status:", err);
       setError("Failed to update pipeline status");
     }
   };
@@ -196,7 +190,6 @@ const Processing = ({ setProcessingStats }) => {
         setError(response.message || "Failed to start pipeline");
       }
     } catch (err) {
-      console.error("Failed to start pipeline:", err);
       setError("Failed to start pipeline: " + err.message);
     }
   };
@@ -216,7 +209,6 @@ const Processing = ({ setProcessingStats }) => {
         },
       ]);
     } catch (err) {
-      console.error("Failed to stop pipeline:", err);
       setError("Failed to stop pipeline: " + err.message);
     }
   };

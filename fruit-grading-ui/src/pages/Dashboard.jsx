@@ -66,8 +66,6 @@ const Dashboard = () => {
           getModelPerformance(),
         ]);
 
-      console.log("Dashboard data loaded successfully");
-
       setSystemStatus(statusData);
       setProcessingStats(statsData);
       setRecentResults(resultsData);
@@ -79,7 +77,6 @@ const Dashboard = () => {
         lastModelTimestamp.current = statsData.lastUpdate;
       }
     } catch (err) {
-      console.error("Failed to load dashboard data:", err);
       setError(
         `Failed to load dashboard data: ${err.message || "Please try again."}`
       );
@@ -102,12 +99,10 @@ const Dashboard = () => {
       setProcessingStats(statsData);
       setRecentResults(resultsData);
 
-      // Check if model was retrained (timestamp changed)
       if (
         statsData.lastUpdate &&
         statsData.lastUpdate !== lastModelTimestamp.current
       ) {
-        console.log("Model update detected - refreshing model data");
         lastModelTimestamp.current = statsData.lastUpdate;
 
         // Reload model-specific data only when model changes
@@ -120,8 +115,7 @@ const Dashboard = () => {
         setModelPerformance(modelData);
       }
     } catch (err) {
-      console.error("Auto-refresh error:", err);
-      // Don't show error for auto-refresh failures
+      // Silent fail for auto-refresh
     }
   };
 

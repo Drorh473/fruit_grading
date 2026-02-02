@@ -1,7 +1,4 @@
-"""
-Dashboard Metadata Management
-Saves and loads model training results and dataset information for dashboards
-"""
+"""Dashboard Metadata Management for model training results."""
 import os
 import json
 import pickle
@@ -10,42 +7,19 @@ from pathlib import Path
 from dotenv import load_dotenv
 import numpy as np
 
-# Load environment
 env_path = Path('.') / '.env'
 load_dotenv(dotenv_path=env_path)
 MODEL_DIR = os.getenv('MODEL_DIR', 'saved_models')
 
 
 def save_dashboard_metadata(results, train_count, test_count, feature_dim, params, label_mapping, confusion_matrix=None, train_features=None, test_features=None, avg_confidence=None, model_type=None):
-    """
-    Save comprehensive dashboard metadata after model training
-
-    Args:
-        results: Dictionary with training results from train_classifier
-        train_count: Number of training samples
-        test_count: Number of testing samples
-        feature_dim: Feature dimension (after PCA if applied)
-        params: Trained model parameters (None for fine-tuned models)
-        label_mapping: Dictionary mapping fruit types to labels
-        confusion_matrix: Optional confusion matrix
-        train_features: Training feature dictionary (for class distribution)
-        test_features: Testing feature dictionary (for class distribution)
-        avg_confidence: Average prediction confidence (0-1 scale)
-        model_type: Optional model type string (e.g., 'FineTunedShuffleNet')
-
-    Returns:
-        filepath: Path to saved metadata file
-    """
+    """Save comprehensive dashboard metadata after model training."""
     os.makedirs(MODEL_DIR, exist_ok=True)
 
-    # Calculate dataset statistics
     training_count = train_count
     testing_count = test_count
-
-    # Count images per object (assuming 4 cameras, multiple frames)
     total_images = (training_count + testing_count) * 4
 
-    # Calculate class distribution
     class_distribution = {}
     if train_features is not None and test_features is not None:
         for fruit_type in label_mapping.keys():
@@ -62,10 +36,7 @@ def save_dashboard_metadata(results, train_count, test_count, feature_dim, param
         for fruit_type in label_mapping.keys():
             class_distribution[fruit_type] = {'train': 0, 'test': 0, 'total': 0}
 
-    # Extract training history
     history = results.get('history', {})
-
-    # Calculate per-class performance from confusion matrix
     per_class_metrics = {}
     if confusion_matrix is not None:
         cm = confusion_matrix
@@ -87,7 +58,6 @@ def save_dashboard_metadata(results, train_count, test_count, feature_dim, param
                 'support': int(cm[i, :].sum())
             }
 
-    # Build model info based on model type
     if model_type == 'FineTunedShuffleNet':
         model_info = {
             'architecture': 'Fine-tuned ShuffleNetV2 (1024->256->3)',
@@ -117,7 +87,6 @@ def save_dashboard_metadata(results, train_count, test_count, feature_dim, param
             'total_parameters': 0
         }
 
-    # Build comprehensive metadata
     metadata = {
         'timestamp': datetime.now().isoformat(),
         'model_info': model_info,
@@ -147,44 +116,35 @@ def save_dashboard_metadata(results, train_count, test_count, feature_dim, param
         'label_mapping': label_mapping,
         'confusion_matrix': confusion_matrix.tolist() if confusion_matrix is not None else None
     }
-    
-    # Save as JSON
+
     metadata_path = os.path.join(MODEL_DIR, 'dashboard_metadata.json')
     with open(metadata_path, 'w') as f:
         json.dump(metadata, f, indent=2)
-    
-    print(f"\n Dashboard metadata saved to {metadata_path}")
-    
-    # Save pickle for backward compatibility
+
     pickle_path = os.path.join(MODEL_DIR, 'dashboard_metadata.pkl')
     with open(pickle_path, 'wb') as f:
         pickle.dump(metadata, f)
-    
+
     return metadata_path
 
 
 def load_dashboard_metadata():
-    """Load the latest dashboard metadata"""
+    """Load the latest dashboard metadata."""
     metadata_path = os.path.join(MODEL_DIR, 'dashboard_metadata.json')
-    
+
     if not os.path.exists(metadata_path):
-        print(f"No dashboard metadata found at {metadata_path}")
         return None
-    
+
     try:
         with open(metadata_path, 'r') as f:
             metadata = json.load(f)
-        
-        print(f" Dashboard metadata loaded from {metadata_path}")
         return metadata
-    
-    except Exception as e:
-        print(f"Error loading dashboard metadata: {e}")
+    except Exception:
         return None
 
 
 def get_latest_model_info():
-    """Get formatted information about the latest trained model"""
+    """Get formatted information about the latest trained model."""
     metadata = load_dashboard_metadata()
     if not metadata:
         return None
@@ -200,7 +160,7 @@ def get_latest_model_info():
 
 
 def format_for_admin_dashboard():
-    """Format metadata for admin dashboard API"""
+    """Format metadata for admin dashboard API."""
     metadata = load_dashboard_metadata()
     if not metadata:
         return None
@@ -236,7 +196,7 @@ def format_for_admin_dashboard():
 
 
 def format_for_user_dashboard():
-    """Format metadata for user/operator dashboard API"""
+    """Format metadata for user/operator dashboard API."""
     metadata = load_dashboard_metadata()
     if not metadata:
         return None

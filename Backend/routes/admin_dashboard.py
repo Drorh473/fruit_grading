@@ -1,8 +1,4 @@
-"""
-Admin Dashboard Routes - UPDATED VERSION
-Endpoints for admin dashboard, system status, and analytics
-Now uses dashboard_metadata.json from last model build
-"""
+"""Admin Dashboard Routes for system status and analytics."""
 from flask import Blueprint, jsonify, request
 from datetime import datetime
 from utils.utils import get_collection, check_db_connection
@@ -17,7 +13,6 @@ def get_system_status():
     try:
         db_status = 'connected' if check_db_connection() else 'disconnected'
         
-        # Try to load from dashboard_metadata first
         metadata = load_dashboard_metadata()
         if metadata:
             return jsonify({
@@ -27,7 +22,6 @@ def get_system_status():
                 'cameras': [True, True, True, True]  
             }), 200
         
-        # Fallback to pipeline_state
         state = pipeline_state.get_state()
         return jsonify({
             'database': db_status,
@@ -37,7 +31,6 @@ def get_system_status():
         }), 200
         
     except Exception as e:
-        print(f"Error in get_system_status: {e}")
         return jsonify({
             'database': 'disconnected',
             'model': 'unknown',
@@ -58,7 +51,6 @@ def get_processing_stats():
                 'lastUpdate': metadata['timestamp']
             }), 200
 
-        # Fallback if no metadata
         return jsonify({
             'totalProcessed': 0,
             'accuracy': 0.0,
@@ -66,7 +58,6 @@ def get_processing_stats():
         }), 200
 
     except Exception as e:
-        print(f"Error in get_processing_stats: {e}")
         return jsonify({
             'totalProcessed': 0,
             'accuracy': 0.0,
@@ -81,7 +72,6 @@ def get_recent_results():
         limit = int(request.args.get('limit', 10))
         collection = get_collection('images')
         
-        # Aggregate to get unique objects with their classifications
         agg_pipeline = [
             {'$sort': {'timestamp': -1}},
             {'$group': {
@@ -108,7 +98,6 @@ def get_recent_results():
         return jsonify(formatted_results), 200
         
     except Exception as e:
-        print(f"Error in get_recent_results: {e}")
         return jsonify([]), 200
 
 
@@ -126,7 +115,6 @@ def get_dataset_info():
                 'featureDim': dataset_info['feature_dim']
             }), 200
 
-        # Fallback if no metadata
         return jsonify({
             'trainingCount': 0,
             'testingCount': 0,
@@ -135,7 +123,6 @@ def get_dataset_info():
         }), 200
 
     except Exception as e:
-        print(f"Error in get_dataset_info: {e}")
         return jsonify({
             'trainingCount': 0,
             'testingCount': 0,
@@ -148,7 +135,6 @@ def get_dataset_info():
 def get_model_performance():
     """Get model performance metrics - uses dashboard_metadata"""
     try:
-        # Try to load from dashboard_metadata
         metadata = load_dashboard_metadata()
         if metadata:
             model_info = metadata['model_info']
@@ -160,7 +146,6 @@ def get_model_performance():
                 'classes': model_info['num_classes']
             }), 200
         
-        # Fallback to pipeline_state
         results = pipeline_state.get_results()
         if results:
             return jsonify({
@@ -178,7 +163,6 @@ def get_model_performance():
             }), 200
             
     except Exception as e:
-        print(f"Error in get_model_performance: {e}")
         return jsonify({
             'architecture': 'ShuffleNetV2 + Multi-View Fusion',
             'trainAccuracy': 0.0,
@@ -198,13 +182,12 @@ def get_per_class_performance():
         return jsonify({}), 200
         
     except Exception as e:
-        print(f"Error in get_per_class_performance: {e}")
         return jsonify({}), 200
 
 
 @admin_dashboard_bp.route('/training-history', methods=['GET'])
 def get_training_history():
-    """Get training history for charts (NEW ENDPOINT)"""
+    """Get training history for charts."""
     try:
         metadata = load_dashboard_metadata()
         if metadata and 'training_history' in metadata:
@@ -218,7 +201,6 @@ def get_training_history():
         }), 200
         
     except Exception as e:
-        print(f"Error in get_training_history: {e}")
         return jsonify({
             'train_loss': [],
             'train_accuracy': [],
@@ -229,7 +211,7 @@ def get_training_history():
 
 @admin_dashboard_bp.route('/confusion-matrix', methods=['GET'])
 def get_confusion_matrix():
-    """Get confusion matrix data (NEW ENDPOINT)"""
+    """Get confusion matrix data."""
     try:
         metadata = load_dashboard_metadata()
         if metadata and metadata.get('confusion_matrix'):
@@ -244,7 +226,6 @@ def get_confusion_matrix():
         }), 200
         
     except Exception as e:
-        print(f"Error in get_confusion_matrix: {e}")
         return jsonify({
             'matrix': None,
             'labels': []
@@ -253,16 +234,12 @@ def get_confusion_matrix():
 
 @admin_dashboard_bp.route('/full-dashboard-data', methods=['GET'])
 def get_full_dashboard_data():
-    """
-    Get all dashboard data in one call (NEW ENDPOINT)
-    All data comes from dashboard_metadata.json
-    """
+    """Get all dashboard data in one call."""
     try:
         admin_data = format_for_admin_dashboard()
         if admin_data:
             return jsonify(admin_data), 200
 
-        # Return empty structure if no metadata
         return jsonify({
             'system_status': {
                 'database': 'connected' if check_db_connection() else 'disconnected',
@@ -289,5 +266,4 @@ def get_full_dashboard_data():
         }), 200
 
     except Exception as e:
-        print(f"Error in get_full_dashboard_data: {e}")
         return jsonify({'error': str(e)}), 500

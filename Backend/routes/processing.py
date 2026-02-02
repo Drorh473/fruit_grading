@@ -1,3 +1,4 @@
+"""ML pipeline processing routes."""
 from flask import Blueprint, jsonify, request, current_app
 from datetime import datetime
 import threading
@@ -8,25 +9,17 @@ from utils.shared_state import pipeline_state
 
 processing_bp = Blueprint('processing', __name__)
 
-# Import build_model functions
 try:
     PROJECT_ROOT = Path(__file__).parent.parent
     if str(PROJECT_ROOT) not in sys.path:
         sys.path.insert(0, str(PROJECT_ROOT))
-    
-    # Import from the processes directory
+
     from processes.build_model import (
         run_tests, setup_database, preprocess_data,
         extract_features, train_classifier,
         generate_confusion_matrix
     )
-    print("Successfully imported build_model functions")
-    
-except ImportError as e:
-    print(f"ERROR: Could not import build_model functions: {e}")
-    print(f"PROJECT_ROOT: {PROJECT_ROOT}")
-    print(f"sys.path: {sys.path}")
-    # Set to None to prevent crashes
+except ImportError:
     run_tests = None
     setup_database = None
     preprocess_data = None
@@ -36,35 +29,32 @@ except ImportError as e:
 
 
 def run_pipeline_background(config):
-    """Background task for running pipeline"""
+    """Background task for running pipeline."""
     try:
         pipeline_state.update_state(status='running', progress=0, running=True)
         pipeline_state.add_log("Pipeline started", 'info')
-        
-        # Extract config
+
         skip_tests = config.get('skipTests', False)
         setup_database_con = config.get('setupDatabase', True)
-        preprocess_data_flag = config.get('preprocessData', True) 
+        preprocess_data_flag = config.get('preprocessData', True)
         extract_features_flag = config.get('extractFeatures', True)
         train_classifier_flag = config.get('trainClassifier', True)
         generate_confusion_matrix_flag = config.get('generateConfusionMatrix', True)
-        
-        # Training hyperparameters
+
         hidden_dim = config.get('hiddenDim', 16)
         epochs = config.get('epochs', 100)
         learning_rate = config.get('learningRate', 0.0005)
         lambda_reg = config.get('lambdaReg', 0.001)
         pca_components = config.get('pcaComponents', 20)
         dropout_rate = config.get('dropoutRate', 0.2)
-        
+
         train_gen = None
         test_gen = None
         train_features = None
         test_features = None
         params = None
-        results = None 
-        
-        # Step 1: Tests (now a visible step)
+        results = None
+
         if not skip_tests:
             pipeline_state.update_step(1, 'processing')
             pipeline_state.add_log("Step 1/6: Running test suite...", 'info')
@@ -79,11 +69,9 @@ def run_pipeline_background(config):
             pipeline_state.update_step(1, 'completed')
             pipeline_state.add_log("Test suite passed", 'success')
         else:
-            # Mark tests as skipped (completed)
             pipeline_state.update_step(1, 'completed')
             pipeline_state.add_log("Step 1/6: Tests skipped", 'info')
-        
-        # Step 2: Database Setup
+
         if setup_database_con:
             pipeline_state.update_step(2, 'processing')
             pipeline_state.add_log("Step 2/6: Setting up database...", 'info')
@@ -101,7 +89,6 @@ def run_pipeline_background(config):
             pipeline_state.update_step(2, 'completed')
             pipeline_state.add_log("Step 2/6: Database setup skipped", 'info')
         
-        # Step 3: Preprocessing
         if preprocess_data_flag:
             pipeline_state.update_step(3, 'processing')
             pipeline_state.add_log("Step 3/6: Preprocessing data...", 'info')
@@ -119,7 +106,6 @@ def run_pipeline_background(config):
             pipeline_state.update_step(3, 'completed')
             pipeline_state.add_log("Step 3/6: Preprocessing skipped", 'info')
         
-        # Step 4: Feature Extraction
         if extract_features_flag:
             pipeline_state.update_step(4, 'processing')
             pipeline_state.add_log("Step 4/6: Extracting features...", 'info')
@@ -137,7 +123,6 @@ def run_pipeline_background(config):
             pipeline_state.update_step(4, 'completed')
             pipeline_state.add_log("Step 4/6: Feature extraction skipped", 'info')
         
-        # Step 5: Model Training
         if train_classifier_flag:
             pipeline_state.update_step(5, 'processing')
             pipeline_state.add_log("Step 5/6: Training classifier...", 'info')
@@ -164,7 +149,6 @@ def run_pipeline_background(config):
             pipeline_state.update_step(5, 'completed')
             pipeline_state.add_log("Step 5/6: Model training skipped", 'info')
         
-        # Step 6: Evaluation
         pipeline_state.update_step(6, 'processing')
         pipeline_state.add_log("Step 6/6: Generating evaluation metrics...", 'info')
         
@@ -176,10 +160,7 @@ def run_pipeline_background(config):
         else:
             pipeline_state.add_log("Evaluation skipped (no results)", 'info')
         
-        # Always mark step 6 as completed
         pipeline_state.update_step(6, 'completed')
-        
-        # Save dashboard metadata (after all steps complete)
         if results is not None and train_features is not None and test_features is not None:
             pipeline_state.add_log("Saving dashboard metadata...", 'info')
             try:
@@ -219,7 +200,6 @@ def run_pipeline_background(config):
             except Exception as e:
                 pipeline_state.add_log(f"Warning: Could not save dashboard metadata: {str(e)}", 'warning')
         
-        # Store results in pipeline_state (only if results exist)
         if results is not None:
             pipeline_state.set_results({
                 'train_accuracy': float(results['train_accuracy']),
@@ -230,8 +210,7 @@ def run_pipeline_background(config):
                 'timestamp': datetime.now().isoformat()
             })
         
-        # Complete
-        pipeline_state.update_state(status='completed', progress=100, running=False,currentStep=1)
+        pipeline_state.update_state(status='completed', progress=100, running=False, currentStep=1)
         pipeline_state.add_log("Pipeline completed successfully!", 'success')
         
     except Exception as e:
@@ -239,7 +218,6 @@ def run_pipeline_background(config):
         pipeline_state.add_log(traceback.format_exc(), 'error')
         pipeline_state.update_state(status='failed', running=False,currentStep=1)
         
-        # Mark current step as failed
         state = pipeline_state.get_state()
         if state['currentStep'] > 0:
             pipeline_state.update_step(state['currentStep'], 'failed')
@@ -256,11 +234,8 @@ def start_pipeline():
 
         config = request.get_json() or {}
 
-        # Reset pipeline state
         pipeline_state.reset_pipeline()
 
-        # Only update config values that are explicitly provided in the request
-        # This preserves any previously set config values
         config_updates = {}
         for key in ['hiddenDim', 'epochs', 'learningRate', 'lambdaReg', 'batchSize', 'pcaComponents', 'dropoutRate']:
             if key in config:
@@ -268,7 +243,6 @@ def start_pipeline():
         if config_updates:
             pipeline_state.update_config(**config_updates)
 
-        # Start pipeline in background thread
         thread = threading.Thread(
             target=run_pipeline_background,
             args=(config,),
@@ -283,7 +257,6 @@ def start_pipeline():
         }), 200
         
     except Exception as e:
-        print(f"Error starting pipeline: {e}")
         return jsonify({
             'success': False,
             'error': str(e)
@@ -300,7 +273,6 @@ def stop_pipeline():
         return jsonify({'success': True}), 200
         
     except Exception as e:
-        print(f"Error stopping pipeline: {e}")
         return jsonify({
             'success': False,
             'error': str(e)
@@ -321,7 +293,6 @@ def get_pipeline_status():
             'steps': state['steps']
         }
         
-        # Add results if completed
         results = pipeline_state.get_results()
         if state['status'] == 'completed' and results:
             response['totalProcessed'] = results['totalProcessed']
@@ -330,7 +301,6 @@ def get_pipeline_status():
         return jsonify(response), 200
         
     except Exception as e:
-        print(f"Error getting pipeline status: {e}")
         return jsonify({
             'running': False,
             'status': 'idle',
@@ -350,7 +320,6 @@ def get_pipeline_logs():
         return jsonify(logs), 200
         
     except Exception as e:
-        print(f"Error getting pipeline logs: {e}")
         return jsonify([]), 200
 
 
@@ -362,7 +331,6 @@ def get_pipeline_config():
         return jsonify(config), 200
         
     except Exception as e:
-        print(f"Error getting pipeline config: {e}")
         return jsonify({
             'hiddenDim': 16,
             'epochs': 100,
@@ -380,7 +348,6 @@ def update_pipeline_config():
     try:
         config = request.get_json()
         
-        # Update config
         updates = {}
         if 'hiddenDim' in config:
             updates['hiddenDim'] = config['hiddenDim']
@@ -402,5 +369,4 @@ def update_pipeline_config():
         return jsonify(pipeline_state.get_config()), 200
         
     except Exception as e:
-        print(f"Error updating pipeline config: {e}")
         return jsonify({'error': str(e)}), 500

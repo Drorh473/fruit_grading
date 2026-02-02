@@ -11,7 +11,6 @@ from datetime import datetime, timedelta
 from tqdm import tqdm
 from multiprocessing import Pool
 
-# Add project to path
 PROJECT_DIR = '/mnt/project'
 if PROJECT_DIR not in sys.path:
     sys.path.insert(0, PROJECT_DIR)
@@ -25,7 +24,6 @@ from Streamers.database_creation import (
     FPS
 )
 
-# Load environment
 env_path = Path('.') / '.env'
 load_dotenv(dotenv_path=env_path)
 ORIGINAL_DATASET_PATH = os.getenv('ORIGINAL_DATASET_PATH', "./data")
@@ -75,7 +73,6 @@ def collect_images_metadata(folder_path, db_name=None, collection_name="images")
         return []
     
     angle_dirs.sort()
-    print(f"Found {len(angle_dirs)} angle directories")
     
     for angle_id in angle_dirs:
         angle_dir = os.path.join(folder_path, angle_id)
@@ -135,50 +132,39 @@ def insert_images_to_db(image_data, db_name=None, collection_name="images"):
 
 
 def copy_images_to_stored(image_data, inserted_ids=None):
-
+    """Copy images to stored dataset directory."""
     results = []
-    
-    # 1. Handle IDs
+
     if inserted_ids is None:
         base_id = int(time.time())
         ids_to_use = [f"{base_id}_{i}" for i in range(len(image_data))]
     else:
         ids_to_use = inserted_ids
 
-    print(f"Copying {len(image_data)} images...")
-
     for i, doc_id in enumerate(ids_to_use):
         try:
             img_data = image_data[i]
-            
-            # 2. Resolve Source Path
             source_path = img_data.get('path') or img_data.get('stored_path')
-            
+
             if not source_path or not os.path.exists(source_path):
-                print(f"Skipping image {i}: Source not found at {source_path}")
                 results.append((False, None))
                 continue
-
 
             camera_dir = f"camera_{img_data['camera_id']}"
             set_type = img_data.get('set_type') or 'testing'
             _, ext = os.path.splitext(source_path)
-            if not ext: ext = ".jpg"
-            
+            if not ext:
+                ext = ".jpg"
+
             filename = f"{doc_id}{ext}"
-            
             dest_dir = os.path.join(STORED_DATASET_PATH, set_type, camera_dir)
             os.makedirs(dest_dir, exist_ok=True)
-            
             dest_path = os.path.join(dest_dir, filename)
 
-            # 4. Copy File
             shutil.move(source_path, dest_path)
-            
             results.append((True, dest_path))
 
-        except Exception as e:
-            print(f"Error copying image {i}: {e}")
+        except Exception:
             results.append((False, None))
 
     return results

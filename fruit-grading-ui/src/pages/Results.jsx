@@ -25,7 +25,6 @@ import {
 const Results = () => {
   const location = useLocation();
 
-  // Data states
   const [predictions, setPredictions] = useState([]);
   const [predictionStats, setPredictionStats] = useState({
     total: 0,
@@ -38,33 +37,27 @@ const Results = () => {
   const [confusionMatrix, setConfusionMatrix] = useState(null);
   const [showNormalized, setShowNormalized] = useState(false);
 
-  // Filter states
   const [searchTerm, setSearchTerm] = useState("");
   const [filterActual, setFilterActual] = useState("all");
   const [filterPredicted, setFilterPredicted] = useState("all");
   const [filterCorrect, setFilterCorrect] = useState("all");
 
-  // UI states
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [exporting, setExporting] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Fetch all data on mount
   useEffect(() => {
     fetchAllData();
   }, []);
 
-  // Handle refresh when navigating from AddFruit
   useEffect(() => {
     if (location.state?.refresh) {
       fetchAllData();
-      // Clear the state to prevent re-fetching on subsequent renders
       window.history.replaceState({}, document.title);
     }
   }, [location.state]);
 
-  // Re-fetch predictions when filters change
   useEffect(() => {
     fetchPredictions();
   }, [searchTerm, filterActual, filterPredicted, filterCorrect]);
@@ -81,22 +74,10 @@ const Results = () => {
 
     try {
       const [kpisData, qualityData, alertsData, cmData] = await Promise.all([
-        getKPIs().catch((err) => {
-          console.error("KPIs fetch failed:", err);
-          return null;
-        }),
-        getQualityDistribution().catch((err) => {
-          console.error("Quality distribution fetch failed:", err);
-          return null;
-        }),
-        getQualityAlerts().catch((err) => {
-          console.error("Alerts fetch failed:", err);
-          return [];
-        }),
-        getConfusionMatrix().catch((err) => {
-          console.error("Confusion matrix fetch failed:", err);
-          return null;
-        }),
+        getKPIs().catch(() => null),
+        getQualityDistribution().catch(() => null),
+        getQualityAlerts().catch(() => []),
+        getConfusionMatrix().catch(() => null),
       ]);
 
       setKpis(kpisData);
@@ -106,7 +87,6 @@ const Results = () => {
 
       await fetchPredictions();
     } catch (err) {
-      console.error("Error fetching data:", err);
       setError("Failed to load results data. Please try again.");
     } finally {
       setLoading(false);
@@ -130,7 +110,6 @@ const Results = () => {
         correct_count: data.correct_count || 0,
       });
     } catch (err) {
-      console.error("Error fetching predictions:", err);
       if (!predictions.length) {
         setError("Failed to load predictions. Please try again.");
       }
@@ -144,7 +123,6 @@ const Results = () => {
       const timestamp = new Date().toISOString().split("T")[0];
       downloadCSV(csvContent, `results_${timestamp}.csv`);
     } catch (err) {
-      console.error("CSV export failed:", err);
       alert("Failed to export CSV. Please try again.");
     } finally {
       setExporting(false);

@@ -31,7 +31,6 @@ def get_camera_statuses():
         return jsonify({'cameras': cameras}), 200
         
     except Exception as e:
-        print(f"Error in get_camera_statuses: {e}")
         return jsonify({'cameras': []}), 200
 
 
@@ -62,7 +61,6 @@ def get_camera_details(camera_id):
         return jsonify(camera_details), 200
         
     except Exception as e:
-        print(f"Error in get_camera_details: {e}")
         return jsonify({'error': 'Camera not found'}), 404
 
 
@@ -78,7 +76,6 @@ def refresh_camera(camera_id):
         }), 200
         
     except Exception as e:
-        print(f"Error in refresh_camera: {e}")
         return jsonify({
             'success': False,
             'error': str(e)
@@ -99,7 +96,6 @@ def refresh_all_cameras():
         }), 200
         
     except Exception as e:
-        print(f"Error in refresh_all_cameras: {e}")
         return jsonify({
             'success': False,
             'error': str(e)
@@ -121,7 +117,6 @@ def get_camera_config():
         return jsonify(config), 200
         
     except Exception as e:
-        print(f"Error in get_camera_config: {e}")
         return jsonify({
             'fps': 30,
             'numCameras': 4,

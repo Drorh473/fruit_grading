@@ -21,8 +21,7 @@ def load_model_metadata():
         try:
             with open(metadata_path, 'r') as f:
                 return json.load(f)
-        except Exception as e:
-            print(f"Error loading metadata: {e}")
+        except Exception:
     return None
 
 
@@ -87,36 +86,26 @@ def get_results_list():
         }), 200
         
     except Exception as e:
-        print(f"Error in get_results_list: {e}")
         return jsonify({'results': [], 'total': 0, 'limit': 100, 'offset': 0}), 500
 
 
 @results_bp.route('/kpis', methods=['GET'])
 def get_kpis():
-    """Get KPIs from model metadata - all data from dashboard_metadata.json"""
+    """Get KPIs from model metadata."""
     try:
-        # Load model metadata for all KPI values
         metadata = load_model_metadata()
 
         if metadata:
             dataset_info = metadata.get('dataset_info', {})
             performance = metadata.get('performance', {})
 
-            # Get total processed from metadata
             total_processed = dataset_info.get('total_objects', 0)
-
-            # Get accuracy
             test_accuracy = performance.get('test_accuracy', 0)
             model_accuracy = round(test_accuracy * 100, 1)
 
-            # Get avg_confidence from metadata
             avg_conf = performance.get('avg_confidence')
-            if avg_conf is not None:
-                avg_confidence = round(avg_conf * 100 if avg_conf <= 1 else avg_conf, 1)
-            else:
-                avg_confidence = 0
+            avg_confidence = round(avg_conf * 100 if avg_conf and avg_conf <= 1 else (avg_conf or 0), 1)
 
-            # Get correct/total from confusion matrix
             cm = metadata.get('confusion_matrix', [])
             if cm:
                 correct_count = sum(cm[i][i] for i in range(len(cm)))
@@ -142,7 +131,6 @@ def get_kpis():
         }), 200
 
     except Exception as e:
-        print(f"Error in get_kpis: {e}")
         return jsonify({
             'totalProcessed': 0,
             'modelAccuracy': 0,
@@ -172,7 +160,6 @@ def get_quality_distribution():
 
             return jsonify(distribution), 200
 
-        # Fallback if no metadata
         return jsonify({
             'market': {'count': 0, 'percentage': 0},
             'standard': {'count': 0, 'percentage': 0},
@@ -181,7 +168,6 @@ def get_quality_distribution():
         }), 200
 
     except Exception as e:
-        print(f"Error in get_quality_distribution: {e}")
         return jsonify({
             'market': {'count': 0, 'percentage': 0},
             'standard': {'count': 0, 'percentage': 0},
@@ -245,7 +231,6 @@ def get_test_predictions():
                     if correct_filter == 'incorrect' and is_correct:
                         continue
                     
-                    # Use avg_confidence from metadata with small variation
                     conf = avg_conf if avg_conf else 0.5
                     conf_value = conf + 0.1 if is_correct else conf - 0.1
                     conf_value = max(0.1, min(0.99, conf_value))
@@ -270,7 +255,6 @@ def get_test_predictions():
         }), 200
         
     except Exception as e:
-        print(f"Error in get_test_predictions: {e}")
         return jsonify({
             'predictions': [],
             'total': 0,
@@ -296,7 +280,6 @@ def get_training_history():
         return jsonify(metadata.get('training_history', {})), 200
         
     except Exception as e:
-        print(f"Error in get_training_history: {e}")
         return jsonify({
             'train_loss': [],
             'train_accuracy': [],
@@ -346,7 +329,6 @@ def get_quality_alerts():
         return jsonify(alerts), 200
         
     except Exception as e:
-        print(f"Error in get_quality_alerts: {e}")
         return jsonify([]), 200
 
 
@@ -359,7 +341,6 @@ def get_batches():
         batches = sorted([b for b in batches if b is not None])
         return jsonify(batches), 200
     except Exception as e:
-        print(f"Error in get_batches: {e}")
         return jsonify([]), 200
 
 
@@ -395,7 +376,6 @@ def get_hourly_trend():
         return jsonify(trend_data), 200
         
     except Exception as e:
-        print(f"Error in get_hourly_trend: {e}")
         return jsonify([]), 200
 
 
@@ -412,7 +392,6 @@ def get_confusion_matrix():
         classes = [name for name, idx in sorted(label_mapping.items(), key=lambda x: x[1])]
         matrix = metadata.get('confusion_matrix', [])
 
-        # Calculate normalized confusion matrix (row-wise normalization)
         normalized = []
         if matrix:
             for row in matrix:
@@ -426,7 +405,6 @@ def get_confusion_matrix():
             correct = sum(matrix[i][i] for i in range(len(matrix)))
             accuracy = round((correct / total) if total > 0 else 0, 3)
 
-            # Calculate per-class metrics (precision, recall, f1)
             per_class = {}
             for i, class_name in enumerate(classes):
                 tp = matrix[i][i]
@@ -458,7 +436,6 @@ def get_confusion_matrix():
         }), 200
 
     except Exception as e:
-        print(f"Error in get_confusion_matrix: {e}")
         return jsonify({'classes': [], 'matrix': [], 'normalized': [], 'metrics': {}}), 200
 
 
@@ -500,7 +477,6 @@ def get_result_details(object_id):
         }), 200
         
     except Exception as e:
-        print(f"Error in get_result_details: {e}")
         return jsonify({'error': str(e)}), 500
 
 
@@ -526,7 +502,6 @@ def get_results_stats():
             'rejectCount': next((r['count'] for r in type_counts if r['_id'] == 'reject'), 0)
         }), 200
     except Exception as e:
-        print(f"Error in get_results_stats: {e}")
         return jsonify({
             'totalObjects': 0, 'totalImages': 0,
             'marketCount': 0, 'standardCount': 0, 'premiumCount': 0, 'rejectCount': 0
@@ -580,5 +555,4 @@ def export_results():
         )
         
     except Exception as e:
-        print(f"Error in export_results: {e}")
         return jsonify({'error': str(e)}), 500

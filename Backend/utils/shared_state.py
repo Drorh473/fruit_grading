@@ -51,7 +51,6 @@ class PipelineState:
                 'type': log_type,
                 'timestamp': datetime.now().isoformat()
             })
-        print(f"[{log_type.upper()}] {message}")
     
     def _calculate_progress(self):
         """Calculate progress based on completed steps only"""
@@ -67,7 +66,6 @@ class PipelineState:
                     step['status'] = status
                     break
             self._state['currentStep'] = step_id
-            # Progress only updates based on completed steps
             self._state['progress'] = self._calculate_progress()
     
     def reset_pipeline(self):
