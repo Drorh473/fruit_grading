@@ -327,17 +327,6 @@
   color: var(--info) !important;
 }
 
-/* Camera Health Footer */
-.camera-health-footer {
-  display: flex;
-  gap: var(--spacing-sm);
-  justify-content: space-between;
-}
-
-.camera-health-footer .btn {
-  flex: 1;
-}
-
 /* Camera Details */
 .camera-details {
   padding: var(--spacing-md);
@@ -457,9 +446,5 @@
 
   .camera-health-grid {
     grid-template-columns: 1fr;
-  }
-
-  .camera-health-footer {
-    flex-direction: column;
   }
 }

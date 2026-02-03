@@ -277,20 +277,6 @@ const CameraMonitor = ({ systemStatus }) => {
                   </div>
                 </div>
 
-                <div className="camera-health-footer">
-                  <button
-                    className="btn btn-secondary btn-sm"
-                    onClick={() => console.log(`View logs for ${feed.name}`)}
-                  >
-                    View Logs
-                  </button>
-                  <button
-                    className="btn btn-secondary btn-sm"
-                    onClick={() => handleRefresh(feed.id)}
-                  >
-                    Run Diagnostics
-                  </button>
-                </div>
               </div>
             );
           })}

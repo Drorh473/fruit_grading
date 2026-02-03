@@ -222,26 +222,10 @@ class TestCameraHealth:
     def test_health_cards_displayed(self, logged_in_admin: Page):
         """Should show health card for each camera"""
         navigate_to_cameras(logged_in_admin)
-        
+
         # CameraMonitor.jsx uses .camera-health-card class
         health_cards = logged_in_admin.locator('.camera-health-card')
         assert health_cards.count() == 4
-    
-    def test_view_logs_button(self, logged_in_admin: Page):
-        """Should have View Logs button"""
-        navigate_to_cameras(logged_in_admin)
-        
-        # CameraMonitor.jsx has "View Logs" button per camera
-        logs_btn = logged_in_admin.locator('button:has-text("View Logs")').first
-        expect(logs_btn).to_be_visible()
-    
-    def test_run_diagnostics_button(self, logged_in_admin: Page):
-        """Should have Run Diagnostics button"""
-        navigate_to_cameras(logged_in_admin)
-        
-        # CameraMonitor.jsx has "Run Diagnostics" button per camera
-        diag_btn = logged_in_admin.locator('button:has-text("Diagnostics")').first
-        expect(diag_btn).to_be_visible()
 
 
 # ============================================================================

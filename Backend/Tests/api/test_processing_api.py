@@ -2,6 +2,7 @@
 import pytest
 import json
 import time
+import threading
 from unittest.mock import patch, MagicMock
 
 # -------------------------------------------------------------------------
@@ -129,8 +130,16 @@ class TestPipelineControl:
     @patch(f'{MOCK_BASE}.run_tests')
     def test_start_pipeline_already_running(self, mock_tests, mock_db, mock_preprocess, mock_extract, mock_train, mock_cm, mock_save, client):
         """Test starting pipeline when already running"""
+        # Use an event to block the pipeline until we've made the second request
+        release_pipeline = threading.Event()
+
+        def blocking_setup_database():
+            # Wait for signal before completing
+            release_pipeline.wait(timeout=5)
+            return True
+
         mock_tests.return_value = True
-        mock_db.return_value = True
+        mock_db.side_effect = blocking_setup_database
         mock_preprocess.return_value = ({}, {})
         mock_extract.return_value = ({}, {})
         mock_train.return_value = (
@@ -140,10 +149,15 @@ class TestPipelineControl:
         mock_cm.return_value = None
         mock_save.return_value = None
 
+        # Start the pipeline (will block at setup_database)
         client.post('/api/pipeline/start',
                    data=json.dumps({'skipTests': True}),
                    content_type='application/json')
 
+        # Give the background thread time to start and set running=True
+        time.sleep(0.1)
+
+        # Try to start again while still running - should fail
         response = client.post('/api/pipeline/start',
                              data=json.dumps({'skipTests': True}),
                              content_type='application/json')
@@ -153,6 +167,8 @@ class TestPipelineControl:
         assert data['success'] is False
         assert 'already running' in data['error'].lower()
 
+        # Release the blocking mock so the pipeline can complete
+        release_pipeline.set()
         time.sleep(0.1)
         client.post('/api/pipeline/stop')
 

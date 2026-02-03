@@ -22,7 +22,7 @@ def load_model_metadata():
             with open(metadata_path, 'r') as f:
                 return json.load(f)
         except Exception:
-    return None
+            return None
 
 
 @results_bp.route('/list', methods=['GET'])
