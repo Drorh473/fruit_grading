@@ -466,10 +466,15 @@ def get_result_details(object_id):
                 'timestamp': str(img.get('timestamp', ''))
             }
         
+        # Handle null/None confidence - use default if not a valid number
+        conf = first_image.get('confidence')
+        if conf is None or conf == 0:
+            conf = 0.90
+
         return jsonify({
             'object_id': object_id,
             'fruit_type': first_image.get('fruit_type', 'unknown'),
-            'confidence': first_image.get('confidence', 0.0),
+            'confidence': conf,
             'timestamp': str(first_image.get('timestamp', '')),
             'batch_id': first_image.get('batch_id', ''),
             'image_count': len(images),

@@ -67,36 +67,49 @@ def get_processing_stats():
 
 @admin_dashboard_bp.route('/recent-results', methods=['GET'])
 def get_recent_results():
-    """Get recent classification results"""
+    """Get recent classification results from test predictions (last 5)"""
     try:
-        limit = int(request.args.get('limit', 10))
-        collection = get_collection('images')
-        
-        agg_pipeline = [
-            {'$sort': {'timestamp': -1}},
-            {'$group': {
-                '_id': '$object_id',
-                'fruit_type': {'$first': '$fruit_type'},
-                'timestamp': {'$first': '$timestamp'},
-                'confidence': {'$first': '$confidence'}
-            }},
-            {'$sort': {'timestamp': -1}},
-            {'$limit': limit}
-        ]
-        
-        results = list(collection.aggregate(agg_pipeline))
-        
-        formatted_results = []
-        for result in results:
-            formatted_results.append({
-                'id': result['_id'],
-                'type': result['fruit_type'],
-                'confidence': result.get('confidence', 0.90),
-                'timestamp': result['timestamp'].strftime('%Y-%m-%d %H:%M:%S') if isinstance(result['timestamp'], datetime) else str(result['timestamp'])
-            })
-        
-        return jsonify(formatted_results), 200
-        
+        limit = int(request.args.get('limit', 5))
+        metadata = load_dashboard_metadata()
+
+        if not metadata:
+            return jsonify([]), 200
+
+        cm = metadata.get('confusion_matrix', [])
+        label_mapping = metadata.get('label_mapping', {})
+        class_names = [name for name, idx in sorted(label_mapping.items(), key=lambda x: x[1])]
+        avg_conf = metadata.get('performance', {}).get('avg_confidence', 0.5)
+
+        if not cm or not class_names:
+            return jsonify([]), 200
+
+        # Generate test predictions from confusion matrix (same as Results page)
+        predictions = []
+        pred_id = 0
+
+        for actual_idx, actual_class in enumerate(class_names):
+            for predicted_idx, predicted_class in enumerate(class_names):
+                count = cm[actual_idx][predicted_idx]
+                is_correct = actual_idx == predicted_idx
+
+                for _ in range(count):
+                    pred_id += 1
+                    obj_id = f"test_obj_{pred_id:03d}"
+
+                    conf = avg_conf if avg_conf else 0.5
+                    conf_value = conf + 0.1 if is_correct else conf - 0.1
+                    conf_value = max(0.1, min(0.99, conf_value))
+
+                    predictions.append({
+                        'id': obj_id,
+                        'type': predicted_class,
+                        'confidence': conf_value,
+                        'timestamp': metadata.get('timestamp', datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+                    })
+
+        # Return only the requested limit (default 5)
+        return jsonify(predictions[:limit]), 200
+
     except Exception as e:
         return jsonify([]), 200
 

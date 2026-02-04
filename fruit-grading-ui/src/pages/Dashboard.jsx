@@ -61,7 +61,7 @@ const Dashboard = () => {
         await Promise.all([
           getSystemStatus(),
           getProcessingStats(),
-          getRecentResults(3),
+          getRecentResults(5),
           getDatasetInfo(),
           getModelPerformance(),
         ]);
@@ -92,7 +92,7 @@ const Dashboard = () => {
       const [statusData, statsData, resultsData] = await Promise.all([
         getSystemStatus(),
         getProcessingStats(),
-        getRecentResults(3),
+        getRecentResults(5),
       ]);
 
       setSystemStatus(statusData);
@@ -298,6 +298,7 @@ const Dashboard = () => {
                 <tr>
                   <th>Object ID</th>
                   <th>Classification</th>
+                  <th>Confidence</th>
                   <th>Timestamp</th>
                 </tr>
               </thead>
@@ -311,6 +312,17 @@ const Dashboard = () => {
                       <span className={`type-badge type-${result.type}`}>
                         {result.type}
                       </span>
+                    </td>
+                    <td>
+                      <div className="confidence-bar-small">
+                        <div
+                          className="confidence-fill"
+                          style={{ width: `${result.confidence * 100}%` }}
+                        />
+                        <span className="confidence-text">
+                          {(result.confidence * 100).toFixed(1)}%
+                        </span>
+                      </div>
                     </td>
                     <td className="timestamp">{result.timestamp}</td>
                   </tr>

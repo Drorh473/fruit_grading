@@ -20,7 +20,7 @@ const UserDashboard = () => {
     totalToday: 0,
     marketCount: 0,
     standardCount: 0,
-    rejectCount: 0,
+    premiumCount: 0,
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -167,13 +167,13 @@ const UserDashboard = () => {
         <div className="summary-card">
           <div
             className="summary-icon"
-            style={{ background: "rgba(231, 76, 60, 0.1)" }}
+            style={{ background: "rgba(241, 196, 15, 0.1)" }}
           >
-            <FiCheckCircle style={{ color: "var(--error)" }} />
+            <FiCheckCircle style={{ color: "#f1c40f" }} />
           </div>
           <div className="summary-content">
-            <p className="summary-label">Rejected</p>
-            <h3 className="summary-value">{stats.rejectCount}</h3>
+            <p className="summary-label">Premium Grade</p>
+            <h3 className="summary-value">{stats.premiumCount}</h3>
           </div>
         </div>
       </div>
