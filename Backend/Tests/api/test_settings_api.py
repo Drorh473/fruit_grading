@@ -142,49 +142,39 @@ class TestDatabaseConnection:
         assert data['success'] is False
 class TestSettingsStatus:
     """Test settings status endpoint"""
-    
+
     def test_get_settings_status(self, client):
         """Test getting system status for settings page"""
         response = client.get('/api/settings/status')
-        
+
         assert response.status_code == 200
         data = json.loads(response.data)
-        
+
         # Verify all required fields
         assert 'database' in data
-        assert 'model' in data
-        assert 'pipeline' in data
         assert 'cameras' in data
-        
+
         # Verify types
         assert isinstance(data['database'], str)
-        assert isinstance(data['model'], str)
-        assert isinstance(data['pipeline'], str)
         assert isinstance(data['cameras'], list)
-    
+
     def test_settings_status_values(self, client):
         """Test settings status has valid values"""
         response = client.get('/api/settings/status')
         data = json.loads(response.data)
-        
+
         # Database should be valid state
         assert data['database'] in ['connected', 'disconnected']
-        
-        # Model should be valid state
-        assert data['model'] in ['loaded', 'trained', 'not_trained', 'unknown']
-        
-        # Pipeline should be valid state
-        assert data['pipeline'] in ['idle', 'running', 'completed', 'failed', 'stopped']
-        
+
         # Cameras should be 4 booleans
         assert len(data['cameras']) == 4
         assert all(isinstance(c, bool) for c in data['cameras'])
-    
+
     def test_settings_status_camera_count(self, client):
         """Test camera count matches configuration"""
         response = client.get('/api/settings/status')
         data = json.loads(response.data)
-        
+
         # Should have 4 cameras
         assert len(data['cameras']) == 4
 

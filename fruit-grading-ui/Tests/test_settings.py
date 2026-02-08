@@ -133,27 +133,6 @@ class TestPathSettings:
         assert test_btns.count() >= 3
 
 # ============================================================================
-# MODEL SECTION TESTS
-# ============================================================================
-
-@pytest.mark.unit
-class TestModelSettings:
-    """Test model configuration section"""
-    
-    def test_model_section_exists(self, logged_in_admin: Page):
-        navigate_to_settings(logged_in_admin)
-        section = logged_in_admin.locator('text=Model Configuration')
-        expect(section).to_be_visible()
-    
-    def test_batch_size_field(self, logged_in_admin: Page):
-        navigate_to_settings(logged_in_admin)
-        expect(logged_in_admin.locator("text=Batch Size")).to_be_visible()
-    
-    def test_model_variant_field(self, logged_in_admin: Page):
-        navigate_to_settings(logged_in_admin)
-        expect(logged_in_admin.locator("text=ShuffleNet").or_(logged_in_admin.locator("text=Variant"))).to_be_visible()
-
-# ============================================================================
 # SYSTEM STATUS TESTS
 # ============================================================================
 
@@ -175,15 +154,9 @@ class TestSystemStatus:
         if status_locator.count() > 0:
              expect(status_locator.first).to_be_visible()
 
-    def test_model_status_shown(self, logged_in_admin: Page):
+    def test_cameras_status_shown(self, logged_in_admin: Page):
         navigate_to_settings(logged_in_admin)
-        # Look for the specific label in the status section
-        expect(logged_in_admin.locator(".status-label:has-text('Model Status')")).to_be_visible()
-
-        
-        def test_cameras_status_shown(self, logged_in_admin: Page):
-            navigate_to_settings(logged_in_admin)
-            expect(logged_in_admin.locator("text=Camera").first).to_be_visible()
+        expect(logged_in_admin.locator("text=Camera").first).to_be_visible()
 
 # ============================================================================
 # FORM INTERACTION TESTS
@@ -192,15 +165,15 @@ class TestSystemStatus:
 @pytest.mark.integration
 class TestSettingsForm:
     """Test settings form interactions"""
-    
-    def test_can_edit_batch_size(self, logged_in_admin: Page):
+
+    def test_can_edit_db_name(self, logged_in_admin: Page):
         navigate_to_settings(logged_in_admin)
-        
-        batch_input = logged_in_admin.locator('input[type="number"]').first
-        expect(batch_input).to_be_visible()
-        batch_input.fill('64')
-        expect(batch_input).to_have_value('64')
-    
+
+        db_input = logged_in_admin.locator('input[type="text"]').first
+        expect(db_input).to_be_visible()
+        db_input.fill('test_db')
+        expect(db_input).to_have_value('test_db')
+
     def test_save_button_exists(self, logged_in_admin: Page):
         navigate_to_settings(logged_in_admin)
         save_btn = logged_in_admin.locator('button:has-text("Save")').first
@@ -262,23 +235,3 @@ class TestSettingsAuthorization:
         url = logged_in_user.url
         assert "/settings" not in url or "/login" in url or "/dashboard" in url
 
-# ============================================================================
-# IMPORT/EXPORT TESTS
-# ============================================================================
-
-@pytest.mark.unit
-class TestImportExport:
-    """Test import/export functionality"""
-    
-    def test_export_button_exists(self, logged_in_admin: Page):
-        navigate_to_settings(logged_in_admin)
-        # Use simple count check if element is optional
-        export_btn = logged_in_admin.locator('button:has-text("Export")')
-        if export_btn.count() > 0:
-            expect(export_btn).to_be_visible()
-    
-    def test_import_button_exists(self, logged_in_admin: Page):
-        navigate_to_settings(logged_in_admin)
-        import_btn = logged_in_admin.locator('button:has-text("Import")')
-        if import_btn.count() > 0:
-            expect(import_btn).to_be_visible()

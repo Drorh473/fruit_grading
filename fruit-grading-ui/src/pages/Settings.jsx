@@ -7,8 +7,6 @@ import {
   FiCheckCircle,
   FiXCircle,
   FiAlertCircle,
-  FiDownload,
-  FiUpload,
   FiLoader,
 } from "react-icons/fi";
 import "./Settings.css";
@@ -20,8 +18,6 @@ import {
   testPath,
   validateAllPaths,
   getSystemStatus,
-  exportSettings,
-  importSettings,
 } from "../utils/SettingsApi";
 
 const Settings = () => {
@@ -35,16 +31,11 @@ const Settings = () => {
     storedDataset: "",
     originalDataset: "",
     processedDataset: "",
-
-    // Model
-    batchSize: 128,
-    modelVariant: "1.0x",
   });
 
   // System status state
   const [systemStatus, setSystemStatus] = useState({
     database: "unknown",
-    model: "unknown",
     cameras: [false, false, false, false],
   });
 
@@ -98,7 +89,6 @@ const Settings = () => {
           console.error("Failed to fetch system status:", err);
           return {
             database: "error",
-            model: "error",
             cameras: [false, false, false, false],
           };
         }),
@@ -322,66 +312,6 @@ const Settings = () => {
   };
 
   /**
-   * Export settings configuration
-   */
-  const handleExport = async () => {
-    try {
-      const settings = await exportSettings();
-      const blob = new Blob([JSON.stringify(settings, null, 2)], {
-        type: "application/json",
-      });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `settings_${new Date().toISOString().split("T")[0]}.json`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-
-      setSaveStatus({
-        success: true,
-        message: "Settings exported successfully",
-      });
-    } catch (err) {
-      console.error("Export failed:", err);
-      setSaveStatus({
-        success: false,
-        message: "Failed to export settings",
-      });
-    }
-  };
-
-  /**
-   * Import settings configuration
-   */
-  const handleImport = async (event) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    try {
-      const text = await file.text();
-      const importedSettings = JSON.parse(text);
-
-      await importSettings(importedSettings);
-
-      // Refresh settings
-      await fetchAllData();
-
-      setSaveStatus({
-        success: true,
-        message: "Settings imported successfully",
-      });
-    } catch (err) {
-      console.error("Import failed:", err);
-      setSaveStatus({
-        success: false,
-        message: err.message || "Failed to import settings",
-      });
-    }
-  };
-
-  /**
    * Get validation icon for path
    */
   const getValidationIcon = (pathType) => {
@@ -418,25 +348,6 @@ const Settings = () => {
           <p className="page-subtitle">
             Configure system parameters and connections
           </p>
-        </div>
-        <div style={{ display: "flex", gap: "var(--spacing-sm)" }}>
-          <button className="btn btn-secondary btn-sm" onClick={handleExport}>
-            <FiDownload />
-            Export
-          </button>
-          <label
-            className="btn btn-secondary btn-sm"
-            style={{ cursor: "pointer" }}
-          >
-            <FiUpload />
-            Import
-            <input
-              type="file"
-              accept=".json"
-              onChange={handleImport}
-              style={{ display: "none" }}
-            />
-          </label>
         </div>
       </div>
 
@@ -637,47 +548,6 @@ const Settings = () => {
         </div>
       </div>
 
-      {/* Model Settings */}
-      <div className="card settings-card">
-        <div className="card-header">
-          <h2 className="card-title">Model Configuration</h2>
-        </div>
-        <div className="settings-grid">
-          <div className="setting-item">
-            <label className="setting-label">Batch Size</label>
-            <input
-              type="number"
-              className="input-field"
-              value={config.batchSize}
-              onChange={(e) =>
-                handleChange("batchSize", parseInt(e.target.value))
-              }
-              min="1"
-              max="512"
-            />
-            <span className="setting-hint">
-              Number of samples per training batch (1-512)
-            </span>
-          </div>
-          <div className="setting-item">
-            <label className="setting-label">ShuffleNet Variant</label>
-            <select
-              className="input-field"
-              value={config.modelVariant}
-              onChange={(e) => handleChange("modelVariant", e.target.value)}
-            >
-              <option value="0.5x">0.5x (Faster, Less Accurate)</option>
-              <option value="1.0x">1.0x (Default, Balanced)</option>
-              <option value="1.5x">1.5x (Slower, More Accurate)</option>
-              <option value="2.0x">2.0x (Slowest, Most Accurate)</option>
-            </select>
-            <span className="setting-hint">
-              Model complexity and speed trade-off
-            </span>
-          </div>
-        </div>
-      </div>
-
       {/* System Status */}
       <div className="card settings-card">
         <div className="card-header">
@@ -700,21 +570,6 @@ const Settings = () => {
               }`}
             >
               {systemStatus.database}
-            </span>
-          </div>
-          <div className="status-item">
-            <span className="status-label">Model Status</span>
-            <span
-              className={`status-badge ${
-                systemStatus.model === "loaded" ||
-                systemStatus.model === "trained"
-                  ? "status-success"
-                  : systemStatus.model === "error"
-                  ? "status-error"
-                  : "status-warning"
-              }`}
-            >
-              {systemStatus.model}
             </span>
           </div>
           <div className="status-item">

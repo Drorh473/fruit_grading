@@ -77,41 +77,33 @@ def test_database():
 @settings_bp.route('/status', methods=['GET'])
 def get_settings_status():
     """Get system status for settings page"""
+    # Initialize with defaults
+    db_status = 'disconnected'
+    num_cameras = current_app.config.get('NUM_OF_CAMERAS', 4)
+    camera_statuses = [False] * num_cameras
+
+    # Check database connection
     try:
-        from Backend.utils.utils import check_db_connection
-        from Backend.utils.shared_state import pipeline_state
-        
-        db_status = 'connected' if check_db_connection() else 'disconnected'
-        state = pipeline_state.get_state()
-        
-        num_cameras = current_app.config.get('NUM_OF_CAMERAS', 4)
+        if current_app.mongo_client is not None:
+            current_app.mongo_client.server_info()
+            db_status = 'connected'
+    except Exception as db_err:
+        current_app.logger.warning(f"Database connection check failed: {db_err}")
+        db_status = 'disconnected'
+
+    # Check camera status - for now cameras are considered available if configured
+    # In production, integrate with actual camera health checks
+    try:
+        # Cameras are available if the system is configured for them
         camera_statuses = [True] * num_cameras
+    except Exception as cam_err:
+        current_app.logger.warning(f"Camera status check failed: {cam_err}")
+        camera_statuses = [False] * num_cameras
 
-        model_dir = current_app.config.get('MODEL_DIR', 'saved_models')
-        model_status = 'not_trained'
-
-        if state['results']:
-            model_status = 'loaded'
-        elif os.path.exists(model_dir):
-            model_files = [f for f in os.listdir(model_dir) 
-                          if f.endswith('.pth') or f.endswith('.pkl')]
-            if model_files:
-                model_status = 'trained'
-        
-        return jsonify({
-            'database': db_status,
-            'model': model_status,
-            'pipeline': state['status'],
-            'cameras': camera_statuses
-        }), 200
-        
-    except Exception as e:
-        return jsonify({
-            'database': 'disconnected',
-            'model': 'unknown',
-            'pipeline': 'idle',
-            'cameras': [False, False, False, False]
-        }), 200
+    return jsonify({
+        'database': db_status,
+        'cameras': camera_statuses
+    }), 200
 
 
 @settings_bp.route('/paths', methods=['GET'])
