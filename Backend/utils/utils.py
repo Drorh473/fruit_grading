@@ -2,7 +2,8 @@
 Shared Utilities
 Helper functions used across route modules
 """
-from flask import current_app, g
+from functools import wraps
+from flask import current_app, g, jsonify
 import pymongo
 
 def get_db():
@@ -27,3 +28,42 @@ def check_db_connection():
         return True
     except:
         return False
+
+
+def handle_api_errors(default_response=None, status_code=200):
+    """
+    Decorator to handle API errors consistently.
+
+    Args:
+        default_response: Default response to return on error (dict or callable)
+        status_code: HTTP status code to return on error (default 200 for graceful degradation)
+
+    Usage:
+        @handle_api_errors(default_response={'data': []})
+        def get_items():
+            # ... implementation
+            return jsonify(items), 200
+
+        @handle_api_errors(default_response=lambda: {'error': 'Failed'}, status_code=500)
+        def risky_operation():
+            # ... implementation
+    """
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            try:
+                return func(*args, **kwargs)
+            except Exception as e:
+                current_app.logger.error(f"API Error in {func.__name__}: {str(e)}")
+
+                if callable(default_response):
+                    response = default_response()
+                elif default_response is not None:
+                    response = default_response
+                else:
+                    response = {'error': str(e)}
+
+                return jsonify(response), status_code
+
+        return wrapper
+    return decorator

@@ -2,7 +2,7 @@
 from flask import Blueprint, jsonify
 from datetime import datetime, timedelta
 from utils.utils import get_collection
-from utils.model_metadata import load_dashboard_metadata, format_for_user_dashboard
+from utils.model_metadata import load_dashboard_metadata, format_for_user_dashboard, generate_predictions_from_confusion_matrix
 
 user_dashboard_bp = Blueprint('user_dashboard', __name__)
 
@@ -57,40 +57,8 @@ def get_recent_results():
         if not metadata:
             return jsonify([]), 200
 
-        cm = metadata.get('confusion_matrix', [])
-        label_mapping = metadata.get('label_mapping', {})
-        class_names = [name for name, idx in sorted(label_mapping.items(), key=lambda x: x[1])]
-        avg_conf = metadata.get('performance', {}).get('avg_confidence', 0.5)
-
-        if not cm or not class_names:
-            return jsonify([]), 200
-
-        # Generate test predictions from confusion matrix (same as Results page)
-        predictions = []
-        pred_id = 0
-
-        for actual_idx, actual_class in enumerate(class_names):
-            for predicted_idx, predicted_class in enumerate(class_names):
-                count = cm[actual_idx][predicted_idx]
-                is_correct = actual_idx == predicted_idx
-
-                for _ in range(count):
-                    pred_id += 1
-                    obj_id = f"test_obj_{pred_id:03d}"
-
-                    conf = avg_conf if avg_conf else 0.5
-                    conf_value = conf + 0.1 if is_correct else conf - 0.1
-                    conf_value = max(0.1, min(0.99, conf_value))
-
-                    predictions.append({
-                        'id': obj_id,
-                        'type': predicted_class,
-                        'confidence': conf_value,
-                        'timestamp': metadata.get('timestamp', datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-                    })
-
-        # Return only the first 5 results
-        return jsonify(predictions[:5]), 200
+        predictions = generate_predictions_from_confusion_matrix(metadata, limit=5)
+        return jsonify(predictions), 200
 
     except Exception as e:
         return jsonify([]), 200

@@ -200,9 +200,9 @@ def format_for_user_dashboard():
     metadata = load_dashboard_metadata()
     if not metadata:
         return None
-    
+
     class_dist = metadata['dataset_info']['class_distribution']
-    
+
     return {
         'stats': {
             'totalToday': metadata['dataset_info']['total_objects'],
@@ -214,3 +214,123 @@ def format_for_user_dashboard():
         'avg_confidence': metadata['performance'].get('avg_confidence'),
         'last_update': metadata['timestamp']
     }
+
+
+def generate_predictions_from_confusion_matrix(metadata, limit=None, filters=None):
+    """
+    Generate test predictions from confusion matrix data.
+
+    Args:
+        metadata: Dashboard metadata dict containing confusion_matrix and label_mapping
+        limit: Optional limit on number of predictions to return
+        filters: Optional dict with keys: search, actual, predicted, correct
+
+    Returns:
+        List of prediction dicts with id, type, confidence, timestamp, etc.
+    """
+    if not metadata:
+        return []
+
+    cm = metadata.get('confusion_matrix', [])
+    label_mapping = metadata.get('label_mapping', {})
+    class_names = [name for name, idx in sorted(label_mapping.items(), key=lambda x: x[1])]
+    avg_conf = metadata.get('performance', {}).get('avg_confidence', 0.5)
+
+    if not cm or not class_names:
+        return []
+
+    filters = filters or {}
+    search = filters.get('search', '')
+    actual_filter = filters.get('actual', 'all')
+    predicted_filter = filters.get('predicted', 'all')
+    correct_filter = filters.get('correct', 'all')
+    include_actual_label = filters.get('include_actual_label', False)
+
+    predictions = []
+    pred_id = 0
+
+    for actual_idx, actual_class in enumerate(class_names):
+        for predicted_idx, predicted_class in enumerate(class_names):
+            count = cm[actual_idx][predicted_idx]
+            is_correct = actual_idx == predicted_idx
+
+            for _ in range(count):
+                pred_id += 1
+                obj_id = f"test_obj_{pred_id:03d}"
+
+                # Apply filters
+                if search and search.lower() not in obj_id.lower():
+                    continue
+                if actual_filter != 'all' and actual_class != actual_filter:
+                    continue
+                if predicted_filter != 'all' and predicted_class != predicted_filter:
+                    continue
+                if correct_filter == 'correct' and not is_correct:
+                    continue
+                if correct_filter == 'incorrect' and is_correct:
+                    continue
+
+                conf = avg_conf if avg_conf else 0.5
+                conf_value = conf + 0.1 if is_correct else conf - 0.1
+                conf_value = max(0.1, min(0.99, conf_value))
+
+                prediction = {
+                    'id': obj_id,
+                    'type': predicted_class,
+                    'confidence': conf_value,
+                    'timestamp': metadata.get('timestamp', datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+                }
+
+                # Add extra fields for detailed view
+                if include_actual_label:
+                    prediction['object_id'] = obj_id
+                    prediction['actual_label'] = actual_class
+                    prediction['predicted_label'] = predicted_class
+                    prediction['correct'] = is_correct
+
+                predictions.append(prediction)
+
+    if limit:
+        return predictions[:limit]
+
+    return predictions
+
+
+def calculate_per_class_metrics(confusion_matrix, class_names):
+    """
+    Calculate precision, recall, and F1 score for each class from confusion matrix.
+
+    Args:
+        confusion_matrix: 2D list or numpy array of confusion matrix
+        class_names: List of class names in order
+
+    Returns:
+        Dict mapping class names to their metrics
+    """
+    if not confusion_matrix or not class_names:
+        return {}
+
+    # Convert to numpy array if needed
+    if isinstance(confusion_matrix, list):
+        cm = np.array(confusion_matrix)
+    else:
+        cm = confusion_matrix
+
+    per_class = {}
+    for i, class_name in enumerate(class_names):
+        tp = cm[i, i]
+        fn = cm[i, :].sum() - tp
+        fp = cm[:, i].sum() - tp
+
+        precision = round(tp / (tp + fp), 3) if (tp + fp) > 0 else 0
+        recall = round(tp / (tp + fn), 3) if (tp + fn) > 0 else 0
+        f1 = round(2 * precision * recall / (precision + recall), 3) if (precision + recall) > 0 else 0
+
+        per_class[class_name] = {
+            'precision': precision,
+            'recall': recall,
+            'f1': f1,
+            'support': int(cm[i, :].sum())
+        }
+
+    return per_class

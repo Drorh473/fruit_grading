@@ -3,36 +3,7 @@
  * Handles fruit folder upload and processing
  */
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_URL || "http://localhost:5000/api";
-
-async function apiFetch(endpoint, options = {}) {
-  try {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-      ...options,
-      // Note: We DO NOT set Content-Type for FormData;
-      // the browser sets it automatically with the boundary
-      headers: {
-        ...options.headers,
-      },
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || `HTTP error! status: ${response.status}`);
-    }
-
-    const contentType = response.headers.get("content-type");
-    if (contentType && contentType.includes("application/json")) {
-      return await response.json();
-    }
-
-    return await response.text();
-  } catch (error) {
-    console.error(`API Error (${endpoint}):`, error);
-    throw error;
-  }
-}
+import { apiFetch } from "./apiClient";
 
 /**
  * Validate folder structure (Now strictly Client-Side helper, or optional server check)
@@ -68,7 +39,7 @@ export async function uploadAndProcessFruit(files) {
   return apiFetch("/fruit/upload-process", {
     method: "POST",
     body: formData,
-    // No Content-Type header! Browser adds it for FormData
+    skipContentType: true, // Let browser set Content-Type for FormData
   });
 }
 

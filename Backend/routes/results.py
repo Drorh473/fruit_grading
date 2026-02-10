@@ -6,23 +6,13 @@ from flask import Blueprint, jsonify, request
 from datetime import datetime, timedelta
 from collections import Counter
 from utils.utils import get_collection
-import os
-import json
+from utils.model_metadata import (
+    load_dashboard_metadata,
+    generate_predictions_from_confusion_matrix,
+    calculate_per_class_metrics
+)
 
 results_bp = Blueprint('results', __name__)
-
-MODEL_DIR = os.getenv('MODEL_DIR', 'saved_models')
-
-
-def load_model_metadata():
-    """Load dashboard metadata from JSON file"""
-    metadata_path = os.path.join(MODEL_DIR, 'dashboard_metadata.json')
-    if os.path.exists(metadata_path):
-        try:
-            with open(metadata_path, 'r') as f:
-                return json.load(f)
-        except Exception:
-            return None
 
 
 @results_bp.route('/list', methods=['GET'])
@@ -93,7 +83,7 @@ def get_results_list():
 def get_kpis():
     """Get KPIs from model metadata."""
     try:
-        metadata = load_model_metadata()
+        metadata = load_dashboard_metadata()
 
         if metadata:
             dataset_info = metadata.get('dataset_info', {})
@@ -145,7 +135,7 @@ def get_kpis():
 def get_quality_distribution():
     """Get quality distribution statistics from metadata"""
     try:
-        metadata = load_model_metadata()
+        metadata = load_dashboard_metadata()
 
         if metadata:
             class_dist = metadata.get('dataset_info', {}).get('class_distribution', {})
@@ -180,8 +170,8 @@ def get_quality_distribution():
 def get_test_predictions():
     """Get test set predictions from model metadata"""
     try:
-        metadata = load_model_metadata()
-        
+        metadata = load_dashboard_metadata()
+
         if not metadata:
             return jsonify({
                 'predictions': [],
@@ -189,71 +179,28 @@ def get_test_predictions():
                 'correct_count': 0,
                 'accuracy': 0
             }), 200
-        
-        search = request.args.get('search', '')
-        actual_filter = request.args.get('actual', 'all')
-        predicted_filter = request.args.get('predicted', 'all')
-        correct_filter = request.args.get('correct', 'all')
-        
-        cm = metadata.get('confusion_matrix', [])
-        label_mapping = metadata.get('label_mapping', {})
-        class_names = [name for name, idx in sorted(label_mapping.items(), key=lambda x: x[1])]
-        avg_conf = metadata.get('performance', {}).get('avg_confidence', 0.5)
-        
-        if not cm or not class_names:
-            return jsonify({
-                'predictions': [],
-                'total': 0,
-                'correct_count': 0,
-                'accuracy': 0
-            }), 200
-        
-        predictions = []
-        pred_id = 0
-        
-        for actual_idx, actual_class in enumerate(class_names):
-            for predicted_idx, predicted_class in enumerate(class_names):
-                count = cm[actual_idx][predicted_idx]
-                is_correct = actual_idx == predicted_idx
-                
-                for _ in range(count):
-                    pred_id += 1
-                    obj_id = f"test_obj_{pred_id:03d}"
-                    
-                    if search and search.lower() not in obj_id.lower():
-                        continue
-                    if actual_filter != 'all' and actual_class != actual_filter:
-                        continue
-                    if predicted_filter != 'all' and predicted_class != predicted_filter:
-                        continue
-                    if correct_filter == 'correct' and not is_correct:
-                        continue
-                    if correct_filter == 'incorrect' and is_correct:
-                        continue
-                    
-                    conf = avg_conf if avg_conf else 0.5
-                    conf_value = conf + 0.1 if is_correct else conf - 0.1
-                    conf_value = max(0.1, min(0.99, conf_value))
-                    
-                    predictions.append({
-                        'object_id': obj_id,
-                        'actual_label': actual_class,
-                        'predicted_label': predicted_class,
-                        'confidence': conf_value,
-                        'correct': is_correct
-                    })
-        
+
+        filters = {
+            'search': request.args.get('search', ''),
+            'actual': request.args.get('actual', 'all'),
+            'predicted': request.args.get('predicted', 'all'),
+            'correct': request.args.get('correct', 'all'),
+            'include_actual_label': True
+        }
+
+        predictions = generate_predictions_from_confusion_matrix(metadata, filters=filters)
+
         total = len(predictions)
-        correct_count = sum(1 for p in predictions if p['correct'])
+        correct_count = sum(1 for p in predictions if p.get('correct'))
         accuracy = round((correct_count / total * 100) if total > 0 else 0, 1)
-        
+
         return jsonify({
             'predictions': predictions,
             'total': total,
             'correct_count': correct_count,
             'accuracy': accuracy
         }), 200
-        
+
     except Exception as e:
         return jsonify({
             'predictions': [],
@@ -267,7 +214,7 @@ def get_test_predictions():
 def get_training_history():
     """Get training history from model metadata"""
     try:
-        metadata = load_model_metadata()
+        metadata = load_dashboard_metadata()
         
         if not metadata:
             return jsonify({
@@ -383,7 +330,7 @@ def get_hourly_trend():
 def get_confusion_matrix():
     """Get confusion matrix from model metadata"""
     try:
-        metadata = load_model_metadata()
+        metadata = load_dashboard_metadata()
 
         if not metadata:
             return jsonify({'classes': [], 'matrix': [], 'normalized': [], 'metrics': {}}), 200
@@ -405,22 +352,7 @@ def get_confusion_matrix():
             correct = sum(matrix[i][i] for i in range(len(matrix)))
             accuracy = round((correct / total) if total > 0 else 0, 3)
 
-            per_class = {}
-            for i, class_name in enumerate(classes):
-                tp = matrix[i][i]
-                fn = sum(matrix[i]) - tp
-                fp = sum(matrix[j][i] for j in range(len(matrix))) - tp
-
-                precision = round(tp / (tp + fp), 3) if (tp + fp) > 0 else 0
-                recall = round(tp / (tp + fn), 3) if (tp + fn) > 0 else 0
-                f1 = round(2 * precision * recall / (precision + recall), 3) if (precision + recall) > 0 else 0
-
-                per_class[class_name] = {
-                    'precision': precision,
-                    'recall': recall,
-                    'f1': f1,
-                    'support': sum(matrix[i])
-                }
+            per_class = calculate_per_class_metrics(matrix, classes)
         else:
             accuracy = metadata.get('performance', {}).get('test_accuracy', 0)
             per_class = metadata.get('per_class_performance', {})
