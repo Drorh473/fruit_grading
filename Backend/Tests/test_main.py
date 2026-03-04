@@ -88,9 +88,9 @@ class TestPhase:
                 if self.failures > 0 or self.errors > 0:
                     self._print_failures(output)
                 
-                # 75% pass rate required
+                # 90% pass rate required
                 success_ratio = (self.tests_run - self.failures - self.errors) / self.tests_run
-                self.passed = (success_ratio >= 0.75)
+                self.passed = (success_ratio >= 0.90)
             else:
                 print("No tests run")
                 self.passed = False

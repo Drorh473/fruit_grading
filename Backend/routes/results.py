@@ -4,7 +4,6 @@ Endpoints for viewing and exporting classification results
 """
 from flask import Blueprint, jsonify, request
 from datetime import datetime, timedelta
-from collections import Counter
 from utils.utils import get_collection
 from utils.model_metadata import (
     load_dashboard_metadata,

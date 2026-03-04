@@ -1,18 +1,8 @@
-/**
- * Shared API Client
- * Centralized API configuration and fetch wrapper
- */
+// Centralized API fetch wrapper with error handling
 
 export const API_BASE_URL =
   import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
-/**
- * Generic fetch wrapper with error handling
- * @param {string} endpoint - API endpoint (e.g., "/admin/system-status")
- * @param {Object} options - Fetch options
- * @param {boolean} options.skipContentType - Skip setting Content-Type header (for FormData)
- * @returns {Promise<any>} Response data
- */
 export async function apiFetch(endpoint, options = {}) {
   try {
     const { skipContentType, ...fetchOptions } = options;
@@ -48,10 +38,6 @@ export async function apiFetch(endpoint, options = {}) {
   }
 }
 
-/**
- * Check API health
- * @returns {Promise<Object>} { status, database }
- */
 export async function checkHealth() {
   return apiFetch("/health");
 }

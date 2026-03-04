@@ -17,8 +17,6 @@ from pathlib import Path
 from dotenv import load_dotenv
 import pymongo
 from tqdm import tqdm
-from sklearn.metrics import accuracy_score, mean_absolute_error, mean_squared_error
-import seaborn as sns
 from preprocessing.preprocessing_from_db import custom_preprocessing
 
 # Load environment variables

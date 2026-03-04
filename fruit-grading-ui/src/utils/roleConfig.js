@@ -1,14 +1,12 @@
-// Role-based access configuration
+// Role-based access and navigation configuration
 
 export const ROLES = {
   ADMIN: 'admin',
   USER: 'user'
 };
 
-// Define which pages each role can access
 export const ROLE_PERMISSIONS = {
   admin: {
-    // Admin has full access to everything
     canAccess: [
       '/dashboard',
       '/cameras',
@@ -30,26 +28,24 @@ export const ROLE_PERMISSIONS = {
     }
   },
   user: {
-    // User has limited access - viewing only
     canAccess: [
       '/user-dashboard',
       '/results'
     ],
     features: {
-      viewSystemStatus: false,     // Can't see technical status
-      viewCameras: false,           // Can't access camera monitor
-      runProcessing: false,         // Can't run pipeline
-      viewResults: true,            // Can view results only
-      addFruit: false,              // Can't add new fruits
-      modifySettings: false,        // Can't change settings
-      exportData: true,             // Can export their results
-      viewLogs: false,              // Can't see system logs
-      manageDatabase: false         // Can't manage database
+      viewSystemStatus: false,
+      viewCameras: false,
+      runProcessing: false,
+      viewResults: true,
+      addFruit: false,
+      modifySettings: false,
+      exportData: true,
+      viewLogs: false,
+      manageDatabase: false
     }
   }
 };
 
-// Navigation items for each role
 export const NAVIGATION_BY_ROLE = {
   admin: [
     { path: '/dashboard', label: 'Dashboard', icon: 'FiHome' },
@@ -65,7 +61,6 @@ export const NAVIGATION_BY_ROLE = {
   ]
 };
 
-// Helper function to check if user has access to a route
 export const hasAccess = (userRole, path) => {
   if (!userRole || !ROLE_PERMISSIONS[userRole]) {
     return false;
@@ -73,7 +68,6 @@ export const hasAccess = (userRole, path) => {
   return ROLE_PERMISSIONS[userRole].canAccess.includes(path);
 };
 
-// Helper function to check if user has a specific feature permission
 export const hasFeaturePermission = (userRole, feature) => {
   if (!userRole || !ROLE_PERMISSIONS[userRole]) {
     return false;

@@ -20,7 +20,7 @@ def get_camera_statuses():
             cameras.append({
                 'id': i,
                 'name': f'Camera {i}',
-                'status': True,  # Mock status - integrate with real cameras
+                'status': True,  # Mock status
                 'angle': angles[i] if i < len(angles) else f'Angle {i}',
                 'fps': fps,
                 'resolution': '224x224',
@@ -68,7 +68,7 @@ def get_camera_details(camera_id):
 def refresh_camera(camera_id):
     """Refresh specific camera"""
     try:
-        # In production, implement actual camera refresh logic
+        #implement actual camera refresh logic
         return jsonify({
             'success': True,
             'message': f'Camera {camera_id} refreshed successfully',
@@ -88,7 +88,7 @@ def refresh_all_cameras():
     try:
         num_cameras = current_app.config.get('NUM_OF_CAMERAS', 4)
         
-        # In production, implement actual camera refresh logic
+        # implement actual camera refresh logic
         return jsonify({
             'success': True,
             'message': f'All {num_cameras} cameras refreshed successfully',

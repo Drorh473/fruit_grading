@@ -40,6 +40,7 @@ from utils.model_metadata import save_dashboard_metadata
 
 def run_tests():
     """Run test suite using test_main.py."""
+    print("[1/6] Running tests...")
     test_script = os.path.join(PROJECT_ROOT, r'Tests\test_main.py')
 
     if not os.path.exists(test_script):
@@ -91,6 +92,7 @@ def extract_features(train_gen, test_gen):
 
 def prepare_image_paths_from_db():
     """Get image paths and labels from database for fine-tuning."""
+    print("  Loading image paths from database...")
     from pymongo import MongoClient
 
     client = MongoClient(os.getenv('MONGODB_URI', 'mongodb://localhost:27017/'))
@@ -123,6 +125,7 @@ def prepare_image_paths_from_db():
 def train_fine_tuned_classifier(epochs=50, learning_rate=0.001, batch_size=8,
                                  early_stopping_patience=10, unfreeze_backbone=False):
     """Train fine-tuned ShuffleNet model."""
+    print("[4/6] Training unified classifier...")
     np.random.seed(42)
     torch.manual_seed(42)
     if torch.cuda.is_available():
@@ -146,6 +149,7 @@ def train_fine_tuned_classifier(epochs=50, learning_rate=0.001, batch_size=8,
             unfreeze_backbone=unfreeze_backbone
         )
 
+        print("[5/6] Saving model...")
         os.makedirs(MODEL_DIR, exist_ok=True)
         model_path = os.path.join(MODEL_DIR, 'fruit_classifier_finetuned.pth')
 
@@ -184,6 +188,7 @@ def train_classifier(train_features, test_features,
                     hidden_dim=32, epochs=100, learning_rate=0.001, lambda_reg=0.01,
                     pca_components=100, dropout_rate=0.0, early_stopping_patience=50):
     """Train fully connected classifier on extracted features."""
+    print("[5/6] Training classifier...")
     np.random.seed(42)
 
     try:
@@ -286,6 +291,9 @@ def run_full_pipeline(skip_tests=False,
                      hidden_dim=8, epochs=500, learning_rate=0.01, lambda_reg=0.001,
                      pca_components=15, dropout_rate=0.2, early_stopping_patience=100):
     """Run full training pipeline: database setup, preprocessing, feature extraction, training."""
+    print("=" * 50)
+    print("Starting full training pipeline")
+    print("=" * 50)
     if not skip_tests:
         test_success = run_tests()
         if not test_success:
@@ -296,13 +304,18 @@ def run_full_pipeline(skip_tests=False,
     stored_dataset_exists = os.path.exists(STORED_DATASET_PATH) if STORED_DATASET_PATH else False
 
     if not stored_dataset_exists:
+        print("[2/6] Setting up database...")
         if not setup_database():
             return False
+    else:
+        print("[2/6] Database exists, skipping...")
 
+    print("[3/6] Preprocessing images...")
     train_gen, test_gen = preprocess_data()
     if not train_gen or not test_gen:
         return False
 
+    print("[4/6] Extracting features...")
     train_features, test_features = extract_features(train_gen, test_gen)
     if not train_features or not test_features:
         return False
@@ -321,11 +334,13 @@ def run_full_pipeline(skip_tests=False,
     if params is None:
         return False
 
+    print("[6/6] Generating confusion matrix...")
     label_mapping = results['label_mapping']
     cm = generate_confusion_matrix(results)
     if cm is not None:
         results['confusion_matrix'] = cm
 
+    print("  Saving dashboard metadata...")
     try:
         save_dashboard_metadata(
             results=results,
@@ -342,6 +357,11 @@ def run_full_pipeline(skip_tests=False,
     except Exception:
         pass
 
+    print("=" * 50)
+    print("Pipeline completed successfully!")
+    print(f"  Train accuracy: {results['train_accuracy']:.2%}")
+    print(f"  Test accuracy:  {results['test_accuracy']:.2%}")
+    print("=" * 50)
     return True
 
 
@@ -349,6 +369,9 @@ def run_fine_tuning_pipeline(skip_tests=False, epochs=50, learning_rate=0.001,
                               batch_size=8, early_stopping_patience=10,
                               unfreeze_backbone=False):
     """Run fine-tuning pipeline using ShuffleNet."""
+    print("=" * 50)
+    print("Starting fine-tuning pipeline")
+    print("=" * 50)
     if not skip_tests:
         test_success = run_tests()
         if not test_success:
@@ -360,13 +383,19 @@ def run_fine_tuning_pipeline(skip_tests=False, epochs=50, learning_rate=0.001,
     processed_dataset_exists = os.path.exists(PROCESSED_DATASET_PATH) if PROCESSED_DATASET_PATH else False
 
     if not stored_dataset_exists:
+        print("[2/6] Setting up database...")
         if not setup_database():
             return False
+    else:
+        print("[2/6] Database exists, skipping...")
 
     if not processed_dataset_exists:
+        print("[3/6] Preprocessing images...")
         train_gen, test_gen = preprocess_data()
         if not train_gen or not test_gen:
             return False
+    else:
+        print("[3/6] Preprocessed data exists, skipping...")
 
     model, results, train_count, test_count = train_fine_tuned_classifier(
         epochs=epochs,
@@ -379,6 +408,7 @@ def run_fine_tuning_pipeline(skip_tests=False, epochs=50, learning_rate=0.001,
     if model is None:
         return False
 
+    print("[5/6] Generating confusion matrix...")
     cm = None
     try:
         from sklearn.metrics import confusion_matrix as sk_confusion_matrix
@@ -389,6 +419,7 @@ def run_fine_tuning_pipeline(skip_tests=False, epochs=50, learning_rate=0.001,
     except Exception:
         pass
 
+    print("[6/6] Saving dashboard metadata...")
     try:
         train_features_dummy = {f"train_{i}": {'label': 0} for i in range(train_count)}
         test_features_dummy = {f"test_{i}": {'label': 0} for i in range(test_count)}
@@ -409,6 +440,11 @@ def run_fine_tuning_pipeline(skip_tests=False, epochs=50, learning_rate=0.001,
     except Exception:
         pass
 
+    print("=" * 50)
+    print("Pipeline completed successfully!")
+    print(f"  Train accuracy: {results['train_accuracy']:.2%}")
+    print(f"  Test accuracy:  {results['test_accuracy']:.2%}")
+    print("=" * 50)
     return True
 
 

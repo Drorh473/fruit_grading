@@ -1,16 +1,12 @@
 """Neural network activation functions."""
 import numpy as np
-
-
 def relu(x):
     """ReLU activation."""
     return np.maximum(0, x)
 
-
 def relu_derivative(x):
     """ReLU derivative."""
     return (x > 0).astype(float)
-
 
 def softmax(x):
     """Numerically stable softmax activation."""
