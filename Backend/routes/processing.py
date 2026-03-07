@@ -1,5 +1,5 @@
 """ML pipeline processing routes."""
-from flask import Blueprint, jsonify, request, current_app
+from flask import Blueprint, jsonify, request
 from datetime import datetime
 import threading
 import traceback

@@ -1,9 +1,6 @@
 """
 Integration tests for preprocessing to feature extraction pipeline.
 Tests the full flow from raw images through preprocessing to fused features.
-
-Note: Unit tests for individual functions (flatten_features, temporal_pooling,
-multi_view_fusion) are in Tests/unit/test_feature_extraction.py
 """
 import pytest
 import numpy as np

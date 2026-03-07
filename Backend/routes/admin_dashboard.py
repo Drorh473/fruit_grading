@@ -1,7 +1,6 @@
 """Admin Dashboard Routes for system status and analytics."""
 from flask import Blueprint, jsonify, request
-from datetime import datetime
-from utils.utils import get_collection, check_db_connection
+from utils.utils import check_db_connection
 from utils.shared_state import pipeline_state
 from utils.model_metadata import load_dashboard_metadata, format_for_admin_dashboard, generate_predictions_from_confusion_matrix
 

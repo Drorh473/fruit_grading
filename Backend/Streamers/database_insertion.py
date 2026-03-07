@@ -3,20 +3,16 @@ import sys
 import time
 import pymongo
 import shutil
-import multiprocessing
 from pathlib import Path
 from dotenv import load_dotenv
 from bson.objectid import ObjectId
 from datetime import datetime, timedelta
-from tqdm import tqdm
-from multiprocessing import Pool
 
 PROJECT_DIR = '/mnt/project'
 if PROJECT_DIR not in sys.path:
     sys.path.insert(0, PROJECT_DIR)
 
 from Streamers.database_creation import (
-    copy_image_file,
     split_data,
     MONGODB_CONNECTION_STRING,
     STORED_DATASET_PATH,

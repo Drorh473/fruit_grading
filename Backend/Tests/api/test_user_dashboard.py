@@ -4,8 +4,7 @@ Essential tests for operator dashboard statistics and results endpoints
 """
 import pytest
 import json
-from pathlib import Path
-import sys
+
 
 class TestDashboardStats:
     """Test dashboard statistics endpoint"""

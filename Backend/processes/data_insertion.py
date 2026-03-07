@@ -19,7 +19,7 @@ from Streamers.database_insertion import collect_images_metadata, copy_images_to
 from preprocessing.preprocessing_insertion import preprocess_images_batch
 from cnn.feature_map_insertion import extract_and_fuse_features, get_feature_vector
 from cnn.fully_connected_layer import load_model, predict
-from cnn.fine_tune_classifier import predict_multiple_images, clear_model_cache
+from cnn.fine_tune_classifier import predict_multiple_images
 
 env_path = Path('.') / '.env'
 load_dotenv(dotenv_path=env_path)

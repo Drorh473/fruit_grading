@@ -4,7 +4,6 @@ Endpoints for system settings and configuration
 """
 from flask import Blueprint, jsonify, request, current_app
 import pymongo
-import os
 
 settings_bp = Blueprint('settings', __name__)
 

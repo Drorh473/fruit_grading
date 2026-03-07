@@ -2,8 +2,7 @@
 Camera Monitor Routes
 Endpoints for camera status and control
 """
-from flask import Blueprint, jsonify, request, current_app
-import os
+from flask import Blueprint, jsonify, current_app
 
 cameras_bp = Blueprint('cameras', __name__)
 

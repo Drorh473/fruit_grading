@@ -4,7 +4,6 @@ Helper functions used across route modules
 """
 from functools import wraps
 from flask import current_app, g, jsonify
-import pymongo
 
 def get_db():
     """Get database instance"""

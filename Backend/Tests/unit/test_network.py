@@ -15,7 +15,6 @@ from cnn.fully_connected_layer import (
     train_step,
     predict,
     evaluate,
-    train,
     save_model,
     load_model
 )

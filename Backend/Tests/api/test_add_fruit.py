@@ -1,7 +1,6 @@
 import pytest
 import json
 import io
-import sys
 from PIL import Image
 from unittest.mock import patch
 

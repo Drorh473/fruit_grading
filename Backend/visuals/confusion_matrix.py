@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib
-matplotlib.use('Agg')  # Use non-GUI backend (must be before pyplot import)
+matplotlib.use('Agg') 
 import matplotlib.pyplot as plt
 import seaborn as sns
 import os

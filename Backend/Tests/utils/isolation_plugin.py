@@ -8,7 +8,6 @@ This plugin:
 3. Cleans up test database after test session
 """
 import os
-import sys
 import pytest
 
 

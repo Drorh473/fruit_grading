@@ -7,7 +7,6 @@ from unittest.mock import patch, MagicMock
 
 # -------------------------------------------------------------------------
 # MOCK PATHS
-# Based on the route code you provided, these functions are imported from:
 # from processes.build_model import (run_tests, setup_database, ...)
 # -------------------------------------------------------------------------
 

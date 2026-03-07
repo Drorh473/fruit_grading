@@ -18,8 +18,7 @@ from cnn.fully_connected_layer import train, evaluate, save_model, predict, comp
 from cnn.fine_tune_classifier import (
     train_fine_tuned_model,
     save_fine_tuned_model,
-    LABEL_MAPPING,
-    REVERSE_MAPPING
+    LABEL_MAPPING
 )
 from visuals.confusion_matrix import generate_full_confusion_matrix_report
 

@@ -8,7 +8,6 @@ from multiprocessing import Pool
 from pathlib import Path
 from dotenv import load_dotenv
 import pymongo
-import time
 from bson.objectid import ObjectId
 import random
 

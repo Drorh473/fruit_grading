@@ -3,17 +3,14 @@ Test Configuration
 Centralized configuration for all tests with proper database isolation
 """
 import os
-import sys
 from pathlib import Path
 from dotenv import load_dotenv
 
-# CRITICAL: Set test environment BEFORE any other imports
-# This must happen first to prevent production modules from loading production env
+
 os.environ['TESTING'] = 'true'
 os.environ['DB_NAME'] = 'test_fruit_grading'
 
-# Find the test environment file
-# Try multiple locations for flexibility
+
 _current_dir = Path(__file__).parent
 _possible_env_paths = [
     _current_dir / '.env.test',           # Same directory as test_config.py

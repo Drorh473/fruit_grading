@@ -12,8 +12,7 @@ if PROJECT_DIR not in sys.path:
 from preprocessing.preprocessing_from_db import (
     process_image,
     set_generator,
-    PROCESSED_DATASET_PATH,
-    STORED_DATASET_PATH
+    PROCESSED_DATASET_PATH
 )
 
 env_path = Path('.') / '.env'
