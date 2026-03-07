@@ -8,7 +8,6 @@ from torch.utils.data import Dataset, DataLoader
 from torchvision.models import shufflenet_v2_x1_0, ShuffleNet_V2_X1_0_Weights
 from torchvision import transforms
 from PIL import Image
-from tqdm import tqdm
 
 LABEL_MAPPING = {'market': 0, 'standard': 1, 'premium': 2}
 REVERSE_MAPPING = {v: k for k, v in LABEL_MAPPING.items()}

@@ -30,23 +30,7 @@ def check_db_connection():
 
 
 def handle_api_errors(default_response=None, status_code=200):
-    """
-    Decorator to handle API errors consistently.
-
-    Args:
-        default_response: Default response to return on error (dict or callable)
-        status_code: HTTP status code to return on error (default 200 for graceful degradation)
-
-    Usage:
-        @handle_api_errors(default_response={'data': []})
-        def get_items():
-            # ... implementation
-            return jsonify(items), 200
-
-        @handle_api_errors(default_response=lambda: {'error': 'Failed'}, status_code=500)
-        def risky_operation():
-            # ... implementation
-    """
+    """Decorator to handle API errors consistently."""
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):

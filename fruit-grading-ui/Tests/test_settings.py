@@ -12,25 +12,22 @@ def navigate_to_settings(page: Page):
         page.wait_for_selector('h1', state='visible')
         return
 
-    # 2. Open Hamburger (helps with visual debugging, but JS click below doesn't strictly need it)
+    # 2. Open Hamburger
     hamburger = page.locator('.hamburger-button')
     if hamburger.is_visible():
         hamburger.click()
         page.wait_for_timeout(500) # Small wait for animation
 
-    # 3. LOCATE the element
+    # 3. Locate the element
     settings_link = page.locator('a[href$="/settings"]')
     
-    # 4. DISPATCH 'click' event directly using JavaScript
-    # This bypasses all visibility/viewport checks entirely.
+    # 4. Dispatch 'click' event directly using JavaScript
     settings_link.dispatch_event('click')
     
     # 5. Wait for navigation
     try:
         expect(page).to_have_url(re.compile(r".*/settings"), timeout=10000)
     except AssertionError:
-        # Fallback: If JS dispatch didn't trigger React Router, try direct force click again
-        # but with no scrolling
         settings_link.evaluate("el => el.click()")
         expect(page).to_have_url(re.compile(r".*/settings"))
 
@@ -39,9 +36,6 @@ def navigate_to_settings(page: Page):
 
 
 
-# ============================================================================
-# RENDERING TESTS
-# ============================================================================
 
 @pytest.mark.unit
 class TestSettingsRendering:
@@ -51,8 +45,6 @@ class TestSettingsRendering:
         """Should load settings page"""
         navigate_to_settings(logged_in_admin)
         
-        # Use a specific locator that ignores the Sidebar H1
-        # .page-header h1 is standard, but get_by_role is most robust
         header = logged_in_admin.get_by_role("heading", name="Settings", exact=False)
         expect(header).to_be_visible()
 
@@ -66,9 +58,7 @@ class TestSettingsRendering:
         expect(cards.first).to_be_visible()
         assert cards.count() >= 3
 
-# ============================================================================
-# DATABASE SECTION TESTS
-# ============================================================================
+
 
 @pytest.mark.unit
 class TestDatabaseSettings:
@@ -81,12 +71,10 @@ class TestDatabaseSettings:
     
     def test_db_name_field(self, logged_in_admin: Page):
         navigate_to_settings(logged_in_admin)
-        # Using locators is better than .content() for dynamic apps
         expect(logged_in_admin.locator("text=Database Name")).to_be_visible()
     
     def test_mongo_connection_field(self, logged_in_admin: Page):
         navigate_to_settings(logged_in_admin)
-        # Be specific: look for the label
         expect(logged_in_admin.locator("label:has-text('MongoDB')")).to_be_visible()
 
     
@@ -95,9 +83,7 @@ class TestDatabaseSettings:
         test_btn = logged_in_admin.locator('button:has-text("Test Connection"), button:has-text("Test")').first
         expect(test_btn).to_be_visible()
 
-# ============================================================================
-# PATHS SECTION TESTS
-# ============================================================================
+
 
 @pytest.mark.unit
 class TestPathSettings:
@@ -132,9 +118,7 @@ class TestPathSettings:
         expect(test_btns.first).to_be_visible()
         assert test_btns.count() >= 3
 
-# ============================================================================
-# SYSTEM STATUS TESTS
-# ============================================================================
+
 
 @pytest.mark.unit
 class TestSystemStatus:
@@ -158,9 +142,7 @@ class TestSystemStatus:
         navigate_to_settings(logged_in_admin)
         expect(logged_in_admin.locator("text=Camera").first).to_be_visible()
 
-# ============================================================================
-# FORM INTERACTION TESTS
-# ============================================================================
+
 
 @pytest.mark.integration
 class TestSettingsForm:
@@ -191,13 +173,7 @@ class TestSettingsForm:
         save_btn = logged_in_admin.locator('button:has-text("Save Settings"), button:has-text("Save")').first
         expect(save_btn).to_be_visible()
         
-        # If your app disables the button, verify it
-        # If it doesn't disable it but just does nothing, you can remove the assertion for 'disabled'
-        # expect(save_btn).to_be_disabled() 
 
-# ============================================================================
-# STATUS MESSAGE TESTS
-# ============================================================================
 
 @pytest.mark.integration
 class TestStatusMessages:
@@ -205,12 +181,10 @@ class TestStatusMessages:
     
     def test_success_message_container(self, logged_in_admin: Page):
         navigate_to_settings(logged_in_admin)
-        # Just check body exists as a baseline, since messages appear dynamically
+        # Check body exists as a baseline, since messages appear dynamically
         expect(logged_in_admin.locator("body")).to_be_visible()
 
-# ============================================================================
-# AUTHORIZATION TESTS
-# ============================================================================
+
 
 @pytest.mark.e2e
 class TestSettingsAuthorization:
@@ -220,7 +194,6 @@ class TestSettingsAuthorization:
         """Admin should access settings page"""
         navigate_to_settings(logged_in_admin)
     
-    # Target the specific page heading
         expect(logged_in_admin.get_by_role("heading", name="Settings", exact=True)).to_be_visible()
     
     def test_regular_user_cannot_access(self, logged_in_user: Page):
@@ -231,7 +204,7 @@ class TestSettingsAuthorization:
         # Wait for redirect
         logged_in_user.wait_for_load_state("networkidle")
         
-        # Verify we are NOT on settings page
+        # Verify we are not on settings page
         url = logged_in_user.url
         assert "/settings" not in url or "/login" in url or "/dashboard" in url
 

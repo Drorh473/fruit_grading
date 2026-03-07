@@ -8,9 +8,6 @@ from typing import Dict, Any, Optional
 import time
 
 
-# ============================================================================
-# AUTHENTICATION HELPERS
-# ============================================================================
 
 def login_user(page: Page, username: str, password: str, role: str = 'user') -> Page:
     """
@@ -56,9 +53,6 @@ def logout_user(page: Page) -> Page:
     return page
 
 
-# ============================================================================
-# NAVIGATION HELPERS
-# ============================================================================
 
 def navigate_to_page(page: Page, route: str) -> Page:
     """
@@ -88,9 +82,6 @@ def wait_for_navigation(page: Page, timeout: int = 5000):
     page.wait_for_load_state("networkidle", timeout=timeout)
 
 
-# ============================================================================
-# ELEMENT INTERACTION HELPERS
-# ============================================================================
 
 def wait_for_element(page: Page, selector: str, timeout: int = 5000):
     """
@@ -114,12 +105,6 @@ def fill_form(page: Page, form_data: Dict[str, str]):
     Args:
         page: Playwright page object
         form_data: Dictionary of field names to values
-    
-    Example:
-        fill_form(page, {
-            'username': 'admin',
-            'password': 'admin123'
-        })
     """
     for field_name, value in form_data.items():
         page.fill(f'input[name="{field_name}"]', value)
@@ -136,10 +121,6 @@ def select_option_by_text(page: Page, selector: str, text: str):
     """
     page.select_option(selector, label=text)
 
-
-# ============================================================================
-# ASSERTION HELPERS
-# ============================================================================
 
 def assert_element_visible(page: Page, selector: str, message: str = None):
     """
@@ -190,9 +171,6 @@ def assert_url_contains(page: Page, url_part: str):
     assert url_part in page.url, f"Expected URL to contain '{url_part}', got '{page.url}'"
 
 
-# ============================================================================
-# API TESTING HELPERS
-# ============================================================================
 
 def make_api_request(method: str, endpoint: str, data: Optional[Dict] = None, 
                      headers: Optional[Dict] = None) -> Dict[str, Any]:
@@ -258,9 +236,6 @@ def assert_api_error(response: Dict[str, Any], expected_status: int):
         f"Expected status {expected_status}, got {response['status_code']}"
 
 
-# ============================================================================
-# MOCK DATA GENERATORS
-# ============================================================================
 
 def generate_mock_pipeline_status(status: str = 'idle', progress: int = 0) -> Dict[str, Any]:
     """
@@ -346,9 +321,6 @@ def generate_mock_camera_status() -> list:
     ]
 
 
-# ============================================================================
-# SCREENSHOT HELPERS
-# ============================================================================
 
 def take_screenshot(page: Page, name: str, path: str = "test-screenshots"):
     """
@@ -389,9 +361,6 @@ def screenshot_element(page: Page, selector: str, name: str, path: str = "test-s
     return screenshot_path
 
 
-# ============================================================================
-# TIMING HELPERS
-# ============================================================================
 
 def measure_page_load_time(page: Page, url: str) -> float:
     """
@@ -434,9 +403,6 @@ def wait_for_condition(condition_func, timeout: int = 5, interval: float = 0.1):
     return False
 
 
-# ============================================================================
-# VALIDATION HELPERS
-# ============================================================================
 
 def validate_form_error(page: Page, expected_error: str):
     """
@@ -463,10 +429,6 @@ def validate_success_message(page: Page, expected_message: str):
     expect(success_element).to_be_visible()
     expect(success_element).to_contain_text(expected_message)
 
-
-# ============================================================================
-# COOKIE/STORAGE HELPERS
-# ============================================================================
 
 def clear_browser_storage(page: Page):
     """

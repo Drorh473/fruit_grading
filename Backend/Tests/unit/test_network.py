@@ -51,11 +51,11 @@ class TestParameterInitialization:
             test_config['NUM_CLASSES']
         )
         
-        # Check shapes - FIXED: biases are (1, dim) not (dim,)
+        # Check shapes 
         assert params['W1'].shape == (test_config['FEATURE_DIM'], test_config['HIDDEN_DIM'])
-        assert params['b1'].shape == (1, test_config['HIDDEN_DIM'])  # FIXED
+        assert params['b1'].shape == (1, test_config['HIDDEN_DIM'])
         assert params['W2'].shape == (test_config['HIDDEN_DIM'], test_config['NUM_CLASSES'])
-        assert params['b2'].shape == (1, test_config['NUM_CLASSES'])  # FIXED
+        assert params['b2'].shape == (1, test_config['NUM_CLASSES'])
     
     def test_initialize_parameters_types(self, test_config):
         """Test that parameters are numpy arrays"""
@@ -82,7 +82,6 @@ class TestParameterInitialization:
         assert np.abs(params['W1']).mean() < 1.0
         assert np.abs(params['W2']).mean() < 1.0
         
-        # Biases should be zeros - FIXED: shape is (1, dim)
         np.testing.assert_array_equal(params['b1'], np.zeros((1, test_config['HIDDEN_DIM'])))
         np.testing.assert_array_equal(params['b2'], np.zeros((1, test_config['NUM_CLASSES'])))
 
@@ -95,7 +94,6 @@ class TestForwardPass:
         batch_size = 10
         X = np.random.rand(batch_size, test_config['FEATURE_DIM'])
         
-        # FIXED: forward_pass returns (A2, cache)
         A2, cache = forward_pass(X, mock_model_parameters)
         
         assert cache['A1'].shape == (batch_size, test_config['HIDDEN_DIM'])
@@ -181,7 +179,6 @@ class TestBackwardPass:
         y = np.array([0, 1, 2, 0, 1, 2, 0, 1, 2, 0])
         
         A2, cache = forward_pass(X, mock_model_parameters)
-        # FIXED: backward_pass signature is (y_true, params, cache, num_classes, lambda_reg)
         grads = backward_pass(y, mock_model_parameters, cache, num_classes=test_config['NUM_CLASSES'])
         
         assert grads['dW1'].shape == mock_model_parameters['W1'].shape
@@ -220,7 +217,6 @@ class TestParameterUpdate:
         learning_rate = 0.01
         updated_params = update_parameters(mock_model_parameters, grads, learning_rate)
         
-        # Parameters should change
         assert not np.array_equal(updated_params['W1'], original_W1)
     
     def test_update_parameters_direction(self, mock_model_parameters):
@@ -262,7 +258,6 @@ class TestTrainingStep:
         
         original_W1 = mock_model_parameters['W1'].copy()
         
-        # FIXED: Unpack 3 values
         loss, accuracy, params = train_step(X, y, mock_model_parameters, 3, learning_rate=0.01)
         
         assert not np.array_equal(params['W1'], original_W1)
@@ -275,7 +270,6 @@ class TestPrediction:
         """Test that predictions have correct shape"""
         X = np.random.rand(10, test_config['FEATURE_DIM'])
         
-        # FIXED: predict returns (predictions, probabilities)
         predictions, probabilities = predict(X, mock_model_parameters)
         
         assert predictions.shape == (10,)
@@ -309,7 +303,6 @@ class TestEvaluation:
         X = np.random.rand(10, test_config['FEATURE_DIM'])
         y = np.array([0, 1, 2, 0, 1, 2, 0, 1, 2, 0])
         
-        # FIXED: evaluate returns (loss, accuracy)
         loss, accuracy = evaluate(X, y, mock_model_parameters, num_classes=test_config['NUM_CLASSES'])
         
         assert isinstance(loss, (float, np.floating))
@@ -332,7 +325,6 @@ class TestModelTraining:
         
         train_losses = []
         for epoch in range(100):
-            # FIXED: Unpack 3 values
             loss, accuracy, params = train_step(X, y, params, 3, learning_rate=0.01)
             train_losses.append(loss)
         
@@ -372,7 +364,6 @@ class TestModelSaveLoad:
         with tempfile.NamedTemporaryFile(suffix='.pkl', delete=False) as f:
             model_path = f.name
         
-        # FIXED: save_model needs (params, history, input_dim, hidden_dim, num_classes, filepath)
         history = {'train_loss': [0.5, 0.4], 'train_accuracy': [0.7, 0.8]}
         save_model(
             mock_model_parameters,
@@ -404,7 +395,6 @@ class TestModelSaveLoad:
             model_path
         )
         
-        # FIXED: load_model returns (params, model_info)
         loaded_params, model_info = load_model(model_path)
         
         # Parameters should match

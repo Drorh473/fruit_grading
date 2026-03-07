@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from Streamers.database_creation import process_dataset
 from preprocessing.preprocessing_from_db import load_dataset_with_preprocessing
 from cnn.pre_trained_feature_map import process_features
-from cnn.fully_connected_layer import train, evaluate, save_model, predict, compute_avg_confidence
+from cnn.fully_connected_layer import train, evaluate, save_model, compute_avg_confidence
 from cnn.fine_tune_classifier import (
     train_fine_tuned_model,
     save_fine_tuned_model,

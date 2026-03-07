@@ -7,7 +7,7 @@ from pymongo import MongoClient
 from PIL import Image
 from flask import Flask
 
-# CRITICAL: Set test environment BEFORE any other imports
+# Set test environment before any other imports
 os.environ['TESTING'] = 'true'
 os.environ['DB_NAME'] = 'test_fruit_grading'
 
@@ -21,7 +21,7 @@ tests_dir = Path(__file__).parent
 if str(tests_dir) not in sys.path:
     sys.path.insert(0, str(tests_dir))
 
-# Import test configuration (this also loads .env.test)
+# Import test configuration
 from Tests.test_config import TestConfig, ensure_test_environment
 
 # Ensure test environment is active
@@ -37,8 +37,6 @@ def _verify_not_production_db(db_name):
         )
 
 
-# ==================== Flask Application Fixtures ====================
-
 @pytest.fixture
 def app():
     """Create Flask app for testing with all blueprints registered"""
@@ -48,7 +46,7 @@ def app():
     app = Flask(__name__)
     app.config['TESTING'] = True
     
-    # Set test configuration - ALWAYS use test database
+    # Set test configuration
     app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max
     app.config['DB_NAME'] = TestConfig.TEST_DB_NAME  # Force test DB
     app.config['MONGO_CONNECTION_STRING'] = TestConfig.MONGO_CONNECTION_STRING
@@ -120,7 +118,6 @@ def client(app):
     return app.test_client()
 
 
-# ==================== Database Fixtures ====================
 
 @pytest.fixture(scope='session')
 def mongo_client():
@@ -188,7 +185,6 @@ def test_collection(test_db):
         print(f"[Test] Collection cleanup warning: {e}")
 
 
-# ==================== Image Fixtures ====================
 
 @pytest.fixture
 def sample_image():
@@ -261,7 +257,6 @@ def multiple_valid_images(tmp_path):
     return image_paths
 
 
-# ==================== Model Fixtures ====================
 
 @pytest.fixture
 def mock_model_parameters():
@@ -278,7 +273,6 @@ def mock_model_parameters():
     }
 
 
-# ==================== Environment Fixtures ====================
 
 @pytest.fixture(scope='session', autouse=True)
 def setup_test_environment():
@@ -344,13 +338,12 @@ def cleanup_uploaded_files():
 @pytest.fixture(autouse=True)
 def enforce_test_database(monkeypatch):
     """
-    Automatically patch environment variables for EVERY test
+    Automatically patch environment variables for every test
     to ensure test database is always used
     """
     monkeypatch.setenv('DB_NAME', TestConfig.TEST_DB_NAME)
     monkeypatch.setenv('TESTING', 'true')
     
-    # Also patch os.getenv to return test values for critical vars
     original_getenv = os.getenv
     
     def patched_getenv(key, default=None):
@@ -363,7 +356,6 @@ def enforce_test_database(monkeypatch):
     monkeypatch.setattr(os, 'getenv', patched_getenv)
 
 
-# ==================== API Testing Fixtures ====================
 
 @pytest.fixture
 def mock_classification_result():
@@ -423,7 +415,6 @@ def api_headers():
     }
 
 
-# ==================== Database Seeding Fixtures ====================
 
 @pytest.fixture
 def seed_test_data(test_collection):

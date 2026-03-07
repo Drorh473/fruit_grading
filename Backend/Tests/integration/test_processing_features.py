@@ -1,7 +1,3 @@
-"""
-Integration tests for preprocessing to feature extraction pipeline.
-Tests the full flow from raw images through preprocessing to fused features.
-"""
 import pytest
 import numpy as np
 from pathlib import Path
@@ -25,11 +21,10 @@ def sample_image():
 
 
 class TestPreprocessingToFeaturesPipeline:
-    """Integration tests for complete preprocessing-to-features pipeline.
-
+    """
+    Integration tests for complete preprocessing-to-features pipeline.
     These tests verify the end-to-end flow from raw images through
-    preprocessing to final fused feature vectors. Individual function
-    unit tests are in test_feature_extraction.py.
+    preprocessing to final fused feature vectors. 
     """
 
     def test_full_pipeline_single_object(self, sample_image):

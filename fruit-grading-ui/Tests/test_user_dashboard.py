@@ -1,7 +1,6 @@
 """
 User Dashboard Tests
 Tests limited view for standard operators
-Matches UserDashboard.jsx structure
 Includes interaction tests for all buttons
 """
 
@@ -73,12 +72,10 @@ class TestDashboardInteractions:
         # Click refresh
         refresh_btn.click()
         
-        # Check for loading state (The text changes to "Refreshing..." or icon spins)
-        # UserDashboard.jsx: {refreshing ? "Refreshing..." : "Refresh"}
+        # Check for loading state
         try:
             expect(logged_in_user.locator('button')).to_contain_text("Refreshing", timeout=2000)
         except AssertionError:
-            # It might have been too fast, which is also fine.
             pass
             
         # Should eventually return to "Refresh"

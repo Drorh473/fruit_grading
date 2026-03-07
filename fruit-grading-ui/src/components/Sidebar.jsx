@@ -18,7 +18,6 @@ const Sidebar = () => {
   const { user, logout, isAdmin } = useAuth();
   const [isHovered, setIsHovered] = useState(false);
 
-  // **FIX: Ensure sidebar-open class is removed on mount and unmount**
   useEffect(() => {
     // Remove class immediately when component mounts
     document.body.classList.remove("sidebar-open");

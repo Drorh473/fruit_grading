@@ -23,7 +23,7 @@ const AddFruit = () => {
 
   const fileInputRef = useRef(null);
 
-  // --- Client-Side Validation Helper ---
+  // Client-Side Validation Helper
   const validateFilesClientSide = (files) => {
     const requiredAngles = ["an_0", "an_1", "an_2", "an_3"];
     // Track count of images per angle folder
@@ -43,7 +43,6 @@ const AddFruit = () => {
         totalImages++;
 
         // Check if any part of the path matches our required angle folders
-        // This is flexible enough to handle "Root/an_0/img.jpg" or just "an_0/img.jpg"
         requiredAngles.forEach((angle) => {
           if (parts.includes(angle)) {
             counts[angle]++;
@@ -67,7 +66,7 @@ const AddFruit = () => {
     };
   };
 
-  // --- Main Action ---
+  // Main Action
   const handleUploadAndProcess = async () => {
     if (selectedFiles.length === 0) {
       setError("No files selected");
@@ -103,7 +102,7 @@ const AddFruit = () => {
     }
   };
 
-  // --- Input Change Handler ---
+  // Input Change Handler
   const handleDirectorySelect = (e) => {
     const files = e.target.files;
     if (files.length > 0) {
@@ -134,13 +133,12 @@ const AddFruit = () => {
     }
   };
 
-  // --- Drag and Drop Logic ---
+  // Drag and Drop Logic 
   // Helper to read entries recursively with batch reading support
   const traverseFileTree = async (item, path = "") => {
     if (item.isFile) {
       return new Promise((resolve) => {
         item.file((file) => {
-          // Manually attach path info since DnD drops often lose it
           Object.defineProperty(file, "webkitRelativePath", {
             value: path + file.name,
           });

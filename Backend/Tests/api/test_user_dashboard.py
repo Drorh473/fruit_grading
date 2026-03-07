@@ -197,7 +197,7 @@ class TestUserDashboardIntegration:
         
         # If we have results, stats should have some counts
         if len(results_data) > 0:
-            # At least totalToday should be >= 0
+            # At least totalToday should be greater-equal than 0
             assert stats_data['totalToday'] >= 0
     
     def test_model_info_and_stats_consistency(self, client):

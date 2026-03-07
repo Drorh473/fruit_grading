@@ -194,9 +194,7 @@ def print_confusion_matrix_breakdown(cm, label_mapping):
 def generate_full_confusion_matrix_report(results, save_dir=None):
     """
     Generate complete confusion matrix report with all visualizations and metrics
-    
-    This is the main function that uses all other functions to create a comprehensive report.
-    
+       
     Args:
         results: Results dictionary from train_classifier containing:
                 - X_test: Test features

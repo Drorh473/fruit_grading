@@ -8,7 +8,7 @@ from torchvision.models import (
     shufflenet_v2_x1_0, ShuffleNet_V2_X1_0_Weights,
     mobilenet_v3_large, MobileNet_V3_Large_Weights,
 )
-import timm # import for the EfficientNet-Lite
+import timm
 import cv2
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -84,13 +84,12 @@ def preprocess_image_for_model(image_path, device, use_custom_preprocessing=True
     """Preprocess image using your custom preprocessing pipeline"""
     try:
         if use_custom_preprocessing:
-            # Use your custom preprocessing from preprocessing_from_db.py
             img = cv2.imread(image_path)
             if img is None:
                 return None
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
             
-            # Apply your custom preprocessing
+            # Apply custom preprocessing
             processed_img = custom_preprocessing(img)
             
             # Convert back to PIL Image for torchvision transforms

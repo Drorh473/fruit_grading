@@ -157,7 +157,6 @@ class TestProcessImage:
     def test_process_image_creates_output_directory(self, valid_image_path, tmp_path, sample_metadata):
         """Test that process_image creates output directory if needed"""
         output_dir = tmp_path / "new_output"
-        # Don't create directory - let function create it
         
         file_id, output_path, error = process_image(
             str(valid_image_path), 
@@ -215,14 +214,11 @@ class TestPreprocessingEdgeCases:
         """Test preprocessing converts grayscale to RGB"""
         # Create grayscale image
         gray_image = np.random.randint(0, 255, (224, 224), dtype=np.uint8)
-        
-        # If preprocessing expects RGB, it should handle grayscale
-        # This test depends on your implementation
+
         try:
             result = custom_preprocessing(gray_image)
             assert result is not None
         except Exception as e:
-            # If it's expected to fail on grayscale, that's okay
             assert 'shape' in str(e).lower() or 'channel' in str(e).lower()
     
     def test_preprocessing_very_small_image(self):

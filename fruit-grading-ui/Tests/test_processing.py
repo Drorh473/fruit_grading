@@ -1,7 +1,6 @@
 """
 Processing Page Tests
 Tests processing pipeline control and monitoring
-Matches Processing.jsx component
 """
 
 import re
@@ -10,7 +9,7 @@ from playwright.sync_api import Page, expect
 
 BASE_URL = "http://localhost:3000"
 
-# Helper function to navigate safely (Preserving Auth)
+# Helper function to navigate safely
 def navigate_to_processing(page: Page):
     """Navigate to processing using the sidebar to preserve Auth state"""
     
@@ -25,11 +24,11 @@ def navigate_to_processing(page: Page):
         hamburger.click()
         page.wait_for_selector('.sidebar.visible, .sidebar-open', timeout=2000)
 
-    # 3. LOCATE the element
+    # 3. Locate the element
     # Matches href="/processing"
     processing_link = page.locator('a[href$="/processing"]')
     
-    # 4. DISPATCH 'click' event directly using JavaScript
+    # 4. Dispatch 'click' event directly using JavaScript
     processing_link.dispatch_event('click')
     
     # 5. Wait for navigation
@@ -41,14 +40,10 @@ def navigate_to_processing(page: Page):
         expect(page).to_have_url(re.compile(r".*/processing"))
 
     # 6. Verify page load with SPECIFIC header
-    # Matches "ML Processing Pipeline" or just "Processing"
     page.wait_for_selector('h1', state='visible')
     expect(page.get_by_role("heading", name="Processing Pipeline", exact=True)).to_be_visible()
 
 
-# ============================================================================
-# RENDERING TESTS
-# ============================================================================
 
 @pytest.mark.unit
 class TestProcessingRendering:
@@ -58,7 +53,6 @@ class TestProcessingRendering:
         """Should load processing page successfully"""
         navigate_to_processing(logged_in_admin)
             
-            # Use exact=True to avoid matching "Data Preprocessing"
         header = logged_in_admin.get_by_role("heading", name="Processing Pipeline", exact=True)
         expect(header).to_be_visible()
         
@@ -87,9 +81,6 @@ class TestProcessingRendering:
         assert found >= 4  # At least 4 steps visible
 
 
-# ============================================================================
-# PIPELINE CONTROL TESTS
-# ============================================================================
 
 @pytest.mark.integration
 class TestPipelineControl:
@@ -111,9 +102,6 @@ class TestPipelineControl:
         expect(refresh_btn).to_be_visible()
 
 
-# ============================================================================
-# CONFIGURATION TESTS
-# ============================================================================
 
 @pytest.mark.unit
 class TestProcessingConfiguration:
@@ -123,7 +111,6 @@ class TestProcessingConfiguration:
         """Should have training configuration section"""
         navigate_to_processing(logged_in_admin)
         
-        # Use get_by_role to avoid ambiguity
         section = logged_in_admin.locator('text=Training Configuration')
         if section.count() > 1:
              expect(section.first).to_be_visible()
@@ -174,9 +161,6 @@ class TestProcessingConfiguration:
             expect(options).to_be_visible()
 
 
-# ============================================================================
-# LOG DISPLAY TESTS
-# ============================================================================
 
 @pytest.mark.integration
 class TestLogDisplay:
@@ -184,22 +168,16 @@ class TestLogDisplay:
     
     def test_log_panel_exists(self, logged_in_admin: Page):
         navigate_to_processing(logged_in_admin)
-        # Be specific: H2 header
         log_section = logged_in_admin.get_by_role("heading", name="Processing Logs")
         expect(log_section).to_be_visible()
 
     
     def test_log_container_scrollable(self, logged_in_admin: Page):
         navigate_to_processing(logged_in_admin)
-        # Fix typo: .logs-container (plural)
         log_container = logged_in_admin.locator('.logs-container')
         assert log_container.count() > 0
 
 
-
-# ============================================================================
-# STEP VISUALIZATION TESTS
-# ============================================================================
 
 @pytest.mark.unit
 class TestStepVisualization:
@@ -222,9 +200,6 @@ class TestStepVisualization:
         assert 'step' in content.lower()
 
 
-# ============================================================================
-# ERROR HANDLING TESTS
-# ============================================================================
 
 @pytest.mark.integration
 class TestProcessingErrorHandling:
@@ -234,14 +209,11 @@ class TestProcessingErrorHandling:
         """Should have error display area"""
         navigate_to_processing(logged_in_admin)
         
-        # Just verify page loads correctly
+        # Verify page loads correctly
         page_content = logged_in_admin.content()
         assert len(page_content) > 0
 
 
-# ============================================================================
-# AUTHORIZATION TESTS
-# ============================================================================
 
 @pytest.mark.e2e
 class TestProcessingAuthorization:
@@ -254,7 +226,7 @@ class TestProcessingAuthorization:
 
     def test_regular_user_cannot_access(self, logged_in_user: Page):
         """Regular user should not access processing page"""
-        # Try to go to processing (using standard goto here as we expect redirect)
+        # Try to go to processing
         logged_in_user.goto(f"{BASE_URL}/processing")
         
         # Wait for redirect
@@ -266,9 +238,6 @@ class TestProcessingAuthorization:
                logged_in_user.locator('[class*="denied"], [class*="error"]').count() > 0
 
 
-# ============================================================================
-# DATASET INFO TESTS
-# ============================================================================
 
 @pytest.mark.unit
 class TestDatasetInfo:

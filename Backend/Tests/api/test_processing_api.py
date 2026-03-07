@@ -5,12 +5,6 @@ import time
 import threading
 from unittest.mock import patch, MagicMock
 
-# -------------------------------------------------------------------------
-# MOCK PATHS
-# from processes.build_model import (run_tests, setup_database, ...)
-# -------------------------------------------------------------------------
-
-# We'll patch them where they are USED (in routes.processing), not where they're defined
 MOCK_BASE = 'routes.processing'
 
 class TestPipelineControl:
@@ -129,11 +123,11 @@ class TestPipelineControl:
     @patch(f'{MOCK_BASE}.run_tests')
     def test_start_pipeline_already_running(self, mock_tests, mock_db, mock_preprocess, mock_extract, mock_train, mock_cm, mock_save, client):
         """Test starting pipeline when already running"""
-        # Use an event to block the pipeline until we've made the second request
+        # Using an event to block the pipeline until the second request is made
         release_pipeline = threading.Event()
 
         def blocking_setup_database():
-            # Wait for signal before completing
+            # Waiting for signal before completing
             release_pipeline.wait(timeout=5)
             return True
 
@@ -390,14 +384,14 @@ class TestPipelineWorkflow:
 
     def test_config_then_start_workflow(self, client):
         """Test updating config before starting pipeline"""
-        # 1. Update config
+        # Update config
         config = {'hiddenDim': 32, 'epochs': 100}
         config_response = client.put('/api/pipeline/config',
                                     data=json.dumps(config),
                                     content_type='application/json')
         assert config_response.status_code == 200
 
-        # 2. Verify config persists
+        # Verify config persists
         status_response = client.get('/api/pipeline/config')
         status_data = json.loads(status_response.data)
         assert status_data['hiddenDim'] == 32

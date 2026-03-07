@@ -5,12 +5,10 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
-# Use __file__ to get reliable path regardless of cwd
 PROJECT_DIR = Path(__file__).parent.parent.absolute()
 if str(PROJECT_DIR) not in sys.path:
     sys.path.insert(0, str(PROJECT_DIR))
 
-# Load .env.test from Tests directory (where this file is located)
 env_path = Path(__file__).parent / '.env.test'
 load_dotenv(dotenv_path=env_path)
 
@@ -68,7 +66,7 @@ class TestPhase:
             # Get output (stderr is merged with stdout)
             output = result.stdout or ''
             
-            # Debug: Always show pytest output
+            # Always show pytest output
             if output.strip():
                 print("Pytest output:")
                 print(output)
@@ -160,9 +158,6 @@ class TestOrchestrator:
     
     def _define_phases(self):
         """Define test phases for pre-pipeline validation"""
-        
-        # Paths relative to Tests directory (where this script is)
-        
         # Phase 1: Critical Unit Tests (Core Components)
         phase1 = TestPhase(
             name="Phase 1: Critical Unit Tests",
@@ -199,7 +194,7 @@ class TestOrchestrator:
                 'Tests/api/test_results_api.py',
                 'Tests/api/test_processing_api.py',
             ],
-            required=False  # Not required for pipeline, but good to have
+            required=False
         )
         
         # Phase 4: Integration Tests
@@ -221,7 +216,7 @@ class TestOrchestrator:
             test_paths=[
                 'Tests/integration/test_build_model.py',
             ],
-            required=False  # Optional
+            required=False
         )
         
         return [phase1, phase2, phase3, phase4, phase5]
@@ -239,7 +234,6 @@ class TestOrchestrator:
         """
         Run quick pre-pipeline validation - only unit and integration tests.
         Skips API tests and full pipeline integration.
-        Perfect for validating before running build_model pipeline.
         """
         print("\n" + "="*70)
         print("QUICK PRE-PIPELINE VALIDATION")

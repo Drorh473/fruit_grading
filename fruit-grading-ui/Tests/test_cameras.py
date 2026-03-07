@@ -1,7 +1,6 @@
 """
 Camera Monitor Tests
 Tests camera feed display and controls
-Matches CameraMonitor.jsx component
 """
 
 import re
@@ -10,7 +9,7 @@ from playwright.sync_api import Page, expect
 
 BASE_URL = "http://localhost:3000"
 
-# Helper function to navigate safely (Preserving Auth)
+# Helper function to navigate safely
 def navigate_to_cameras(page: Page):
     """Navigate to cameras using the sidebar to preserve Auth state"""
     
@@ -25,11 +24,11 @@ def navigate_to_cameras(page: Page):
         hamburger.click()
         page.wait_for_selector('.sidebar.visible, .sidebar-open', timeout=2000)
 
-    # 3. LOCATE the element
+    # 3. Locate the element
     # Matches href="/cameras"
     camera_link = page.locator('a[href$="/cameras"]')
     
-    # 4. DISPATCH 'click' event directly using JavaScript
+    # 4. Dispatch 'click' event directly using JavaScript
     camera_link.dispatch_event('click')
     
     # 5. Wait for navigation
@@ -40,13 +39,10 @@ def navigate_to_cameras(page: Page):
         camera_link.evaluate("el => el.click()")
         expect(page).to_have_url(re.compile(r".*/cameras"))
 
-    # 6. Verify page load with SPECIFIC header
+    # 6. Verify page load with specific header
     page.wait_for_selector('h1:has-text("Camera Monitor")', state='visible')
 
 
-# ============================================================================
-# RENDERING TESTS
-# ============================================================================
 
 @pytest.mark.unit
 class TestCameraRendering:
@@ -56,8 +52,6 @@ class TestCameraRendering:
         """Should load camera monitor page"""
         navigate_to_cameras(logged_in_admin)
         
-        # CameraMonitor.jsx has h1 "Camera Monitor"
-        # Use exact text or role to be safe
         header = logged_in_admin.get_by_role("heading", name="Camera Monitor")
         expect(header).to_be_visible()
     
@@ -82,13 +76,9 @@ class TestCameraRendering:
         navigate_to_cameras(logged_in_admin)
         
         # CameraMonitor.jsx shows "Last updated: {time}"
-        # Use locator instead of content() for robustness
         expect(logged_in_admin.locator("text=Last updated").first).to_be_visible()
 
 
-# ============================================================================
-# CAMERA CARD TESTS
-# ============================================================================
 
 @pytest.mark.unit
 class TestCameraCards:
@@ -138,14 +128,9 @@ class TestCameraCards:
         navigate_to_cameras(logged_in_admin)
         
         # CameraMonitor.jsx shows "LIVE" with recording-indicator
-        # Be permissive as "LIVE" might be in a span
         content = logged_in_admin.content()
         assert 'LIVE' in content or 'Active' in content
 
-
-# ============================================================================
-# CAMERA CONTROLS TESTS
-# ============================================================================
 
 @pytest.mark.integration
 class TestCameraControls:
@@ -164,7 +149,6 @@ class TestCameraControls:
         navigate_to_cameras(logged_in_admin)
         
         # CameraMonitor.jsx has .btn-icon with FiRefreshCw for each camera
-        # Just check for buttons inside camera cards
         refresh_btns = logged_in_admin.locator('.camera-card button')
         assert refresh_btns.count() >= 4
     
@@ -187,14 +171,9 @@ class TestCameraControls:
         # CameraMonitor.jsx allows clicking to select camera
         first_camera = logged_in_admin.locator('.camera-card').first
         first_camera.click()
-        
-        # Should add .selected class (if implemented) or just not crash
         logged_in_admin.wait_for_timeout(200)
 
 
-# ============================================================================
-# CAMERA HEALTH TESTS
-# ============================================================================
 
 @pytest.mark.unit
 class TestCameraHealth:
@@ -205,7 +184,6 @@ class TestCameraHealth:
         navigate_to_cameras(logged_in_admin)
         
         # CameraMonitor.jsx has "Camera System Health" section
-        # Use specific locator to avoid matching multiple elements
         section = logged_in_admin.get_by_role("heading", name="Camera System Health")
         expect(section).to_be_visible()
     
@@ -228,9 +206,6 @@ class TestCameraHealth:
         assert health_cards.count() == 4
 
 
-# ============================================================================
-# FEED DISPLAY TESTS
-# ============================================================================
 
 @pytest.mark.unit
 class TestCameraFeedDisplay:

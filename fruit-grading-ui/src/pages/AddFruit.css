@@ -2,7 +2,7 @@
   padding: var(--spacing-xl);
   max-width: 1200px;
   margin: 0 auto;
-  position: relative; /* Needed for drag overlay positioning */
+  position: relative;
 }
 
 /* Add spacing between cards */
@@ -89,8 +89,8 @@
   border: 1px solid var(--border);
   color: var(--text-primary);
   cursor: pointer;
-  padding: 0 var(--spacing-lg); /* Match input height */
-  height: 42px; /* Ensure this matches your input-field height */
+  padding: 0 var(--spacing-lg); 
+  height: 42px; 
   border-radius: var(--radius-md, 4px);
   font-weight: 500;
   transition: all 0.2s;

@@ -187,7 +187,7 @@ class TestDataSplitting:
         training_count = test_collection.count_documents({"set_type": "training"})
         testing_count = test_collection.count_documents({"set_type": "testing"})
         
-        # Check ratio is approximately correct (±5%)
+        # Check ratio is approximately correct ~5%
         ratio = training_count / 100
         assert 0.65 <= ratio <= 0.75
     
@@ -246,11 +246,8 @@ class TestDatabaseRobustness:
     
     def test_malformed_document_rejection(self, test_collection):
         """Test rejection of documents missing required fields"""
-        # Create schema validation
-        # Note: This is a conceptual test - actual implementation depends on your validation logic
         malformed_doc = {
             "path": "/test/image.png",
-            # Missing required fields: fruit_type, object_id, etc.
         }
         required_fields = ['path', 'fruit_type', 'object_id', 'camera_id']
         missing_fields = [f for f in required_fields if f not in malformed_doc]

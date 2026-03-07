@@ -1,7 +1,6 @@
 """
 Results Page Tests
 Tests classification results display and filtering
-Matches refactored Results.jsx component
 """
 
 import re
@@ -35,9 +34,6 @@ def navigate_to_results(page: Page):
     page.wait_for_selector('h1:has-text("Classification Results")', state='visible')
 
 
-# ============================================================================
-# RENDERING TESTS
-# ============================================================================
 
 @pytest.mark.unit
 class TestResultsRendering:
@@ -68,9 +64,7 @@ class TestResultsRendering:
         expect(table.or_(empty).first).to_be_visible()
 
 
-# ============================================================================
-# KPI SECTION TESTS
-# ============================================================================
+
 
 @pytest.mark.unit
 class TestKPISection:
@@ -99,9 +93,7 @@ class TestKPISection:
         assert trends.count() >= 0
 
 
-# ============================================================================
-# FILTER TESTS
-# ============================================================================
+
 
 @pytest.mark.integration
 class TestResultsFiltering:
@@ -141,9 +133,6 @@ class TestResultsFiltering:
             search_input.fill('test')
 
 
-# ============================================================================
-# PREDICTED GRADE DISTRIBUTION TESTS
-# ============================================================================
 
 @pytest.mark.unit
 class TestPredictedGradeDistribution:
@@ -175,9 +164,7 @@ class TestPredictedGradeDistribution:
             assert 'Reject' not in legend_text
 
 
-# ============================================================================
-# SYSTEM STATUS TESTS
-# ============================================================================
+
 
 @pytest.mark.unit
 class TestSystemStatus:
@@ -198,9 +185,7 @@ class TestSystemStatus:
         assert alert_list.count() >= 0
 
 
-# ============================================================================
-# TRAINING HISTORY TESTS
-# ============================================================================
+
 
 @pytest.mark.unit
 class TestTrainingHistory:
@@ -235,9 +220,7 @@ class TestTrainingHistory:
         assert legends.count() >= 0
 
 
-# ============================================================================
-# CONFUSION MATRIX TESTS
-# ============================================================================
+
 
 @pytest.mark.unit
 class TestConfusionMatrix:
@@ -268,9 +251,7 @@ class TestConfusionMatrix:
             assert 'reject' not in matrix_text.lower()
 
 
-# ============================================================================
-# EXPORT TESTS
-# ============================================================================
+
 
 @pytest.mark.integration
 class TestResultsExport:
@@ -299,9 +280,7 @@ class TestResultsExport:
             expect(export_options).to_be_visible()
 
 
-# ============================================================================
-# TABLE TESTS
-# ============================================================================
+
 
 @pytest.mark.unit
 class TestResultsTable:
@@ -333,9 +312,7 @@ class TestResultsTable:
         assert batch_header.count() == 0
 
 
-# ============================================================================
-# RESPONSIVE TESTS
-# ============================================================================
+
 
 @pytest.mark.unit
 class TestResponsiveLayout:

@@ -50,11 +50,11 @@ class TestGetSettings:
         response = client.get('/api/settings')
         data = json.loads(response.data)
         
-        # Database name should be string (if set)
+        # Database name should be string
         if data['dbName']:
             assert isinstance(data['dbName'], str)
         
-        # Paths should be strings (if set)
+        # Paths should be strings
         if data['storedDataset']:
             assert isinstance(data['storedDataset'], str)
 
@@ -265,7 +265,7 @@ class TestSettingsIntegration:
         
         assert update_response.status_code == 200
         
-        # Retrieve settings (they may not persist in test mode)
+        # Retrieve settings
         get_response = client.get('/api/settings')
         assert get_response.status_code == 200
 

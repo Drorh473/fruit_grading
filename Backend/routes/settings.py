@@ -90,10 +90,8 @@ def get_settings_status():
         current_app.logger.warning(f"Database connection check failed: {db_err}")
         db_status = 'disconnected'
 
-    # Check camera status - for now cameras are considered available if configured
-    # In production, integrate with actual camera health checks
+    # Check camera status
     try:
-        # Cameras are available if the system is configured for them
         camera_statuses = [True] * num_cameras
     except Exception as cam_err:
         current_app.logger.warning(f"Camera status check failed: {cam_err}")

@@ -6,7 +6,6 @@
       <style type="text/css">body {
   font-family: Helvetica, Arial, sans-serif;
   font-size: 12px;
-  /* do not increase min-width as some may use split screens */
   min-width: 800px;
   color: #999;
 }
@@ -33,9 +32,7 @@ table {
   border-collapse: collapse;
 }
 
-/******************************
- * SUMMARY INFORMATION
- ******************************/
+
 #environment td {
   padding: 5px;
   border: 1px solid #e6e6e6;
@@ -49,9 +46,7 @@ table {
   padding: 0 20px;
 }
 
-/******************************
- * TEST RESULT COLORS
- ******************************/
+
 span.passed,
 .passed .col-result {
   color: green;
@@ -79,17 +74,7 @@ span.xpassed,
   margin-right: 3px;
 }
 
-/******************************
- * RESULTS TABLE
- *
- * 1. Table Layout
- * 2. Extra
- * 3. Sorting items
- *
- ******************************/
-/*------------------
- * 1. Table Layout
- *------------------*/
+
 #results-table {
   border: 1px solid #e6e6e6;
   color: #999;
@@ -106,9 +91,7 @@ span.xpassed,
   font-weight: bold;
 }
 
-/*------------------
- * 2. Extra
- *------------------*/
+
 .logwrapper {
   max-height: 230px;
   overflow-y: scroll;
@@ -238,9 +221,7 @@ div.media {
   font-size: 12px;
 }
 
-/*------------------
- * 3. Sorting items
- *------------------*/
+
 .sortable {
   cursor: pointer;
 }
@@ -701,7 +682,7 @@ const renderContent = (tests) => {
     const newTable = document.createElement('table')
     newTable.id = 'results-table'
 
-    // remove all sorting classes and set the relevant
+    // Remove all sorting classes and set the relevant
     findAll('.sortable', tableHeader).forEach((elem) => elem.classList.remove('asc', 'desc'))
     tableHeader.querySelector(`.sortable[data-column-type="${sortAttr}"]`)?.classList.add(sortAsc ? 'desc' : 'asc')
     newTable.appendChild(tableHeader)

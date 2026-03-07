@@ -1,12 +1,3 @@
-"""
-Pytest Plugin for Database Isolation
-Add this to your pytest plugins to ensure test isolation
-
-This plugin:
-1. Forces test environment variables BEFORE any test imports
-2. Patches os.getenv to return test values
-3. Cleans up test database after test session
-"""
 import os
 import pytest
 
@@ -16,7 +7,7 @@ def pytest_configure(config):
     Called after command line options have been parsed and all plugins loaded.
     This is the earliest hook where we can set up test isolation.
     """
-    # Force test environment BEFORE any test modules are imported
+    # Force test environment before any test modules are imported
     os.environ['TESTING'] = 'true'
     os.environ['DB_NAME'] = 'test_fruit_grading'
     os.environ['PYTEST_CURRENT_TEST'] = 'true'
@@ -82,7 +73,7 @@ def global_test_isolation():
     
     yield
     
-    # Restore original environment (optional, usually not needed as tests end)
+    # Restore original environment
     for key, value in original_env.items():
         if value is not None:
             os.environ[key] = value

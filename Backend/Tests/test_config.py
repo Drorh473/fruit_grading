@@ -22,7 +22,7 @@ _possible_env_paths = [
 _env_loaded = False
 for env_path in _possible_env_paths:
     if env_path.exists():
-        load_dotenv(dotenv_path=env_path, override=True)  # override=True is KEY!
+        load_dotenv(dotenv_path=env_path, override=True)
         print(f"[TestConfig] Loaded test environment from: {env_path}")
         _env_loaded = True
         break
@@ -38,12 +38,12 @@ os.environ['DB_NAME'] = 'test_fruit_grading'
 class TestConfig:
     """Test configuration constants with database isolation"""
     
-    # Database - ALWAYS use test database
+    # using test database
     MONGO_CONNECTION_STRING = os.getenv('MONGO_CONNECTION_STRING', 'mongodb://localhost:27017/')
     TEST_DB_NAME = 'test_fruit_grading'  # Hardcoded for safety
     TEST_COLLECTION_NAME = os.getenv('COLLECTION_NAME', 'test_images')
     
-    # Verify we're NOT using production database
+    # Verify we're not using production database
     _db_name_from_env = os.getenv('DB_NAME', '')
     if _db_name_from_env == 'fruit_grading':
         raise RuntimeError(
@@ -51,7 +51,7 @@ class TestConfig:
             "Check your .env.test file and ensure it's being loaded correctly."
         )
     
-    # Paths - Use temporary directories for test isolation
+    # Paths - Using temporary directories for test isolation
     BASE_DIR = Path(__file__).parent
     FIXTURES_DIR = BASE_DIR / 'fixtures'
     IMAGES_DIR = FIXTURES_DIR / 'images'
@@ -60,7 +60,7 @@ class TestConfig:
     DATABASE_FIXTURES_DIR = FIXTURES_DIR / 'database'
     MODEL_FIXTURES_DIR = FIXTURES_DIR / 'models'
     
-    # Temporary directories - Use /tmp for complete isolation
+    # Temporary directories - Using /tmp for complete isolation
     TEMP_DIR = Path('/tmp/fruit_grading_tests')
     TEMP_PROCESSED_DIR = TEMP_DIR / 'processed'
     TEMP_FEATURES_DIR = TEMP_DIR / 'features'
@@ -114,7 +114,7 @@ class TestConfig:
     
     @classmethod
     def verify_test_mode(cls):
-        """Verify we're running in test mode - call this before any DB operations"""
+        """Verify we're running in test mode"""
         current_db = os.getenv('DB_NAME', '')
         if current_db == 'fruit_grading':
             raise RuntimeError("Tests attempting to use production database!")
@@ -122,14 +122,7 @@ class TestConfig:
 
 
 def ensure_test_environment():
-    """
-    Call this function at the start of test modules to ensure
-    test environment is properly configured.
-    
-    Usage:
-        from test_config import ensure_test_environment
-        ensure_test_environment()
-    """
+    """Ensure test environment is properly configured."""
     # Force test database
     os.environ['DB_NAME'] = 'test_fruit_grading'
     os.environ['TESTING'] = 'true'

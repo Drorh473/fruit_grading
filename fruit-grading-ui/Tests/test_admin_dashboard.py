@@ -1,7 +1,6 @@
 """
 Admin Dashboard Tests
 Tests system overview, stats, and administrative controls
-Matches Dashboard.jsx structure (System Status, Camera Status, Recent Results)
 """
 
 import re
@@ -113,7 +112,6 @@ class TestSystemInformation:
         expect(logged_in_admin.get_by_role("heading", name="Dataset Information")).to_be_visible()
         
         # Check for specific labels inside this card
-        # Note: Using :has-text inside the card context would be better, but page-global is fine for now
         expect(logged_in_admin.locator('.info-label:has-text("Training Samples")')).to_be_visible()
         expect(logged_in_admin.locator('.info-label:has-text("Total Images")')).to_be_visible()
 
@@ -137,7 +135,5 @@ class TestDashboardInteractions:
         expect(refresh_btn).to_be_visible()
         expect(refresh_btn).to_be_enabled()
         
-        # Click and verify state change (optional, depends on API speed)
+        # Click and verify state change
         refresh_btn.click()
-        # It might briefly become disabled
-        # expect(refresh_btn).to_be_disabled() 

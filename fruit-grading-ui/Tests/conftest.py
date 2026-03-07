@@ -1,7 +1,6 @@
 """
 Pytest Configuration and Fixtures
 Shared test setup and utilities
-Updated to match actual JSX components
 """
 
 import pytest
@@ -15,7 +14,7 @@ def browser():
     """Session-scoped browser instance"""
     with sync_playwright() as p:
         browser = p.chromium.launch(
-            headless=True,  # Set to False to see browser
+            headless=True, 
             slow_mo=0,
         )
         yield browser
@@ -72,15 +71,14 @@ def logged_in_admin(page: Page, admin_credentials):
     """
     Pre-authenticated admin user
     Returns page already logged in as admin
-    Updated to match Login.jsx (uses radio buttons, not select)
     """
     page.goto(f"{BASE_URL}/login")
     
-    # Fill login form - Login.jsx uses placeholders
+    # Fill login form
     page.fill('input[placeholder="Enter username"]', admin_credentials['username'])
     page.fill('input[placeholder="Enter password"]', admin_credentials['password'])
     
-    # Select admin role - Login.jsx uses radio buttons
+    # Select admin role
     page.locator('.role-option:has(input[value="admin"])').click()
     
     # Submit

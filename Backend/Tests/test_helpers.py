@@ -132,10 +132,6 @@ def assert_valid_image_metadata(metadata):
         assert field in metadata, f"Missing required field: {field}"
 
 
-# =============================================================================
-# API Test Utilities - Shared helpers for API endpoint testing
-# =============================================================================
-
 import json
 
 

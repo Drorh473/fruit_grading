@@ -17,6 +17,12 @@ add_fruit_bp = Blueprint('add_fruit', __name__)
 UPLOAD_FOLDER = os.path.join(PROJECT_ROOT, 'uploads_temp')
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
+"""
+Handles multi-angle fruit image upload and classification.
+Receives image files organized by camera angle (an_0 through an_3), saves them to a temporary
+batch folder, runs the ML processing pipeline, and returns the predicted fruit grade with confidence.
+Cleans up temporary files after processing regardless of success or failure.
+"""
 @add_fruit_bp.route('/upload-process', methods=['POST'])
 def upload_and_process():
     temp_dir = None

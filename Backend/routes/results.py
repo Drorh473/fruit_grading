@@ -397,7 +397,7 @@ def get_result_details(object_id):
                 'timestamp': str(img.get('timestamp', ''))
             }
         
-        # Handle null/None confidence - use default if not a valid number
+        # Handle null/None confidence
         conf = first_image.get('confidence')
         if conf is None or conf == 0:
             conf = 0.90

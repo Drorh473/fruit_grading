@@ -72,9 +72,7 @@ const Settings = () => {
     }
   }, [config, originalConfig]);
 
-  /**
-   * Fetch all settings and system status
-   */
+  // Fetch all settings and system status
   const fetchAllData = async () => {
     setLoading(true);
     setSaveStatus(null);
@@ -113,9 +111,7 @@ const Settings = () => {
     }
   };
 
-  /**
-   * Handle field change
-   */
+  // Handle field change
   const handleChange = (field, value) => {
     setConfig((prev) => ({
       ...prev,
@@ -124,9 +120,7 @@ const Settings = () => {
     setSaveStatus(null);
   };
 
-  /**
-   * Save settings to backend
-   */
+  // Save settings to backend
   const handleSave = async () => {
     setIsSaving(true);
     setSaveStatus(null);
@@ -155,9 +149,7 @@ const Settings = () => {
     }
   };
 
-  /**
-   * Reset settings to defaults
-   */
+  // Reset settings to defaults
   const handleReset = async () => {
     if (
       !window.confirm("Are you sure you want to reset all settings to default?")
@@ -195,9 +187,7 @@ const Settings = () => {
     }
   };
 
-  /**
-   * Test database connection
-   */
+  // Test database connection
   const testConnection = async () => {
     setTestingConnection(true);
     setSaveStatus(null);
@@ -235,9 +225,7 @@ const Settings = () => {
     }
   };
 
-  /**
-   * Test individual path
-   */
+  // Test individual path
   const testSinglePath = async (pathType, pathValue) => {
     setTestingPaths((prev) => ({ ...prev, [pathType]: true }));
 
@@ -269,9 +257,7 @@ const Settings = () => {
     }
   };
 
-  /**
-   * Validate all paths at once
-   */
+  // Validate all paths at once
   const validatePaths = async () => {
     setTestingPaths({
       stored: true,
@@ -311,9 +297,7 @@ const Settings = () => {
     }
   };
 
-  /**
-   * Get validation icon for path
-   */
+  // Get validation icon for path
   const getValidationIcon = (pathType) => {
     const validation = pathValidation[pathType];
     const testing = testingPaths[pathType];

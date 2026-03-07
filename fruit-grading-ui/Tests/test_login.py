@@ -1,7 +1,6 @@
 """
 Login Page Tests
 Tests authentication flow and login UI
-Matches Login.jsx component
 """
 
 import re
@@ -12,9 +11,6 @@ from playwright.sync_api import Page, expect
 BASE_URL = "http://localhost:3000"
 
 
-# ============================================================================
-# RENDERING TESTS
-# ============================================================================
 
 @pytest.mark.unit
 class TestLoginRendering:
@@ -67,9 +63,6 @@ class TestLoginRendering:
         expect(demo_section).to_be_visible()
 
 
-# ============================================================================
-# FORM INTERACTION TESTS
-# ============================================================================
 
 @pytest.mark.unit
 class TestLoginInteractions:
@@ -116,9 +109,6 @@ class TestLoginInteractions:
         expect(user_radio).to_be_checked()
 
 
-# ============================================================================
-# VALIDATION TESTS
-# ============================================================================
 
 @pytest.mark.integration
 class TestLoginValidation:
@@ -145,9 +135,6 @@ class TestLoginValidation:
         expect(error).to_be_visible(timeout=2000)
 
 
-# ============================================================================
-# AUTHENTICATION FLOW TESTS
-# ============================================================================
 
 @pytest.mark.e2e
 @pytest.mark.auth
@@ -183,7 +170,7 @@ class TestLoginFlow:
         
         page.fill('input[placeholder="Enter username"]', 'admin')
         page.fill('input[placeholder="Enter password"]', 'admin123')
-        # Leave user role selected (default)
+        # Leave user role selected
         page.click('button.login-button')
         
         error = page.locator('.login-error')
@@ -191,9 +178,6 @@ class TestLoginFlow:
         assert "/login" in page.url
 
 
-# ============================================================================
-# ACCESSIBILITY TESTS
-# ============================================================================
 
 @pytest.mark.unit
 class TestLoginAccessibility:

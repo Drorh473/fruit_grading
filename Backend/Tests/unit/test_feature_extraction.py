@@ -10,11 +10,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from cnn.pre_trained_feature_map import (
     load_model,
-    extract_features_from_generator,
     flatten_features,
     temporal_pooling,
-    multi_view_fusion,
-    process_features
+    multi_view_fusion
 )
 
 
@@ -190,7 +188,6 @@ class TestTemporalPooling:
         
         pooled = temporal_pooling(flattened)
         
-        # Average should be [3.0, 5.0, 7.0]
         expected = np.array([3.0, 5.0, 7.0])
         # Access the 'features' key
         np.testing.assert_array_almost_equal(pooled['apple_obj001_0']['features'], expected)
@@ -321,12 +318,10 @@ class TestMultiViewFusion:
         pooled = {
             'obj001_0': {'features': np.array([1., 2.]), 'label': 0, 'fruit_type': 'test'},
             'obj001_1': {'features': np.array([3., 4.]), 'label': 0, 'fruit_type': 'test'}
-            # Only 2 cameras, but target is 4
         }
 
         fused = multi_view_fusion(pooled, target_views=4)
 
-        # With average pooling, only available views are averaged (no zero padding)
         # Average of [1,2] and [3,4] = [2,3]
         expected = np.array([2., 3.])
         np.testing.assert_array_equal(fused['obj001']['features'], expected)

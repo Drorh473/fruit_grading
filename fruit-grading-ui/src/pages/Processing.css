@@ -249,7 +249,7 @@
   transform: rotate(180deg);
 }
 
-/* Dropdown Options - positioned fixed to escape parent overflow */
+/* Dropdown Options */
 .select-options {
   position: absolute;
   top: calc(100% + 4px);

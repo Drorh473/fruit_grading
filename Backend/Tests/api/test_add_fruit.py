@@ -4,17 +4,14 @@ import io
 from PIL import Image
 from unittest.mock import patch
 
-# -------------------------------------------------------------------------
-# TARGET PATCH PATH
-# Based on your file path: Backend/routes/add_fruit.py
-# -------------------------------------------------------------------------
-# We try two likely variations to be safe:
-# 1. 'routes.add_fruit.process_new_fruit_folder' (if running from Backend/)
-# 2. 'backend.routes.add_fruit.process_new_fruit_folder' (if running from parent)
+''' 
+TARGET PATCH PATH
+Based on the file path: Backend/routes/add_fruit.py
 
-# We will use a try-except block in the test setup if needed, but for now, 
-# 'routes.add_fruit.process_new_fruit_folder' is the most probable correct path
-# because your previous errors showed `backend` as the rootdir.
+We try two likely variations to be safe:
+1. 'routes.add_fruit.process_new_fruit_folder' (if running from Backend/)
+2. 'backend.routes.add_fruit.process_new_fruit_folder' (if running from parent)
+'''
 
 TARGET_PATCH = 'routes.add_fruit.process_new_fruit_folder'
 
@@ -79,7 +76,7 @@ class TestUploadProcessEndpoint:
                                      data={'dataset': file_list},
                                      content_type='multipart/form-data')
 
-                # DEBUG: Print error if it fails
+                # Print error if it fails
                 if response.status_code != 200:
                     print(f"DEBUG ERROR: {response.data}")
 
@@ -144,8 +141,10 @@ class TestUploadProcessEndpoint:
 
 
 class TestUploadProcessValidation:
-
+    """Tests image file validation rules for the upload endpoint."""
+    
     def test_valid_extensions_accepted(self, client, tmp_path):
+        """Verifies all supported image formats (.jpg, .jpeg, .png, .bmp) are accepted."""
         with patch(TARGET_PATCH) as mock_process:
             mock_process.return_value = {'object_id': 'id', 'predicted_type': 'p', 'confidence': 1.0}
 
@@ -163,6 +162,7 @@ class TestUploadProcessValidation:
                 assert response.status_code == 200, f"Failed for extension {ext}"
 
     def test_multiple_images_per_angle(self, client, tmp_path):
+        """Verifies endpoint correctly processes batches with multiple images per camera angle."""    
         with patch(TARGET_PATCH) as mock_process:
             mock_process.return_value = {
                 'object_id': 'mock_multi',
@@ -198,8 +198,10 @@ class TestUploadProcessValidation:
 
 
 class TestUploadProcessResponse:
+    """Tests API response structure and data completeness for successful uploads."""
 
     def test_success_response_format(self, client, tmp_path):
+        """Verifies successful upload returns all required fields (objectId, predictedType, confidence, etc.)."""
         with patch(TARGET_PATCH) as mock_process:
             mock_process.return_value = {
                 'object_id': 'id_789',

@@ -24,7 +24,7 @@
   letter-spacing: -0.5px;
 }
 
-/* Page Description - Moved below header */
+/* Page Description */
 .page-description {
   padding: var(--spacing-lg) 0;
   margin-bottom: var(--spacing-lg);
