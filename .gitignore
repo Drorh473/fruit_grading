@@ -2,6 +2,7 @@ DataSets/
 gitignore.
 .vscode/
 .claude/
+./node_modules
 saved_models/
 *.pkl
 *.pth
