@@ -1,21 +1,103 @@
+
+# ── Python ────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyd
+*.pyo
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Package / build artifacts
+*.egg-info/
+*.egg
+build/
+dist/
+wheels/
+
+# Distribution / packaging
+MANIFEST
+
+
+# ── Testing (Python) ─────────────────────────────────────────
+.pytest_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# Test output files
+test-report.html
+test-screenshots/
+*.log
+
+
+# ── ML / Data artifacts ───────────────────────────────────────
 DataSets/
-gitignore.
-.vscode/
-.claude/
-./node_modules
 saved_models/
+
+# Model weight files
 *.pkl
 *.pth
 *.h5
 *.weights
-__pycache__/
-*.pyc
-*.pyo
-.env
-.env.test
-.DS_Store
+*.onnx
+*.pb
+*.pt
 
-
-# Confusion matrices and visualizations
+# Generated visualizations
 confusion_matrix.png
 confusion_matrix_normalized.png
+visuals/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+
+# ── Frontend / Node.js ────────────────────────────────────────
+node_modules/
+dist/
+
+# Vite cache
+.vite/
+*.timestamp-*
+
+# Environment files (local overrides — keep .env.example)
+.env
+.env.local
+.env.test
+.env.*.local
+
+# Test & coverage output
+coverage/
+lcov.info
+
+
+# ── OS files ─────────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+
+# ── IDE / Editor ──────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*.suo
+*.user
+*.iml
+*.iws
+.project
+.classpath
+
+
+# ── Misc ─────────────────────────────────────────────────────
+.claude/
+*.tmp
+*.bak
+*.orig
