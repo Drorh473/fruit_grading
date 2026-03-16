@@ -226,6 +226,26 @@ npm run preview
 
 ---
 
+## Dataset
+
+The fruit image dataset is hosted on Google Drive and is **not included in this repository** (binary files are excluded via `.gitignore`).
+
+**Download the dataset:**
+[Google Drive — Fruit Dataset](https://drive.google.com/drive/folders/1sgxQsTSwG7ZsJKxKEQO25T8rZxNCV5Qh?usp=drive_link)
+
+After downloading, extract the folder and point the `ORIGINAL_DATASET_PATH` environment variable at it (see Configuration below).
+
+The dataset directory should contain fruit images organized by grade:
+
+```
+original_dataset/
+├── premium/
+├── standard/
+└── market/
+```
+
+---
+
 ## Configuration
 
 Create a `.env` file in the `Backend/` directory with the following variables:
@@ -235,8 +255,8 @@ Create a `.env` file in the `Backend/` directory with the following variables:
 MONGO_CONNECTION_STRING=mongodb://localhost:27017/
 DB_NAME=fruit_grading
 
-# Dataset paths
-ORIGINAL_DATASET_PATH=/path/to/original/fruit/images
+# Dataset paths (point ORIGINAL_DATASET_PATH at the downloaded Drive folder)
+ORIGINAL_DATASET_PATH=/path/to/downloaded/fruit/images
 PROCESSED_DATASET_PATH=/path/to/processed/images
 STORED_DATASET_PATH=/path/to/stored/images
 
@@ -249,15 +269,6 @@ CAMERA_FPS=30
 
 # Training
 BATCH_SIZE=128
-```
-
-The dataset directory should contain fruit images organized by grade:
-
-```
-original_dataset/
-├── premium/
-├── standard/
-└── market/
 ```
 
 ---
