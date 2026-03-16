@@ -12,7 +12,7 @@
   --error: #e74c3c;
   --info: #3498db;
 
-  /* Neutral Colors */
+  /* Neutral Colors (dark theme defaults) */
   --bg-dark: #0d1117;
   --bg-medium: #161b22;
   --bg-light: #21262d;
@@ -32,6 +32,19 @@
   --transition-normal: 0.3s ease;
 }
 
+/* Light Theme Overrides — blue-toned with strong contrast */
+[data-theme="light"] {
+  --primary-dark: #b8d0ea;
+  --primary-medium: #ccdded;
+  --primary-light: #d6e8f4;
+  --bg-dark: #dbeafe;       /* blue-100: main page background */
+  --bg-medium: #eff6ff;     /* blue-50: card/panel background */
+  --bg-light: #bfdbfe;      /* blue-200: surface, sidebar headers */
+  --text-primary: #0f1d35;  /* very dark navy — high contrast */
+  --text-secondary: #2d4a72; /* medium blue — still readable */
+  --border: #93c5fd;         /* blue-300: clear borders */
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -46,6 +59,7 @@ body {
   -moz-osx-font-smoothing: grayscale;
   background-color: var(--bg-dark);
   color: var(--text-primary);
+  transition: background-color var(--transition-normal), color var(--transition-normal);
 }
 
 .app {
@@ -58,7 +72,8 @@ body {
   margin-left: 0;
   background-color: var(--bg-dark);
   min-height: 100vh;
-  transition: margin-left var(--transition-normal);
+  overflow-x: hidden;
+  transition: margin-left var(--transition-normal), background-color var(--transition-normal);
 }
 
 /* When sidebar is open, shift content to the right */
@@ -363,8 +378,13 @@ tr:hover {
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
 }
 
-/* Page Header Styles - No borders */
+/* Page Header Styles — authoritative base for all pages */
 .page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--spacing-md);
   margin-bottom: var(--spacing-xl);
   border: none;
 }
@@ -383,4 +403,50 @@ tr:hover {
   border: none;
   padding-bottom: 0;
   margin-bottom: 0;
+}
+
+/* Button group on the right side of page headers */
+.page-header .btn,
+.page-header .header-actions {
+  flex-shrink: 0;
+}
+
+/* ─── Responsive Breakpoints ───────────────────────────────── */
+
+/* Tablet */
+@media (max-width: 1024px) {
+  .grid-4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .page-header h1 {
+    font-size: 1.75rem;
+  }
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+  .grid-2,
+  .grid-3,
+  .grid-4 {
+    grid-template-columns: 1fr;
+  }
+
+  .page-header h1 {
+    font-size: 1.5rem;
+  }
+
+  .card {
+    padding: var(--spacing-md);
+  }
+
+  .table-container {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .card-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--spacing-sm);
+  }
 }

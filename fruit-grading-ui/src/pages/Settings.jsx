@@ -9,6 +9,7 @@ import {
   FiAlertCircle,
   FiLoader,
 } from "react-icons/fi";
+import PageHeader from "../components/PageHeader";
 import "./Settings.css";
 import {
   getSettings,
@@ -326,14 +327,10 @@ const Settings = () => {
 
   return (
     <div className="settings">
-      <div className="page-header">
-        <div>
-          <h1>Settings</h1>
-          <p className="page-subtitle">
-            Configure system parameters and connections
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        title="Settings"
+        subtitle="Configure system parameters and connections"
+      />
 
       {saveStatus && (
         <div

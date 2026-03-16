@@ -6,8 +6,10 @@ import {
   Navigate,
 } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
+import { ThemeProvider } from "./context/ThemeContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Sidebar from "./components/Sidebar";
+import ThemeToggle from "./components/ThemeToggle";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import UserDashboard from "./pages/UserDashboard";
@@ -37,14 +39,19 @@ function AppContent() {
   // Show login page if not authenticated
   if (!user) {
     return (
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route path="*" element={<Navigate to="/login" replace />} />
-      </Routes>
+      <>
+        {/* Fixed toggle on login — no page header available */}
+        <ThemeToggle fixed />
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="*" element={<Navigate to="/login" replace />} />
+        </Routes>
+      </>
     );
   }
 
   // Show app with sidebar for authenticated users
+  // ThemeToggle lives inside PageHeader on each page — not rendered here
   return (
     <div className="app">
       <Sidebar />
@@ -166,11 +173,13 @@ function AppContent() {
 // Main App component with AuthProvider
 function App() {
   return (
-    <Router>
-      <AuthProvider>
-        <AppContent />
-      </AuthProvider>
-    </Router>
+    <ThemeProvider>
+      <Router>
+        <AuthProvider>
+          <AppContent />
+        </AuthProvider>
+      </Router>
+    </ThemeProvider>
   );
 }
 

@@ -13,6 +13,7 @@ import {
   getDatasetInfo,
   getModelPerformance,
 } from "../utils/AdminDashboardApi";
+import PageHeader from "../components/PageHeader";
 import "./Dashboard.css";
 
 const Dashboard = () => {
@@ -155,13 +156,10 @@ const Dashboard = () => {
 
   return (
     <div className="dashboard">
-      <div className="page-header">
-        <div>
-          <h1>System Dashboard</h1>
-          <p className="page-subtitle">
-            Monitor your fruit grading system status and performance
-          </p>
-        </div>
+      <PageHeader
+        title="System Dashboard"
+        subtitle="Monitor your fruit grading system status and performance"
+      >
         <button
           className="btn btn-secondary"
           onClick={handleRefresh}
@@ -170,7 +168,7 @@ const Dashboard = () => {
           <FiRefreshCw className={loading ? "spinning" : ""} />
           Refresh
         </button>
-      </div>
+      </PageHeader>
 
       {error && (
         <div

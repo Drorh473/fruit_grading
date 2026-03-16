@@ -1,6 +1,9 @@
 .processing {
   padding: var(--spacing-xl);
   max-width: 1600px;
+  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 /* Add spacing between all cards */
@@ -387,6 +390,12 @@
 }
 
 /* Responsive */
+@media (max-width: 1024px) {
+  .processing {
+    padding: var(--spacing-lg);
+  }
+}
+
 @media (max-width: 768px) {
   .processing {
     padding: var(--spacing-md);

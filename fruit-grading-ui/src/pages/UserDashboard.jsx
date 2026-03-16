@@ -12,6 +12,7 @@ import {
   getUserDashboardStats,
   getRecentResults,
 } from "../utils/UserDashboardApi";
+import PageHeader from "../components/PageHeader";
 import "./UserDashboard.css";
 
 const UserDashboard = () => {
@@ -67,12 +68,10 @@ const UserDashboard = () => {
   if (loading) {
     return (
       <div className="user-dashboard">
-        <div className="page-header">
-          <div>
-            <h1>Welcome, {user?.username}</h1>
-            <p className="page-subtitle">Loading dashboard data...</p>
-          </div>
-        </div>
+        <PageHeader
+          title={`Welcome, ${user?.username}`}
+          subtitle="Loading dashboard data..."
+        />
         <div className="card">
           <div
             style={{
@@ -91,13 +90,10 @@ const UserDashboard = () => {
 
   return (
     <div className="user-dashboard">
-      <div className="page-header">
-        <div>
-          <h1>Welcome, {user?.username}</h1>
-          <p className="page-subtitle">
-            Operator Dashboard - View Classification Results
-          </p>
-        </div>
+      <PageHeader
+        title={`Welcome, ${user?.username}`}
+        subtitle="Operator Dashboard - View Classification Results"
+      >
         <button
           className="btn btn-secondary"
           onClick={handleRefresh}
@@ -106,7 +102,7 @@ const UserDashboard = () => {
           <FiRefreshCw className={refreshing ? "spinning" : ""} />
           {refreshing ? "Refreshing..." : "Refresh"}
         </button>
-      </div>
+      </PageHeader>
 
       {/* Error Alert */}
       {error && (

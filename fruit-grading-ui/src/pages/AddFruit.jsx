@@ -9,6 +9,7 @@ import {
   FiPlus,
 } from "react-icons/fi";
 import { uploadAndProcessFruit } from "../utils/AddFruitApi";
+import PageHeader from "../components/PageHeader";
 import "./AddFruit.css";
 
 const AddFruit = () => {
@@ -251,12 +252,10 @@ const AddFruit = () => {
         </div>
       )}
 
-      <div className="page-header">
-        <div>
-          <h1>Add New Fruit</h1>
-          <p className="page-subtitle">Add and classify a new fruit object</p>
-        </div>
-      </div>
+      <PageHeader
+        title="Add New Fruit"
+        subtitle="Add and classify a new fruit object"
+      />
 
       {error && (
         <div

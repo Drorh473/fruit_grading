@@ -6,6 +6,7 @@ import {
   FiAlertCircle,
   FiCheckCircle,
 } from "react-icons/fi";
+import PageHeader from "../components/PageHeader";
 import "./CameraMonitor.css";
 
 const CameraMonitor = ({ systemStatus }) => {
@@ -89,23 +90,20 @@ const CameraMonitor = ({ systemStatus }) => {
 
   return (
     <div className="camera-monitor">
-      <div className="page-header">
-        <div>
-          <h1>Camera Monitor</h1>
-          <p className="page-subtitle">
-            Real-time camera feed visualization and system health
-          </p>
+      <PageHeader
+        title="Camera Monitor"
+        subtitle="Real-time camera feed visualization and system health"
+        extra={
           <p className="last-update">
             Last updated: {lastUpdate.toLocaleTimeString()}
           </p>
-        </div>
-        <div className="header-actions">
-          <button className="btn btn-primary" onClick={handleRefreshAll}>
-            <FiRefreshCw />
-            Refresh All
-          </button>
-        </div>
-      </div>
+        }
+      >
+        <button className="btn btn-primary" onClick={handleRefreshAll}>
+          <FiRefreshCw />
+          Refresh All
+        </button>
+      </PageHeader>
 
       {/* Camera Grid View */}
       <div className="camera-grid">

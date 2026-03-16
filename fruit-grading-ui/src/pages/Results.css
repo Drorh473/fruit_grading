@@ -1,6 +1,9 @@
 .results {
   padding: var(--spacing-xl);
   max-width: 1600px;
+  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 /* Refresh button spin animation */
@@ -569,6 +572,10 @@ code {
 
   .alerts-sidebar {
     order: -1;
+  }
+
+  .results {
+    padding: var(--spacing-lg);
   }
 }
 

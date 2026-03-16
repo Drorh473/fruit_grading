@@ -13,6 +13,7 @@ import {
   getPipelineLogs,
   getPipelineConfig,
 } from "../utils/processingApi";
+import PageHeader from "../components/PageHeader";
 import "./Processing.css";
 
 const Processing = ({ setProcessingStats }) => {
@@ -250,35 +251,30 @@ const Processing = ({ setProcessingStats }) => {
 
   return (
     <div className="processing">
-      <div className="page-header">
-        <div>
-          <h1>Processing Pipeline</h1>
-          <p className="page-subtitle">
-            Run the complete ML pipeline from data to model
-          </p>
-        </div>
-        <div className="header-actions">
-          <button
-            className="btn btn-secondary"
-            onClick={handleRefresh}
-            disabled={isProcessing}
-          >
-            <FiRefreshCw />
-            Refresh
+      <PageHeader
+        title="Processing Pipeline"
+        subtitle="Run the complete ML pipeline from data to model"
+      >
+        <button
+          className="btn btn-secondary"
+          onClick={handleRefresh}
+          disabled={isProcessing}
+        >
+          <FiRefreshCw />
+          Refresh
+        </button>
+        {!isProcessing ? (
+          <button className="btn btn-primary" onClick={handleStart}>
+            <FiPlay />
+            Start Pipeline
           </button>
-          {!isProcessing ? (
-            <button className="btn btn-primary" onClick={handleStart}>
-              <FiPlay />
-              Start Pipeline
-            </button>
-          ) : (
-            <button className="btn btn-danger" onClick={handleStop}>
-              <FiSquare />
-              Stop
-            </button>
-          )}
-        </div>
-      </div>
+        ) : (
+          <button className="btn btn-danger" onClick={handleStop}>
+            <FiSquare />
+            Stop
+          </button>
+        )}
+      </PageHeader>
 
       {error && (
         <div className="alert alert-error">

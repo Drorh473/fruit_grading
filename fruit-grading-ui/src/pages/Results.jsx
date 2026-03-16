@@ -11,6 +11,7 @@ import {
   FiAlertCircle,
   FiRefreshCw,
 } from "react-icons/fi";
+import PageHeader from "../components/PageHeader";
 import "./Results.css";
 import {
   getTestPredictions,
@@ -157,11 +158,10 @@ const Results = () => {
 
   return (
     <div className="results">
-      <div className="page-header">
-        <div>
-          <h1>Classification Results</h1>
-          <p className="page-subtitle">Model predictions on test set objects</p>
-        </div>
+      <PageHeader
+        title="Classification Results"
+        subtitle="Model predictions on test set objects"
+      >
         <button
           className="btn btn-secondary"
           onClick={handleRefresh}
@@ -170,7 +170,7 @@ const Results = () => {
           <FiRefreshCw className={refreshing ? "spin" : ""} />
           {refreshing ? "Refreshing..." : "Refresh"}
         </button>
-      </div>
+      </PageHeader>
 
       {/* KPI Cards */}
       {kpis && (

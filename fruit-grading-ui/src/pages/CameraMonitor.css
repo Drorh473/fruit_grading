@@ -1,18 +1,15 @@
 .camera-monitor {
   padding: var(--spacing-xl);
   max-width: 1600px;
-}
-
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: var(--spacing-xl);
+  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .header-actions {
   display: flex;
   gap: var(--spacing-md);
+  align-items: center;
 }
 
 .last-update {
@@ -419,6 +416,10 @@
 @media (max-width: 1200px) {
   .camera-health-metrics {
     grid-template-columns: 1fr;
+  }
+
+  .camera-monitor {
+    padding: var(--spacing-lg);
   }
 }
 
