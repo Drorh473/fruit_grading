@@ -1,32 +1,22 @@
-# ─────────────────────────────────────────────────────────────
-# Frontend E2E & Integration Test Dependencies
-# Python/Playwright-based test suite for fruit-grading-ui
-#
-# Install:  pip install -r requirements-test.txt
-# Browsers: playwright install chromium
-# Run:      pytest Tests/ -v
-# ─────────────────────────────────────────────────────────────
-
-# ── Core test runner ──────────────────────────────────────────
+#Core test runner 
 pytest==8.3.4
-pytest-asyncio==0.24.0          # async test support (future-proofing)
+pytest-asyncio==0.24.0          
 
-# ── Playwright browser automation ─────────────────────────────
+#Playwright browser automation 
 playwright==1.49.1
 pytest-playwright==0.6.2
 
-# ── Reporting ─────────────────────────────────────────────────
-pytest-html==4.1.1              # HTML test report (--html=test-report.html)
-pytest-cov==6.0.0               # Coverage integration
-coverage==7.6.8                 # Coverage engine (used by pytest-cov)
+#Reporting
+pytest-html==4.1.1             
+pytest-cov==6.0.0               
+coverage==7.6.8                 
 
-# ── Performance & parallelism ─────────────────────────────────
-pytest-timeout==2.3.1           # Per-test timeout (timeout = 30 in pytest.ini)
-pytest-xdist==3.6.1             # Parallel test execution (-n auto)
+#Performance & parallelism 
+pytest-timeout==2.3.1           
+pytest-xdist==3.6.1             
 
-# ── HTTP / API testing ────────────────────────────────────────
-requests==2.32.3                # Used in conftest.py api_client fixture
-                                # and helpers.py make_api_request
-
-# ── Utilities ─────────────────────────────────────────────────
-python-dotenv==1.0.1            # Load BASE_URL / API_URL from .env if needed
+#HTTP / API testing
+requests==2.32.3                
+                      
+#Utilities 
+python-dotenv==1.0.1           
